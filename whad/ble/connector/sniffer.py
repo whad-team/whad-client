@@ -329,6 +329,9 @@ class Sniffer(BLE, EventsManager):
         if not self.started:
             if not self.start():
                 raise WhadDeviceNotReady()
+            stop_on_exit = True
+        else:
+            stop_on_exit = False
 
         start = time()
         try:
@@ -352,6 +355,10 @@ class Sniffer(BLE, EventsManager):
                             self.__access_addresses[aa].update(timestamp=timestamp, rssi=rssi)
                         yield self.__access_addresses[aa]
 
+                    # Enforce timeout
+                    if timeout is not None and (time() - start) > timeout:
+                        break
+
             elif self.__configuration.active_connection is not None:
                 message = self.wait_for_message(keep=message_filter(Synchronized),
                                                 timeout=0.1)
@@ -372,6 +379,10 @@ class Sniffer(BLE, EventsManager):
                                     self.monitor_packet_rx(packet)
                                     yield packet
 
+                            # Enforce timeout
+                            if timeout is not None and (time() - start) > timeout:
+                                break
+
             else:
                 if self.support_raw_pdu():
                     message_type = BleRawPduReceived
@@ -388,7 +399,16 @@ class Sniffer(BLE, EventsManager):
                             self.monitor_packet_rx(packet)
                             yield packet
 
+                    # Enforce timeout
+                    if timeout is not None and (time() - start) > timeout:
+                        break
+
 
         # Handle device disconnection
         except WhadDeviceDisconnected:
             return
+
+        # Stop current mode if we started it in the first place
+        if stop_on_exit:
+            if not self.stop():
+                raise WhadDeviceNotReady()
