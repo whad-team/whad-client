@@ -22,7 +22,8 @@ from .uart import Uart
 from .tcp import TcpSocket
 
 # Load supported virtual interfaces
-from .hci import Hci
+#from .hci import Hci
+from .hci import HciLoader
 from .pcap import Pcap
 from .apimote import Apimote
 from .rfstorm import RfStorm
@@ -47,7 +48,7 @@ __all__ = [
     "WhadVirtualDevice",
     "WhadDeviceConnector",
     "LockedConnector",
-    
+
     # Virtual devices
     "Hci",
     "Pcap",

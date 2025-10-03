@@ -214,6 +214,20 @@ class DevOutThread(Thread):
                 return
 
 
+class DeviceLoader:
+    """
+    WHAD lazy device loader.
+    """
+    @classmethod
+    def get_loaders(cls):
+        """
+        Return available loaders.
+        """
+        # List every available device class
+        device_loaders = {}
+        for device_loader in cls.__subclasses__():
+            device_loaders[device_loader.INTERFACE_NAME] = device_loader
+        return device_loaders
 
 class Device:
     """WHAD hardware interface
@@ -297,6 +311,30 @@ class Device:
 
         # Return interface or raise an exception
         raise WhadDeviceNotFound()
+
+    @classmethod
+    def find(cls, interface_string):
+        '''
+        Create a specific device according to the provided interface string,
+        formed as follows:
+
+        <device_type>[device_index][:device_identifier]
+
+        Examples:
+            - `uart` or `uart0`: defines the first compatible UART device available
+            - `uart1`: defines the second compatible UART device available
+            - `uart:/dev/ttyACMO`: defines a compatible UART device identified
+              by `/dev/tty/ACMO`
+            - `ubertooth` or `ubertooth0`: defines the first available Ubertooth device
+            - `ubertooth:11223344556677881122334455667788`: defines a Ubertooth
+              device with serial number *11223344556677881122334455667788*
+        '''
+        loaders = DeviceLoader.get_loaders()
+        print(loaders)
+        devtype = re.match('^([^0-9:]+)(([0-9]+)|(:.+))?$', interface_string)
+        if devtype is not None and devtype.group(1) in loaders:
+            return loaders[devtype.group(1)].create(interface_string)
+        return None
 
 
     @classmethod
@@ -923,7 +961,7 @@ class Device:
 class VirtualDevice(Device):
     """
     Virtual interface implementation.
-    
+
     This variant of the base Interface class provides a way to emulate an interface
     compatible with WHAD. This emulated compatible interface is used as an adaptation
     layer between WHAD's core and third-party hardware that does not run a WHAD-enabled
