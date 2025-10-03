@@ -5,6 +5,7 @@ basic BLE-related methods for the attached interface.
 """
 import struct
 import logging
+from typing import Optional
 
 # Scapy
 from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_DATA, BTLE_ADV_IND, \
@@ -69,6 +70,7 @@ class BLE(Connector):
         If `auto` is set to False, PDUs must be processed manually and
         won't be forwarded to PDU-related callbacks.
         """
+        self.__started = False
         self.__ready = False
         super().__init__(device)
 
@@ -95,6 +97,11 @@ class BLE(Connector):
 
         # Set synchronous mode if provided
         self.enable_synchronous(synchronous)
+
+    @property
+    def started(self) -> bool:
+        """Check if selected mode is started."""
+        return self.__started
 
     def close(self):
         """Close BLE device
@@ -572,9 +579,9 @@ class BLE(Connector):
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
-    def connect_to(self, bd_addr: BDAddress, random: bool = False, access_address: int = None, \
-                   channel_map: ChannelMap = None, crc_init: int = None, hop_interval: int = None, \
-                   hop_increment: int = None):
+    def connect_to(self, bd_addr: BDAddress, random: Optional[bool] = False, access_address: Optional[int] = None,
+                   channel_map: Optional[ChannelMap] = None, crc_init: Optional[int] = None, hop_interval: Optional[int] = None,
+                   hop_increment: Optional[int] = None):
         """
         Initiate a Bluetooth Low Energy connection.
         """
@@ -595,17 +602,24 @@ class BLE(Connector):
         """
         Start currently enabled mode.
         """
-        logger.info('starting current BLE mode ...')
+        if not self.__started:
+            logger.info('starting current BLE mode ...')
+            # Create and send a Start message
+            msg = self.hub.ble.create_start()
+            resp = self.send_command(msg, message_filter(CommandResult))
 
-        # Create a Start message
-        msg = self.hub.ble.create_start()
+            # Check result
+            if isinstance(resp, Success):
+                logger.info('current BLE mode successfully started')
+                self.__started = True
+            else:
+                logger.info('an error occured while starting !')
+                self.__started = False
 
-        resp = self.send_command(msg, message_filter(CommandResult))
-        if isinstance(resp, Success):
-            logger.info('current BLE mode successfully started')
+            return self.__started
         else:
-            logger.info('an error occured while starting !')
-        return isinstance(resp, Success)
+            logger.debug("starting current BLE mode, ignoring (already started)")
+            return True
 
     def disconnect(self, conn_handle):
         """Terminate a specific connection.
@@ -624,18 +638,31 @@ class BLE(Connector):
         """
         Stop currently enabled mode.
         """
-        logger.debug("Stopping BLE connector ...")
-        # Create a Stop message
-        msg = self.hub.ble.create_stop()
+        if self.__started:
+            logger.debug("stopping BLE connector ...")
 
-        resp = self.send_command(msg, message_filter(CommandResult))
+            # Create and send a Stop message
+            msg = self.hub.ble.create_stop()
+            resp = self.send_command(msg, message_filter(CommandResult))
 
-        # Remove all triggers
-        for trigger in self.__triggers:
-            trigger.connector = None
-        self.__triggers = []
+            # Successfully stopped ?
+            if isinstance(resp, Success):
+                # Remove all triggers
+                for trigger in self.__triggers:
+                    trigger.connector = None
+                self.__triggers = []
 
-        return isinstance(resp, Success)
+                # Connector is now stopped.
+                self.__started = False
+
+                logger.debug("BLE connector is now stopped.")
+                return True
+
+            # Return result.
+            return False
+        else:
+            logger.debug("Stopping current BLE connector, ignored (already stopped)")
+            return True
 
     def set_encryption(self, conn_handle, enabled=False, ll_key=None, ll_iv=None,
                        key=None, rand=None, ediv=None):
@@ -1454,17 +1481,24 @@ class BLENew(Connector):
         """
         Start currently enabled mode.
         """
-        logger.info('starting current BLE mode ...')
+        if not self.__started:
+            logger.info('starting current BLE mode ...')
+            # Create and send a Start message
+            msg = self.hub.ble.create_start()
+            resp = self.send_command(msg, message_filter(CommandResult))
 
-        # Create a Start message
-        msg = self.hub.ble.create_start()
+            # Check result
+            if isinstance(resp, Success):
+                logger.info('current BLE mode successfully started')
+                self.__started = True
+            else:
+                logger.info('an error occured while starting !')
+                self.__started = False
 
-        resp = self.send_command(msg, message_filter(CommandResult))
-        if isinstance(resp, Success):
-            logger.info('current BLE mode successfully started')
+            return self.__started
         else:
-            logger.info('an error occured while starting !')
-        return isinstance(resp, Success)
+            logger.debug("starting current BLE mode, ignoring (already started)")
+            return True
 
     def disconnect(self, conn_handle):
         """Terminate a specific connection.

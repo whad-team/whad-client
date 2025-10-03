@@ -28,12 +28,33 @@ def test_sniffer_create(sniff_mock):
     """Test creating a Bluetooth sniffer.
     """
     sniffer = Sniffer(sniff_mock)
-    sniffer.start()
     packets = []
     for packet in sniffer.sniff(timeout=2.0):
         packets.append(packet)
         break
     sniffer.stop()
+    assert packets[0][BTLE_ADV_IND].AdvA == "00:11:22:33:44:55"
+
+def test_sniffer_create_with_forced_start(sniff_mock):
+    """Test creating a Bluetooth sniffer.
+    """
+    sniffer = Sniffer(sniff_mock)
+    packets = []
+    sniffer.start()
+    for packet in sniffer.sniff(timeout=2.0):
+        packets.append(packet)
+        break
+    sniffer.stop()
+    assert packets[0][BTLE_ADV_IND].AdvA == "00:11:22:33:44:55"
+
+def test_sniffer_create_with_context(sniff_mock):
+    """Test creating a Bluetooth sniffer.
+    """
+    packets = []
+    with Sniffer(sniff_mock) as sniffer:
+        for packet in sniffer.sniff(timeout=2.0):
+            packets.append(packet)
+            break
     assert packets[0][BTLE_ADV_IND].AdvA == "00:11:22:33:44:55"
 
 def test_sniffer_channel_set(sniff_mock):
@@ -48,7 +69,6 @@ def test_sniffer_channel_set(sniff_mock):
     sniffer.configuration = sniffer_cfg
 
     # Sniff for advertisement data
-    sniffer.start()
     packets = []
     for packet in sniffer.sniff(timeout=2.0):
         packets.append(packet)
@@ -67,7 +87,6 @@ def test_sniffer_channel_default(sniff_mock):
     sniffer.configuration = sniffer_cfg
 
     # Sniff for advertisement data
-    sniffer.start()
     packets = []
     for packet in sniffer.sniff(timeout=2.0):
         packets.append(packet)
@@ -87,7 +106,6 @@ def test_sniffer_address_filter_match(sniff_mock):
     sniffer.configuration = sniffer_cfg
 
     # Sniff for advertisement data
-    sniffer.start()
     packets = []
     for packet in sniffer.sniff(timeout=2.0):
         packets.append(packet)
@@ -116,7 +134,6 @@ def test_sniffer_address_filter_nomatch(sniff_mock):
     sniffer.configuration = sniffer_cfg
 
     # Sniff for advertisement data
-    sniffer.start()
     packets = []
     for packet in sniffer.sniff(timeout=0.5):
         packets.append(packet)
