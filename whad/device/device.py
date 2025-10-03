@@ -1,4 +1,58 @@
-"""WHAD new hardware interface
+"""
+WHAD provides various classes to interact with WHAD-enabled hardware:
+
+- :py:class:`whad.device.device.Device`
+- :py:class:`whad.device.device.VirtualDevice`
+
+Class :class:`whad.device.device.Device` is the default class that allows WHAD devices
+enumeration and access. It is the main class to use to open any device, through
+its :method:`whad.device.Device.create` method as shown below:
+
+.. code-block:: python
+
+    from whad.device import Device
+
+    dev = Device.create("uart0")
+
+The :py:class:`whad.device.device.VirtualDevice` shall not be directly used. This class
+is used to add support for incompatible WHAD devices like the *Ubertooth*
+or the *ApiMote* and acts as an adaptation layer between the underlying WHAD
+protocol and the specific protocol used by the target hardware.
+
+.. important::
+
+    The :py:class:`whad.device.device.WhadDevice` class that is still defined in WHAD (and used
+    in some old example scripts or documentation) is an alias for the new
+    :py:class:`whad.device.Device` class, and is meant to be deprecated in the future.
+    This old class has been renamed to ``Device`` for clarity, and the same happened
+    with the old default connector class :py:class:`whad.device.connector.WhadConnector`
+    that has been renamed to :py:class:`whad.device.connector.Connector`.
+
+    These old classes will be marked as *deprecated* in a future release, with a
+    specific EOL date announced. A warning message will be issued in case one of
+    these classes is used in a script or a tool to give time to users to migrate
+    to the new ones (renaming classes is enough to switch to the new implementation,
+    APIs stay the same).
+
+Default device classes
+----------------------
+
+.. autoclass:: whad.device.device.Device
+    :members:
+
+.. autoclass:: whad.device.device.VirtualDevice
+    :show-inheritance:
+    :members:
+
+Old device classes to be deprecated in the future
+-------------------------------------------------
+
+.. autoclass:: whad.device.device.WhadDevice
+    :show-inheritance:
+
+.. autoclass:: whad.device.device.WhadVirtualDevice
+    :show-inheritance:
+
 """
 import re
 import logging
@@ -1090,7 +1144,11 @@ class VirtualDevice(Device):
 
 
 class WhadDevice(Device):
-    """Renamed to `Device` for clarity, will be deprecated later."""
+    """
+    This class is an alias for :py:class:`whad.device.device.Device`,
+    and will be deprecated in a near future. This class has been introduced
+    in a previous version of WHAD and has been renamed for clarity purpose.
+    """
 
     @classmethod
     def create_inst(cls, interface_string):
@@ -1108,7 +1166,11 @@ class WhadDevice(Device):
         return Device.check_interface(interface)
 
 class WhadVirtualDevice(VirtualDevice):
-    """Renamed to `VirtualDevice` for clarity, will be deprecated later."""
+    """
+    This class is an alias for :py:class:`whad.device.device.VirtualDevice`,
+    and will be deprecated in a near future. This class has been introduced
+    in a previous version of WHAD and has been renamed for clarity purpose.
+    """
 
     @classmethod
     def create_inst(cls, interface_string):

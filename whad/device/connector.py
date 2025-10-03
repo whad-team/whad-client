@@ -1,17 +1,54 @@
 """
-WHAD default device connector module.
+Connectors
+----------
 
-This module provides a default connector class `WhadDeviceConnector` that
-implements all the basic features of a device connector:
+*Connectors* in WHAD are dedicated classes used to connect an *application*
+to a WHAD compatible hardware (any compatible *device*) in order to provide
+a set of features. We can see a *connector* as a role applied to a device,
+usually related to a *domain* (or *wireless protocol*), that exposes methods
+to perform various tasks that rely on a subset of commands supported by the
+hardware.
 
-- Sending and receiving messages
-- A synchronous mode used for message sniffing and processing
-- A locked mode (enabled by default) to temporarily save messages while the connector
-  is initializing (no more message lost)
-- A dedicated notification manager and basic notification class to allow external objects
-  to subscribe for specific notifications.
+*Connectors* shall ensure the device they are linked to does support the
+target domain and a mimimal set of commands, and can tailor its behavior
+depending on the capabilities of the hardware. If a *connector* is linked
+to a device that either does not support the *domain* this *connector* is
+supposed to operate or lacks specific *commands*, a
+:py::class:`whad.exceptions.UnsupportedDomain` exception or a
+:py:class:`whad.exceptions.UnsupportedCapability` may be raised.
 
+Default connector features
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+WHAD provides a default connector class, :py:class:`whad.device.connector.Connector`,
+that implements a set of features out-of-the-box:
+
+- Packet and message sniffing and processing
+- Event notification mechanism
+- Synchronous mode
+
+Sniffing packet and messages could be useful to implement packet sniffers or
+intercept some specific events like disconnection of the linked hardware device.
+Most of the time this feature is used to sniff packets related to a target domain.
+The :py:function:`whad.device.connector.Connector.sniff` method is specifically
+tailored for this use. When not sniffing, packets received from the hardware device
+are forwarded to the connector's packet processing methods than can be overriden by
+inheriting classes.
+
+By default, the default connector class provides methods to add and remove custom
+event listeners (:py:function:`whad.device.connector.Connector.add_listener` and
+:py:function:`whad.device.connector.Connector.remove_listener`), and an additional
+method to send an event to the registered listeners (:py:function:`whad.device.connector.Connector.notify`).
+
+Last but not least, the provided *synchronous mode* will disable packet forwarding
+and save all received packets in a reception queue, waiting for the application to
+retrieve and process them. Service messages will still be processed by the *connector*,
+in order to handle any device disconnection or other unexpected event that may occur.
+When this *synchronous mode* is disabled, every unprocessed packet stored in the
+reception queue are automatically forwarded to the connector's packet processing
+methods, and will be then dispatched to the corresponding handlers.
 """
+
 import logging
 import contextlib
 from time import time
@@ -887,4 +924,8 @@ class LockedConnector(Connector):
 
 
 class WhadDeviceConnector(Connector):
-    """Old class"""
+    """
+    This class is an alias for :py:class:`whad.device.connector.Connector`,
+    and will be deprecated in a near future. This class has been introduced
+    in a previous version of WHAD and has been renamed for clarity purpose.
+    """
