@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 class DeviceEvt:
     """Device event.
     """
-    def __init__(self, device: 'Device'):
+    def __init__(self, device: Optional['Device'] = None):
         self.__device = device
 
     @property
@@ -37,7 +37,8 @@ class DeviceEvt:
     def __repr__(self) -> str:
         """Printable representation of this event
         """
-        return f"DeviceEvt(iface='{self.device.interface}')"
+        iface = self.device.interface if self.device is not None else 'undefined'
+        return f"DeviceEvt(iface='{iface}')"
 
 class Disconnected(DeviceEvt):
     """Interface has disconnected.
@@ -45,7 +46,8 @@ class Disconnected(DeviceEvt):
     def __repr__(self) -> str:
         """Printable representation of this event.
         """
-        return f"Disconnected(device='{self.device.interface}')"
+        iface = self.device.interface if self.device is not None else 'undefined'
+        return f"Disconnected(device='{iface}')"
 
 class MessageReceived(DeviceEvt):
     """Message has been received.
@@ -55,14 +57,15 @@ class MessageReceived(DeviceEvt):
         self.__message = message
 
     @property
-    def message(self) -> HubMessage:
+    def message(self) -> Optional[HubMessage]:
         """Received message."""
         return self.__message
 
     def __repr__(self) -> str:
         """Printable representation of this event.
         """
-        return f"MessageReceived(device='{self.device.interface}')"
+        iface = self.device.interface if self.device is not None else 'undefined'
+        return f"MessageReceived(device='{iface}')"
 
 class DevInThread(Thread):
     """Internal thread processing data sent by the connector to the
