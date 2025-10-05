@@ -343,7 +343,7 @@ class TCPSocketConnector(Connector):
                             # Is socket closed ?
                             if len(data) == 0:
                                 # Exit serve loop
-                                raise WhadDeviceDisconnected()
+                                break
 
                             # Process received data
                             self.on_data_received(data)

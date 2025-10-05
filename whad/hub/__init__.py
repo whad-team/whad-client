@@ -8,7 +8,7 @@ the way protocol buffers messages are created by mapping some of their propertie
 to protobuf messages fields.
 """
 import logging
-from typing import Union
+from typing import Union, Type, Optional
 
 # Load default Python's `StrEnum` class for Python >= 3.11
 # and rely on `StrEnum` package to provide this class for
@@ -70,6 +70,7 @@ class ProtocolHub(Registry):
         """Instantiate a WHAD protocol hub for a specific version.
         """
         self.__version = proto_version
+        self.__cache = {}
 
     @property
     def version(self) -> int:
@@ -103,7 +104,53 @@ class ProtocolHub(Registry):
     def unifying(self):
         return self.get('unifying')
 
-    def get(self, factory: str):
+    def load(self, factory: str) -> Optional[Type[Registry]]:
+        """Lazy loading of factory class (dedicated registry).
+
+        :param factory: Factory alias to load
+        :type  factory: str
+        :return: Factory class
+        :rtype: Registry
+        """
+        if factory == 'generic':
+            from .generic import Generic
+            return Generic
+        elif factory == 'discovery':
+            from .discovery import Discovery
+            return Discovery
+        elif factory == 'ble':
+            from .ble import BleDomain
+            return BleDomain
+        elif factory == 'dot15d4':
+            from .dot15d4 import Dot15d4Domain
+            return Dot15d4Domain
+        elif factory == 'esb':
+            from .esb import EsbDomain
+            return EsbDomain
+        elif factory == 'phy':
+            from .phy import PhyDomain
+            return PhyDomain
+        elif factory == 'unifying':
+            from .unifying import UnifyingDomain
+            return UnifyingDomain
+
+        # Not found
+        logger.warning(
+            "[protohub::load()] cannot dynamically load message definitions for domain %s !",
+            factory
+        )
+        return None
+
+    def get(self, factory: str) -> Registry:
+        """
+        Dynamically load registry bound to a specific domain
+        and find the corresponding factory class.
+
+        :param factory: factory name to load.
+        :type  factory: str
+        """
+        if factory not in self.__cache:
+            self.__cache[factory] = self.load(factory)
         return ProtocolHub.bound(factory, self.__version)(self.__version)
 
     def parse(self, data: Union[Message, bytes]):
@@ -123,7 +170,14 @@ class ProtocolHub(Registry):
         else:
             return None
 
-        # Only process generic messages
+        # Identify the message base type and ensure the corresponding
+        # factory has been loaded.
+        msg_type = msg.WhichOneof('msg')
+        if msg_type not in self.__cache:
+            self.__cache[msg_type] = self.load(msg_type)
+
+        # Process incoming message, forward to corresponding sub-registries
+        # following the defined registry hierarchy.
         return ProtocolHub.bound(
             msg.WhichOneof('msg'),
             self.__version).parse(self.__version, msg)
@@ -153,12 +207,3 @@ class ProtocolHub(Registry):
 
         return msg
 
-
-
-from .generic import Generic
-from .discovery import Discovery
-from .ble import BleDomain
-from .dot15d4 import Dot15d4Domain
-from .phy import PhyDomain
-from .esb import EsbDomain
-from .unifying import UnifyingDomain

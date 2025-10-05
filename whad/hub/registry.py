@@ -3,6 +3,9 @@
 This module implements the Registry class used in automated protocol buffers
 messages parsing.
 """
+from typing import Optional
+from scapy.packet import Packet
+
 from .exceptions import UnsupportedVersionException
 
 class Registry:
@@ -42,3 +45,13 @@ class Registry:
 
         # If not found, raise exception
         raise UnsupportedVersionException(name, version)
+
+    def is_packet_compat(self, packet: Packet) -> bool:
+        """Default method to determine if a packet is compatible or not."""
+        return False
+
+
+    def convert_packet(self, packet) -> Optional['HubMessage']:
+        """Default packet conversion method."""
+        return None
+

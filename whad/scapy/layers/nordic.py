@@ -1,4 +1,10 @@
-from scapy.all import *
+from scapy.fields import (
+    Field, XByteField, ShortField, ByteField, LEShortField, LEIntField,
+)
+from scapy.config import conf
+from scapy.packet import Packet, bind_layers
+from scapy.utils import str2mac, mac2str
+from scapy.volatile import RandMAC
 from scapy.layers.bluetooth4LE import BTLE
 
 class LEMACField(Field):
