@@ -4,20 +4,20 @@ import re
 import logging
 import contextlib
 from time import time
-from typing import Generator, Callable, Union
+from typing import Generator, Callable, Union, Type, Optional
 from threading import Thread, Lock
 from queue import Queue, Empty
 
 from whad.helpers import message_filter
-from whad.exceptions import WhadDeviceNotReady, WhadDeviceError, \
-    WhadDeviceTimeout, WhadDeviceDisconnected, WhadDeviceNotFound
-
+from whad.exceptions import (
+    WhadDeviceNotReady, WhadDeviceError, WhadDeviceTimeout, WhadDeviceDisconnected,
+    WhadDeviceNotFound,
+)
 from whad.hub import ProtocolHub
 from whad.hub.message import HubMessage
-from whad.hub.generic.cmdresult import CommandResult, ResultCode
+from whad.hub.generic.cmdresult import CommandResult
 from whad.hub.discovery import InfoQueryResp, DomainInfoQueryResp, DeviceReady
 from whad.hub.discovery import DeviceType
-
 
 from .info import DeviceInfo
 
@@ -26,11 +26,11 @@ logger = logging.getLogger(__name__)
 class DeviceEvt:
     """Device event.
     """
-    def __init__(self, device = None):
+    def __init__(self, device: 'Device'):
         self.__device = device
 
     @property
-    def device(self) -> 'Device':
+    def device(self) -> Optional['Device']:
         """Related device"""
         return self.__device
 
@@ -222,6 +222,34 @@ class Device:
     # Should be lowercase.
     INTERFACE_NAME = None
 
+    @staticmethod
+    def get_all_ifaces():
+        """Load all known interfaces."""
+        # Base transport
+        from .uart import Uart
+        from .hci import Hci
+        from .tcp import TcpSocket
+        from .unix import UnixSocket
+        # Virtual transport
+        from .apimote import Apimote
+        from .pcap import Pcap
+        from .rfstorm import RfStorm
+        from .rzusbstick import RzUsbStick
+        from .ubertooth import Ubertooth
+        from .yard import YardStickOne
+        return [
+            Uart,
+            Hci,
+            TcpSocket,
+            UnixSocket,
+            Pcap,
+            Apimote,
+            RfStorm,
+            RzUsbStick,
+            Ubertooth,
+            YardStickOne
+        ]
+
     @classmethod
     def _get_sub_classes(cls):
         """
@@ -238,7 +266,7 @@ class Device:
         return device_classes
 
     @classmethod
-    def create_inst(cls, interface_string):
+    def create_inst(cls, interface_string) -> Type['Device']:
         """
         Helper allowing to get a device according to the interface string provided.
 
@@ -292,7 +320,7 @@ class Device:
         if interfaces is not None and iface_id in interfaces:
             return interfaces[iface_id]
 
-        if interfaces is not None and iface_id is None and 0 in interfaces:
+        if interfaces is not None and iface_id is None and 0 in interfaces and interfaces[0] is not None:
             return interfaces[0]
 
         # Return interface or raise an exception
@@ -316,7 +344,13 @@ class Device:
             - `ubertooth:11223344556677881122334455667788`: defines a Ubertooth
               device with serial number *11223344556677881122334455667788*
         '''
-        device_classes = cls._get_sub_classes()
+        # First try to find the corresponding device by calling find()
+        device = Device.find(interface_string)
+        if device is not None:
+            return device
+
+        # If not found, loop over all known interfaces
+        device_classes = cls.get_all_ifaces()
         device = None
         for device_class in device_classes:
             logger.debug("trying class %s", device_class)
@@ -328,12 +362,65 @@ class Device:
 
         raise WhadDeviceNotFound
 
+    @staticmethod
+    def find(interface: str) -> Type['Device']:
+        """Find a device based on its interface string with lazy loading of
+        available interface implementations.
+
+        :param interface: Interface name following WHAD's standard interface pattern
+        :type  interface: str
+        :return: Found interface object
+        :rtype: Device
+        :raise: WhadDeviceNotFound
+        """
+        # Based on selected transport, load the corresponding interface class.
+        dev_info = re.match('^([^0-9:]+)([0-9]|:).*$', interface)
+        if dev_info is not None:
+            transport = dev_info.group(1).lower()
+            # Basic interfaces using native transport
+            if transport == 'uart':
+                from .uart import Uart
+                return Uart.create_inst(interface)
+            elif transport == 'hci':
+                from .hci import Hci
+                return Hci.create_inst(interface)
+            elif transport == 'tcp':
+                from .tcp import TcpSocket
+                return TcpSocket.create_inst(interface)
+            elif transport == 'unix':
+                from .unix import UnixSocket
+                return UnixSocket.create_inst(interface)
+
+            # Virtual interfaces using emulated transport
+            elif transport == 'apimote':
+                from .apimote import Apimote
+                return Apimote.create_inst(interface)
+            elif transport == 'pcap':
+                from .pcap import Pcap
+                return Pcap.create_inst(interface)
+            elif transport == 'rfstorm':
+                from .rfstorm import RfStorm
+                return RfStorm.create_inst(interface)
+            elif transport == 'rzusbstick':
+                from .rzusbstick import RzUsbStick
+                return RzUsbStick.create_inst(interface)
+            elif transport == 'ubertooth':
+                from .ubertooth import Ubertooth
+                return Ubertooth.create_inst(interface)
+            elif transport == 'yardstickone':
+                from .yard import YardStickOne
+                return YardStickOne.create_inst(interface)
+
+            # No other known transport
+            raise WhadDeviceNotFound
+
+
     @classmethod
     def list(cls) -> Union[list,dict]:
         '''
         Returns every available compatible devices.
         '''
-        device_classes = cls._get_sub_classes()
+        device_classes = cls.get_all_ifaces()
 
         available_devices = []
         for device_class in device_classes:
@@ -362,7 +449,8 @@ class Device:
         '''
         # If class has interface name, return the interface alias
         if hasattr(self.__class__,"INTERFACE_NAME"):
-            return self.__class__.INTERFACE_NAME + str(self.index)
+            if self.__class__.INTERFACE_NAME is not None:
+                return self.__class__.INTERFACE_NAME + str(self.index)
 
         # Interface is unknown
         return "unknown"
@@ -374,7 +462,7 @@ class Device:
         '''
         return self.__class__.__name__
 
-    def __init__(self, index: int = None):
+    def __init__(self, index: Optional[int] = None):
         """Initialize an interface
         """
         # Interface state
@@ -959,7 +1047,7 @@ class VirtualDevice(Device):
             getattr(self, callback_name)(message)
         else:
             logger.info("unhandled message: %s", message)
-            self._send_whad_command_result(ResultCode.ERROR)
+            self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_discovery_info_query(self, _):
         major, minor, revision = self._fw_version
