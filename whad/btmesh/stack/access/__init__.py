@@ -310,3 +310,16 @@ class AccessLayer(Layer):
         if is_acked:
             response = model.wait_response(timeout)
         return response
+
+    def send_direct_message(self, message):
+        """
+        Process a message originating from us directly (not in response from another message, usually a message from a ModelClient/Shell)
+        Only used when sending a raw message from CLI command "senda_raw_access")
+
+        :param message: Packet and its context
+        :type message: (BTMesh_Model_Message, MeshMessageContext)
+        """
+        pkt, ctx = message
+        ctx.is_ctl = False
+        ctx.azsmic = 0
+        self.send_to_upper_transport(message)

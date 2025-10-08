@@ -134,7 +134,7 @@ class BTMeshProvisionerShell(BTMeshBaseShell):
                 )
             )
 
-    def complete_prov(self):
+    def complete_prov_distant(self):
         """autocomplete wireshark command"""
         completions = {}
         completions["start"] = {}
@@ -142,17 +142,17 @@ class BTMeshProvisionerShell(BTMeshBaseShell):
         return completions
 
     @category(PROV_CAT)
-    def do_prov(self, args):
+    def do_prov_distant(self, args):
         """Provisions the device at index specified in the list (via command list_unprov)
 
-        <ansicyan><b>prov <i>["start"|"auth"]</i> <i>index|value</i></b></ansicyan>
+        <ansicyan><b>prov_distant <i>["start"|"auth"]</i> <i>index|value</i></b></ansicyan>
 
         To start provisioning :
 
-        > prov start 1
+        > prov_distant start 1
 
         If auth value needs to be input (when prompted)
-        > prov auth 1234
+        > prov_distant auth 1234
         """
         if self._current_mode != self.MODE_STARTED:
             self.error("You need to auto provision the provisioner before")

@@ -85,6 +85,7 @@ Welcome to WHAD's documentation!
 
     btmesh/started
     btmesh/profile
+    btmesh/attacks
 
 .. toctree::
     :maxdepth: 1

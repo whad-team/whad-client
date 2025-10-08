@@ -176,3 +176,7 @@ Here, we send a Generic OnOff set message to the broadcast address.
 
 
 Optionally, you can expect the Status response with the `response` variable. In that case you can specify a timeout for the delay to wait for the Status response.
+
+An important class to use is the `whad.btmesh.stack.utils.MeshMessageContext`. It is associated with a BtMesh packet (Rx or Tx) and contains metadata about it,
+such as source, destination, TTL, keys used...
+When sending a message, make sure to set the parameters of the messages you want to send in this object.
