@@ -318,24 +318,6 @@ class BTMeshNode(BTMesh):
             return
         self.whitelist.pop(index)
 
-    def set_relay(self, onoff):
-        """
-        Enables of disabled relaying on the NetworkLayer
-
-        :param onoff: Set the relay on or off
-        :type onoff: boolean
-        """
-        if self.profile.is_provisioned:
-            self._main_stack.get_layer("network").state.is_relay_enabled = onoff
-
-    def get_relaying_status(self):
-        """
-        Returns whether the relaying is enabled or not
-        """
-        if self.profile.is_provisioned:
-            return self._main_stack.get_layer("network").state.is_relay_enabled
-        return False
-
     def send_raw_access(self, message):
         """
         Sends a message created from raw hex string and its context to the access layer to be sent to the network
@@ -344,7 +326,7 @@ class BTMeshNode(BTMesh):
         :type message: (BTMesh_Model_Message, MeshMessageContext)
         """
         if self.profile.is_provisioned:
-            self._main_stack.get_layer("access").process_new_message(message)
+            self._main_stack.get_layer("access").send_direct_message(message)
 
     def on_provisioning_complete(self, prov_data):
         """

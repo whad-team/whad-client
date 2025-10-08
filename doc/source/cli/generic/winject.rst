@@ -118,6 +118,12 @@ Specific RF4CE options
 
 * ``--channel`` (``-c``): select a channel (11-26) to use for injection
 
+Specific BTMesh options
+^^^^^^^^^^^^^^^^^^^^^^^
+
+* ``--channel`` (``-c``): select a channel (37,38,39) to use for injection
+
+
 
 Injecting scapy packets
 ^^^^^^^^^^^^^^^^^^^^^^^^

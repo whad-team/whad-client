@@ -1123,9 +1123,14 @@ class ConfigurationModelServer(ModelServer):
 
         for element in elements:
             for model in element.models:
-                pub_key_index_state = model.get_state(
-                    "model_publication"
-                ).get_sub_state("model_publication_publish_app_key_index")
+                if isinstance(model, ModelClient):
+                    continue
+                model_publish_state = model.get_state("model_publication")
+                if model_publish_state is None:
+                    continue
+                pub_key_index_state = model_publish_state.get_sub_state(
+                    "model_publication_publish_app_key_index"
+                )
 
                 if pub_key_index_state.get_value() == app_key_index and (
                     model_id is None or model_id == model.model_id

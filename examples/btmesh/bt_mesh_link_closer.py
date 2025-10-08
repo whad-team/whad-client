@@ -3,8 +3,6 @@ from whad.ble.exceptions import ConnectionLostException
 import sys
 from whad.btmesh.connector.provisionee import Provisionee
 from whad.btmesh.attacker.link_closer import LinkCloserAttacker, LinkCloserConfiguration
-from time import sleep
-from whad.btmesh.stack.utils import MeshMessageContext
 
 
 if len(sys.argv) != 2:

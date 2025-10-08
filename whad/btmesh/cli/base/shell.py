@@ -420,7 +420,7 @@ class BTMeshBaseShell(InteractiveShell):
             return
 
         if len(arg) < 1:
-            relay = self._connector.get_relaying_status()
+            relay = self._connector.profile.local_node.is_relay
             if relay:
                 self.success("Relay is activated on the node.")
             else:
@@ -429,10 +429,10 @@ class BTMeshBaseShell(InteractiveShell):
         else:
             relay = arg[0].lower()
             if relay == "on":
-                self._connector.set_relay(True)
+                self._connector.profile.local_node.is_relay = True
                 self.success("Relay is now activated on the node.")
             elif relay == "off":
-                self._connector.set_relay(False)
+                self._connector.profile.local_node.is_relay = False
                 self.success("Relays is now deactivated on the node")
             else:
                 self.error("Wrong argument, should be on/off")
@@ -1344,7 +1344,7 @@ class BTMeshBaseShell(InteractiveShell):
 
         > To update/add key (index 1, bound to net_key_idx 0) :  app_keys update 1 0 aab2255e6422d330088e09bb015ed707
 
-        > To remove : app_keys remove 1
+        > To remove : app_keys remove 1 0
 
         > To send an AppKey (index 0, bound to netkey 1) to node 0x0005  : app_keys send 0 1 0x0005
 
@@ -1411,17 +1411,18 @@ class BTMeshBaseShell(InteractiveShell):
             success = self.profile.remove_app_key(app_key_index, net_key_index)
 
             if not success:
-                self.error(
-                    "Removal of NetKey failed, does it exist ? Or maybe only a single net_key is present."
-                )
+                self.error("Removal of AppKey failed, does it exist ?")
                 return
-            self.success("Successfully removed NetKey with index %d" % net_key_index)
+            self.success(
+                "Successfully removed AppKey with index %d bound to NetKey %d"
+                % (app_key_index, net_key_index)
+            )
             return
 
         elif action == "send":
             if len(args) < 4:
                 self.error(
-                    "Specify app_key_index, net_key_index and distant_node address"
+                    "Specify net_key_index, app_key_index and distant_node address"
                 )
                 return
 
@@ -2174,7 +2175,7 @@ class BTMeshBaseShell(InteractiveShell):
     def do_stop(self, arg):
         """Only in attack mode. Stops the currently running attack.
 
-        <ansicyan><b>check</b></ansicyan>
+        <ansicyan><b>stop</b></ansicyan>
         """
         if self._current_mode != self.MODE_ATTACK or self._selected_attack is None:
             self.error(
@@ -2234,7 +2235,6 @@ class BTMeshBaseShell(InteractiveShell):
                         "   |─ <ansiyellow><b>%s</b></ansiyellow>:"
                         % (state.name + "." + sub_state.name),
                     ),
-                    sub_state.value,
                 )
                 for field_name, value in sub_state.values.items():
                     if value is not None:
