@@ -12,6 +12,7 @@ from whad.common.sniffing import EventsManager
 from whad.hub.ant import RawPduReceived, PduReceived
 from whad.hub.message import AbstractPacket
 from whad.exceptions import WhadDeviceDisconnected
+from whad.scapy.layers.ant import ANT_FS_Link_Command_Packet
 
 
 logger = logging.getLogger(__name__)
@@ -87,7 +88,7 @@ class Sniffer(ANT, EventsManager):
 
     @channel.setter
     def channel(self, channel=57):
-        self.stop()
+        #self.stop()
         self.__configuration.channel = channel
         self._enable_sniffing()
 
@@ -103,6 +104,9 @@ class Sniffer(ANT, EventsManager):
         self._enable_sniffing()
 
     def process_packet(self, packet):
+        if ANT_FS_Link_Command_Packet in packet:
+            self.channel = packet.frequency
+            print("[i] Hopping to channel "+str(packet.frequency))
         return packet
 
     def sniff(self, timeout: float = None) -> Generator[Packet, None, None]:
