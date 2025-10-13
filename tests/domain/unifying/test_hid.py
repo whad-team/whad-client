@@ -42,13 +42,17 @@ def test_unknown_hid_keycode():
 def test_unifying_unenc_keystroke_processing():
     """Check a valid Logitech Unifying packet is correctly converted into a keycode."""
     # Build a 'Q' keystroke (modifiers=SHIFT, key code Q for FR keyboard)
-    pkt = ESB_Hdr()/Logitech_Unifying_Hdr()/Logitech_Unencrypted_Keystroke_Payload(
+    keypress = ESB_Hdr()/Logitech_Unifying_Hdr()/Logitech_Unencrypted_Keystroke_Payload(
         hid_data=b"\x02\x04\x00\x00\x00\x00\x00"
+    )
+    keyrelease = ESB_Hdr()/Logitech_Unifying_Hdr()/Logitech_Unencrypted_Keystroke_Payload(
+        hid_data=b"\x00\x00\x00\x00\x00\x00\x00"
     )
 
     analyzer = UnifyingKeystroke()
     analyzer.set_locale("fr")
-    analyzer.process_packet(pkt)
+    analyzer.process_packet(keypress)
+    analyzer.process_packet(keyrelease)
     assert analyzer.triggered
     assert analyzer.completed
     assert analyzer.output["key"] == 'Q'
