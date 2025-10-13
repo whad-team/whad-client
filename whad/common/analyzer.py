@@ -2,7 +2,8 @@
 """
 WHAD traffic analyzer base module.
 """
-from typing import List, Any
+from typing import List, Any, Optional, Any, Type
+
 from scapy.packet import Packet
 
 
@@ -55,7 +56,7 @@ class TrafficAnalyzer:
         if param in self.__parameters:
             self.__parameters[param] = value
 
-    def process_packet(self, packet):
+    def process_packet(self, packet: Packet):
         """Process a packet.
         """
 
@@ -91,7 +92,7 @@ class TrafficAnalyzer:
         return self.__marked_packets
 
     @property
-    def output(self):
+    def output(self) -> Optional[Any]:
         """Returns the traffic analyzer output.
         """
         return None

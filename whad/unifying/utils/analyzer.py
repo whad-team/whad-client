@@ -1,5 +1,12 @@
+"""
+This module provides two classes to analyze Logitech Unifying communications:
+- :class:`whad.unifying.utils.analyzer.UnifyingMouseMovement` that recovers mouse movements from wireless traffic;
+- :class:`whad.unifying.utils.analyzer.UnifyingKeystroke` that recovers keystrokes from plaintext and decrypted wireless traffic.
+"""
 import locale
 import logging
+
+from scapy.packet import Packet
 
 from whad.common.analyzer import TrafficAnalyzer
 from whad.common.converters.hid.mappings import HID_MAP
@@ -75,6 +82,14 @@ class UnifyingKeystroke(TrafficAnalyzer):
         "locale": get_default_kb_locale(),
     }
 
+    def __init__(self, **kwargs):
+        """Initialize Unifying keystroke analyzer."""
+        super().__init__(**kwargs)
+
+        # save pending keystrokes and recovered keystrokes
+        self.__pending_keys = None
+        self.__keys = None
+
     def set_locale(self, locale: str):
         """
         Change locale to the specified `locale`.
@@ -88,10 +103,16 @@ class UnifyingKeystroke(TrafficAnalyzer):
     @property
     def output(self):
         return {
-            "key" :self.key
+            "key" :self.__keys
         }
 
-    def process_packet(self, packet):
+    def process_packet(self, packet: Packet):
+        """Process an incoming packet.
+
+        :param packet: Incoming packet to process.
+        :type  packet: scapy.packet.Packet
+        """
+        # Extract HID data from packet, if any
         hid_data = None
         if Logitech_Unencrypted_Keystroke_Payload in packet:
             self.trigger()
@@ -106,24 +127,42 @@ class UnifyingKeystroke(TrafficAnalyzer):
             else:
                 hid_data = packet.hid_data
 
+        # Process found HID data
         if hid_data is not None:
+            # Empty HID report ?
             if hid_data == b"\x00" * 7:
-                self.key = None
+                # Got an empty HID report, send pending keystroke if any.
+                if self.__pending_keys is not None:
+                    self.__keys = self.__pending_keys
+                    self.__pending_keys = None
+                    self.complete()
             else:
                 try:
+                    # Non-empty report, recover pressed key based on HID scan code and locale
                     key = LogitechUnifyingKeystrokeConverter.get_key_from_hid_data(hid_data, locale=self.__locale)
-                    if key != self.key:
-                        self.key = key
-                        if len(self.key) > 1:
-                            self.key = " [{}] ".format(self.key)
+                    if len(key) > 1:
+                        key = " [{}] ".format(key)
+
+                    # If pending keystroke and a detected keystroke are different, we must report
+                    # the pending keystroke as we may have missed an event (key release).
+                    if self.__pending_keys is not None and key != self.__pending_keys:
+                        self.__keys = self.__pending_keys
+                        self.__pending_keys = None
                         self.complete()
+
+                    # Keep pending keystroke in memory.
+                    self.__pending_keys = key
                 except (HIDCodeNotFound, InvalidHIDData):
                     pass
 
     def reset(self):
+        """Traffic analyzer reset callback."""
         super().reset()
+        # Restore current locale
         self.__locale = self.get_param("locale")
-        self.key = None
+
+        # Reset keystrokes.
+        self.__keys = None
 
 
 analyzers = {
@@ -131,3 +170,4 @@ analyzers = {
     "mouse" : UnifyingMouseMovement,
     "keystroke" : UnifyingKeystroke
 }
+
