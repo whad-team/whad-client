@@ -6,7 +6,7 @@ import logging
 from scapy.packet import Packet, bind_layers
 from scapy.fields import ByteField, XByteField, X3BytesField, IntField, \
     StrFixedLenField, ShortField, ByteEnumField, XShortField, XShortEnumField, \
-    FieldLenField, StrLenField, StrField, SignedByteField
+    FieldLenField, StrLenField, StrField, SignedByteField, FCSField
 from struct import pack
 
 from whad.scapy.layers.esb import ESB_Payload_Hdr, SBAddressField, ESB_Ping_Request, \
@@ -19,18 +19,23 @@ class Logitech_Unifying_Hdr(Packet):
     fields_desc = [
         XByteField("dev_index",0x00),
         XByteField("frame_type",  0x00),
-        XByteField("checksum",None)
+        FCSField("checksum",None, fmt="B")
     ]
 
     def pre_dissect(self,s):
+        """Try to find the longest byte sequence with a valid checksum."""
         calcCksum = 0xFF
         currentByte = 0
-        while calcCksum+1 != s[currentByte] and currentByte < len(s) - 1:
+        cs_pos = None
+        #while calcCksum+1 != s[currentByte] and currentByte < len(s) - 1:
+        while currentByte < len(s) - 1:
             calcCksum = (calcCksum - s[currentByte]) & 0xFF
             currentByte += 1
-        if calcCksum+1 != s[currentByte]:
+            if calcCksum+1 == s[currentByte]:
+                cs_pos= currentByte
+        if cs_pos is None:
             return s
-        return  s[:2] + s[currentByte:currentByte+1] + s[2:currentByte] + s[currentByte+1:]
+        return  s[:currentByte+1]
 
 
     def post_dissect(self, s):
@@ -40,6 +45,7 @@ class Logitech_Unifying_Hdr(Packet):
         return s
 
     def post_build(self,p,pay):
+        """Re-compute checksum if needed."""
         #if self.checksum is None:
         cksum = 0xFF
         for i in (p[:2] + pay):
