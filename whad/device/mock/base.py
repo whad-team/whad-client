@@ -110,7 +110,7 @@ class MockOutThread(Thread):
                 logger.debug("[iface][%s] Device disconnected, sending event to connector.",
                              self.__iface.interface)
                 self.__iface.put_message(Disconnected(self.__iface))
-                return
+                break
 
 class MockDevice(Device):
     """Mock device
@@ -213,10 +213,10 @@ class MockDevice(Device):
         """
         if self.__iface_in is not None:
             self.__iface_in.cancel()
-            self.__iface_in.join()
+            #self.__iface_in.join()
         if self.__iface_out is not None:
             self.__iface_out.cancel()
-            self.__iface_out.join()
+            #self.__iface_out.join()
 
     def open(self):
         """Open the mock device. We don't call Device.open() to avoid background
@@ -265,9 +265,9 @@ class MockDevice(Device):
 
         # Notify connector (if any) that the device has disconnected
         # Notify connector that device has closed
-        if self.__connector is not None:
+        if self.connector is not None:
             logger.debug("[%s] Send disconnection event to connector %s", self.interface,
-                         self.__connector)
+                         self.connector)
             self.connector.send_event(Disconnected(self))
             logger.debug("[%s] Disconnection event sent !", self.interface)
 
