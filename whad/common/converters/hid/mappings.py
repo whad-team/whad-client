@@ -5,10 +5,10 @@ from .maps import HID_MAP
 # Special keys
 HID_SPECIALS = {
     (0, 0): "",
-    (0, 4): "ALT",
+    (0, 4): "LALT",
     (0, 2): "SHIFT",
     (0, 1): "CTRL",
-    (0, 64): "ALT",
+    (0, 64): "RALT",
     (0, 32): "SHIFT",
     (0, 16): "CTRL",
     (0, 8): "GUI",
@@ -60,6 +60,7 @@ HID_SPECIALS = {
     (97, 0): "KP9PAGEUP",
     (98, 0): "KP0INSERT",
     (99, 0): "KP.DELETE",
+    (101, 0): "APPLICATION",
     (103, 0): "KP=",
     (133, 0): "KP,",
     (134, 0): "KP=",

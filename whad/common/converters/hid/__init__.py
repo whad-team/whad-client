@@ -74,7 +74,7 @@ class HIDConverter:
             return "CTRL+" + HIDConverter.get_key_from_hid_code(hid_code, modifiers, locale)
         if modifiers & 4:
             modifiers -= 4
-            return "ALT+" + HIDConverter.get_key_from_hid_code(hid_code, modifiers, locale)
+            return "LALT+" + HIDConverter.get_key_from_hid_code(hid_code, modifiers, locale)
         if modifiers & 8:
             modifiers -= 8
             return "GUI+" + HIDConverter.get_key_from_hid_code(hid_code, modifiers, locale)
@@ -83,7 +83,7 @@ class HIDConverter:
             return "CTRL+" + HIDConverter.get_key_from_hid_code(hid_code, modifiers, locale)
         if modifiers & 64:
             modifiers -= 64
-            return "ALT+" + HIDConverter.get_key_from_hid_code(hid_code, modifiers, locale)
+            return "RALT+" + HIDConverter.get_key_from_hid_code(hid_code, modifiers, locale)
         if modifiers & 128:
             modifiers -= 128
             return "RGUI+" + HIDConverter.get_key_from_hid_code(hid_code, modifiers, locale)
