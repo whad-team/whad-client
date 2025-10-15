@@ -2,6 +2,7 @@
 keypress information from HID code/modifiers and a given locale, and to convert a specific
 keycode into the corresponding HID code/modifiers for a given locale.
 """
+from re import I
 from whad.common.converters.hid.exceptions import (
     HIDCodeNotFound,
     HIDKeyNotFound,
@@ -63,6 +64,10 @@ class HIDConverter:
         :param modifiers: HID modifiers to convert
         :param locale: Keyboard keymap to consider
         """
+        # Make sure the specified locale is valid
+        if locale not in HID_MAP:
+            raise HIDLocaleNotFound(locale)
+
         # Handle Ctrl, Alt and Gui keys
         if modifiers & 1:
             modifiers -= 1
