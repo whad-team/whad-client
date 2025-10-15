@@ -18,13 +18,17 @@ def mock_devices():
 def scan_mock(mock_devices):
     """Create a BLE DeviceScan mock.
     """
-    return DeviceScan(devices=mock_devices, sniffing=False, nowait=True)
+    scan_device = DeviceScan(devices=mock_devices, sniffing=False, nowait=True)
+    yield scan_device
+    scan_device.close()
 
 @pytest.fixture
 def sniff_mock(mock_devices):
     """Create a BLE DeviceScan mock.
     """
-    return DeviceScan(devices=mock_devices, sniffing=True, nowait=True)
+    scan_device = DeviceScan(devices=mock_devices, sniffing=True, nowait=True)
+    yield scan_device
+    scan_device.close()
 
 def test_scanner_no_sniffing(scan_mock):
     """Test scanner instantiation with hardware supporting only scanning.

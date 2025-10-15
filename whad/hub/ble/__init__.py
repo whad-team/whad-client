@@ -1,6 +1,6 @@
 """WHAD Protocol Bluetooth Low Energy domain message abstraction layer.
 """
-from typing import List
+from typing import List, Optional
 from dataclasses import dataclass, field, fields
 
 from .bdaddr import BDAddress
@@ -197,7 +197,7 @@ class BleDomain(Registry):
         """
         return isinstance(packet.metadata, BLEMetadata)
 
-    def convert_packet(self, packet) -> HubMessage:
+    def convert_packet(self, packet) -> Optional[HubMessage]:
         """Convert a BLE packet to SendPdu or SendBlePdu message.
         """
         if isinstance(packet.metadata, BLEMetadata):

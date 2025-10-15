@@ -22,7 +22,9 @@ def mock_devices():
 def sniff_mock(mock_devices):
     """Create a BLE DeviceScan mock.
     """
-    return DeviceScan(devices=mock_devices, sniffing=True, nowait=True)
+    scan_device = DeviceScan(devices=mock_devices, sniffing=True, nowait=True)
+    yield scan_device
+    scan_device.close()
 
 def test_sniffer_create(sniff_mock):
     """Test creating a Bluetooth sniffer.

@@ -16,19 +16,10 @@ from .device import Device, VirtualDevice, DeviceEvt, Disconnected, MessageRecei
 from .connector import Connector, Event, LockedConnector, WhadDeviceConnector
 from .bridge import Bridge
 
-# Load supported hardware interfaces
-from .unix import UnixSocket
+# Base device classes
 from .uart import Uart
 from .tcp import TcpSocket
-
-# Load supported virtual interfaces
-from .hci import Hci
-from .pcap import Pcap
-from .apimote import Apimote
-from .rfstorm import RfStorm
-from .rzusbstick import RzUsbStick
-from .ubertooth import Ubertooth
-from .yard import YardStickOne
+from .unix import UnixSocket
 
 __all__ = [
     # Base classes
@@ -47,16 +38,9 @@ __all__ = [
     "WhadVirtualDevice",
     "WhadDeviceConnector",
     "LockedConnector",
-    
-    # Virtual devices
-    "Hci",
-    "Pcap",
-    "Uart",
+
+    # Base devices
     "TcpSocket",
+    "Uart",
     "UnixSocket",
-    "Apimote",
-    "RfStorm",
-    "RzUsbStick",
-    "Ubertooth",
-    "YardStickOne",
 ]
