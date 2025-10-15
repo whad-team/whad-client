@@ -1,8 +1,15 @@
+"""Human Interface Device (HID) mappings for HID converter.
+"""
+
+# Special keys
 HID_SPECIALS = {
     (0, 0): "",
     (0, 4): "ALT",
     (0, 2): "SHIFT",
     (0, 1): "CTRL",
+    (0, 64): "ALT",
+    (0, 32): "SHIFT",
+    (0, 16): "CTRL",
     (0, 8): "GUI",
     (71, 0): "SCROLLLOCK",
     (40, 0): "ENTER",
@@ -57,6 +64,7 @@ HID_SPECIALS = {
     (134, 0): "KP=",
 }
 
+# Global keymap
 HID_MAP = {}
 
 HID_MAP["be"] = {
@@ -2080,9 +2088,9 @@ HID_MAP["us"] = {
     (27, 2): "X",
     (28, 2): "Y",
     (29, 2): "Z",
-    (47, 0): "(",
+    (47, 0): "[",
     (49, 0): "\\",
-    (48, 0): ")",
+    (48, 0): "]",
     (35, 2): "^",
     (45, 2): "_",
     (53, 0): "`",
