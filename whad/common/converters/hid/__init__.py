@@ -1,3 +1,7 @@
+"""This module provides the `HIDConverter` class, an helper class to generate human-readable
+keypress information from HID code/modifiers and a given locale, and to convert a specific
+keycode into the corresponding HID code/modifiers for a given locale.
+"""
 from whad.common.converters.hid.exceptions import (
     HIDCodeNotFound,
     HIDKeyNotFound,
@@ -8,7 +12,8 @@ from whad.common.converters.hid.mappings import HID_MAP, HID_SPECIALS
 
 class HIDConverter:
     """
-    This class provides a basic API to convert an HID code to an human friendly keystroke and vice versa.
+    This class provides a basic API to convert an HID code to an human friendly
+    keystroke and vice versa.
     """
 
     @staticmethod
@@ -40,9 +45,9 @@ class HIDConverter:
 
         # If caller specified some modifiers, apply them
         modifier_keys = {"ALT": alt, "CTRL": ctrl, "SHIFT": shift, "GUI": gui}
-        for key, pressed in modifier_keys.items():
+        for keycode, pressed in modifier_keys.items():
             if pressed:
-                mapping = [m for m, k in HID_SPECIALS.items() if k == key][0]
+                mapping = [m for m, k in HID_SPECIALS.items() if k == keycode][0]
                 modifiers += mapping[1]
 
         return (hid_code, modifiers)
@@ -68,6 +73,21 @@ class HIDConverter:
         if modifiers & 8:
             modifiers -= 8
             return "GUI+" + HIDConverter.get_key_from_hid_code(hid_code, modifiers, locale)
+        if modifiers & 16:
+            modifiers -= 16
+            return "CTRL+" + HIDConverter.get_key_from_hid_code(hid_code, modifiers, locale)
+        if modifiers & 64:
+            modifiers -= 64
+            return "ALT+" + HIDConverter.get_key_from_hid_code(hid_code, modifiers, locale)
+        if modifiers & 128:
+            modifiers -= 128
+            return "RGUI+" + HIDConverter.get_key_from_hid_code(hid_code, modifiers, locale)
+
+        # Map Right-SHIFT modifier to Left-SHIFT modifier
+        if modifiers & 32:
+            modifiers -= 32
+            if not modifiers & 2:
+                modifiers += 2
 
         if (hid_code, modifiers) in HID_MAP[locale]:
             return HID_MAP[locale][(hid_code, modifiers)]
