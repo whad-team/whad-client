@@ -32,7 +32,7 @@ jobs:
       - name: Test with tox
         run: tox
       - name: Build documentation
-        uses: tlylt/install-graphviz@v1
+        uses: ts-graphviz/setup-graphviz@v2
         run: |
           pip install .
           cd doc
