@@ -33,6 +33,8 @@ jobs:
         run: tox
       - name: Build documentation
         run: |
+          apt install graphviz
+          pip install .
           cd doc
           pip install -r requirements.txt
           make html
