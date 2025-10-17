@@ -32,8 +32,8 @@ jobs:
       - name: Test with tox
         run: tox
       - name: Build documentation
+        uses: tlylt/install-graphviz@v1
         run: |
-          apt install graphviz
           pip install .
           cd doc
           pip install -r requirements.txt
