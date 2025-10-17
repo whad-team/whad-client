@@ -15,6 +15,7 @@ from scapy.packet import Packet
 from scapy.config import conf
 from scapy.themes import BrightTheme
 
+from whad.common.analyzer import InvalidParameter
 from whad.scapy.layers import *
 from whad.cli.app import CommandLineApp, run_app
 from whad.device.unix import UnixConnector, UnixSocketServer
@@ -376,7 +377,9 @@ class WhadAnalyzeApp(CommandLineApp):
 
                     # Wait for the associated interface to disconnect
                     connector.join()
-
+        except InvalidParameter as param_err:
+            # Invalid parameter provided
+            self.error(f"An invalid value has been provided for parameter '{param_err.parameter}' ({param_err.value}) !")
         except KeyboardInterrupt:
             # Launch post-run tasks
             self.post_run()
