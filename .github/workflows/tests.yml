@@ -31,3 +31,8 @@ jobs:
           pip install tox tox-gh-actions
       - name: Test with tox
         run: tox
+      - name: Build documentation
+        run: |
+          cd doc
+          pip install -r requirements.txt
+          make html
