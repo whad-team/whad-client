@@ -8,7 +8,7 @@ import logging
 
 from scapy.packet import Packet
 
-from whad.common.analyzer import TrafficAnalyzer
+from whad.common.analyzer import TrafficAnalyzer, InvalidParameter
 from whad.common.converters.hid.mappings import HID_MAP
 from whad.unifying.stack.constants import ClickType
 from whad.unifying.hid import LogitechUnifyingMouseMovementConverter
@@ -96,9 +96,14 @@ class UnifyingKeystroke(TrafficAnalyzer):
 
         :param locale: New locale to use.
         :type  locale: str
+        :raise: InvalidParameter
         """
-        self.set_param("locale", locale)
-        self.__locale = locale
+        # First, make sure the locale is valid
+        if locale in HID_MAP:
+            self.set_param("locale", locale)
+            self.__locale = locale
+        else:
+            raise InvalidParameter("locale", locale)
 
     @property
     def output(self):
@@ -156,12 +161,21 @@ class UnifyingKeystroke(TrafficAnalyzer):
                     pass
 
     def reset(self):
-        """Traffic analyzer reset callback."""
-        super().reset()
-        # Restore current locale
-        self.__locale = self.get_param("locale")
+        """
+        Reset this analyzer.
 
-        # Reset keystrokes.
+        :raise: InvalidParameter
+        """
+        super().reset()
+
+        # Reload locale from paramater and make sure it is valid
+        locale = self.get_param("locale")
+        if locale in HID_MAP:
+            self.__locale = locale
+        else:
+            raise InvalidParameter("locale", locale)
+
+        # Reset current keypress
         self.__keys = None
 
 

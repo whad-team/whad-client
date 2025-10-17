@@ -6,6 +6,31 @@ from typing import List, Any, Optional, Any, Type
 
 from scapy.packet import Packet
 
+class InvalidParameter(Exception):
+    """Invalid parameter specified to a traffic analyzer."""
+    def __init__(self, name: str, value: Any):
+        """Initialization."""
+        super().__init__()
+        self.__name = name
+        self.__value = value
+
+    @property
+    def parameter(self) -> str:
+        """Invalid parameter name."""
+        return self.__name
+
+    @property
+    def value(self) -> Any:
+        """Parameter value"""
+        return self.__value
+
+    def __str__(self) -> str:
+        """String representation of this exception."""
+        return f"InvalidParameter(name=\"{self.__name}\", value=\"{self.__value}\")"
+
+    def __repr__(self) -> str:
+        """Representation of this exception."""
+        return str(self)
 
 class TrafficAnalyzer:
     """
