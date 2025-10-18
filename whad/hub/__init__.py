@@ -121,7 +121,7 @@ class ProtocolHub(Registry):
         elif factory == 'ble':
             from .ble import BleDomain
             return BleDomain
-        elif factory == 'dot15d4':
+        elif factory in ('dot15d4', 'rf4ce', 'zigbee'):
             from .dot15d4 import Dot15d4Domain
             return Dot15d4Domain
         elif factory == 'esb':
