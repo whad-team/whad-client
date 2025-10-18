@@ -239,8 +239,9 @@ class WhadSniffApp(CommandLineApp):
             self.error("WHAD interface doesn't support the requested frequency.")
         except KeyboardInterrupt:
             self.warning("sniffer stopped (CTRL-C)")
-            sniffer.stop()
-            sniffer.close()
+            if sniffer is not None:
+                sniffer.stop()
+                sniffer.close()
             for monitor in monitors:
                 monitor.close()
             sys.exit(1)
