@@ -501,7 +501,7 @@ class Sniffer(BTMesh, EventsManager):
 
             while True:
                 message = self.wait_for_message(
-                    filter=message_filter(message_type), timeout=0.1
+                    keep=message_filter(message_type), timeout=0.1
                 )
 
                 if message is not None:
