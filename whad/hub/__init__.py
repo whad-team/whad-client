@@ -37,6 +37,7 @@ class Domain(StrEnum):
     RF4CE = 'rf4ce'
     UNIFYING = 'unifying'
     ZIGBEE = 'zigbee'
+    BTMESH = 'btmesh'
 
 class ProtocolHub(Registry):
     """WHAD Protocol Hub class
@@ -118,7 +119,7 @@ class ProtocolHub(Registry):
         elif factory == 'discovery':
             from .discovery import Discovery
             return Discovery
-        elif factory == 'ble':
+        elif factory in ('ble', 'btmesh'):
             from .ble import BleDomain
             return BleDomain
         elif factory in ('dot15d4', 'rf4ce', 'zigbee'):
