@@ -357,18 +357,18 @@ enabled with option ``--decrypt / -d`` in order to decode any encrypted payload 
     $ wsniff -i uart0 --format=show unifying --decrypt -k 086712d2f4f567662cb5ebafca20bb96
 
 
-BTMesh sniffing
----------------
+Bluetooth Mesh sniffing
+------------------------
 
-``wsniff`` can sniff Bluetooth Mesh packets and is able to :
+``wsniff`` can sniff Bluetooth Mesh (BTMesh) packets and is able to :
 
 * sniff without any keys clear BTMesh messages
 * use given NetKeys/IVIndex and AppKeys to try and decrypt BTMesh messages
 
-The BTMesh sniffer is related to the BLE sniffer since BTMesh is based on BLE. However the BTMesh sniffer will ignore BLE packets not related to BTMesh.
+The BTMesh sniffer is related to the BLE sniffer since BTMesh is based on BLE. However the BTMesh sniffer will ignore all BLE packets that are not valid BTMesh packets.
 
-Specific Logitech Unifying options
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Specific Bluetooth Mesh options
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 * ``--channel`` (``-c``): select a channel (37,38,39) to sniff
 * ``--decrypt`` (``-d``): enable decryption
@@ -380,7 +380,7 @@ Specific Logitech Unifying options
 Sniffing without any keys
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Without the decryption actiatvated, all packets will be shown as is. If they are alreatdy in clear format (beacons), they are showed in clear.
+Without the decryption enabled, all packets will be shown as is. If they are already in clear format (beacons), they are showed in clear without further processing.
 If encrypted, the packets are showed encrypted/obfuscated.
 
 If ``wsniff`` is to be piped to ``wshark`` tool, do not active decryption since decryption will output decrypted and reassembled packets that are no longer valid for wireshark.
@@ -421,7 +421,7 @@ Sniffing with keys and decryption
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ``wsniff`` allows the sniffing with decryption and reassembly of BTMesh packets. This is only informational as reassembled and decrypted packets do not exist as is in the protocol.
-Thus is decryption is activated, you cannot pipe ``wsniff`` to other tools.
+Thus if decryption is activated, you cannot pipe ``wsniff`` to other tools.
 
 It will output application level messages (Model messages) or control messages after reassembly and decryption.
 
