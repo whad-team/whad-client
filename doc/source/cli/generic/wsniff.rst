@@ -356,3 +356,85 @@ enabled with option ``--decrypt / -d`` in order to decode any encrypted payload 
 
     $ wsniff -i uart0 --format=show unifying --decrypt -k 086712d2f4f567662cb5ebafca20bb96
 
+
+Bluetooth Mesh sniffing
+------------------------
+
+``wsniff`` can sniff Bluetooth Mesh (BTMesh) packets and is able to :
+
+* sniff without any keys clear BTMesh messages
+* use given NetKeys/IVIndex and AppKeys to try and decrypt BTMesh messages
+
+The BTMesh sniffer is related to the BLE sniffer since BTMesh is based on BLE. However the BTMesh sniffer will ignore all BLE packets that are not valid BTMesh packets.
+
+Specific Bluetooth Mesh options
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* ``--channel`` (``-c``): select a channel (37,38,39) to sniff
+* ``--decrypt`` (``-d``): enable decryption
+* ``--net_keys`` (``-n``): provide list of NetKeys in the form of hex strings
+* ``--app-keys`` (``-a``): provide list of AppKeys in the form of hex strings
+* ``--iv_indexes`` (``-x``): provide list of IVIndexes for each specified NetKey via the -n option (same order). By default IVIndexes are 0.
+
+
+Sniffing without any keys
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Without the decryption enabled, all packets will be shown as is. If they are already in clear format (beacons), they are showed in clear without further processing.
+If encrypted, the packets are showed encrypted/obfuscated.
+
+If ``wsniff`` is to be piped to ``wshark`` tool, do not active decryption since decryption will output decrypted and reassembled packets that are no longer valid for wireshark.
+
+
+.. code-block:: text
+
+    $ wsniff -i uart1 --format=show btmesh
+    [ raw=True, decrypted=False, timestamp=328379018, channel=37, rssi=-17, direction=0, connection_handle=0, is_crc_valid=True, relative_timestamp=0, encrypt=False ]
+    ###[ BT4LE ]###
+    access_addr= 0x8e89bed6
+    crc       = 0xaa4275
+    ###[ BTLE advertising header ]###
+        RxAdd     = public
+        TxAdd     = public
+        ChSel     = 0
+        RFU       = 0
+        PDU_type  = ADV_NONCONN_IND
+        Length    = 0x1e
+    ###[ BTLE ADV_NONCONN_IND ]###
+            AdvA      = aa:aa:aa:aa:aa:02
+            \data      \
+            |###[ EIR Header ]###
+            |  len       = 23
+            |  type      = mesh_beacon
+            |###[ Bluetooth Mesh Beacon ]###
+            |     mesh_beacon_type= secure_network_beacon
+            |     \secure_beacon_data\
+            |      |###[ Bluetooth Mesh Secure Network Beacon ]###
+            |      |  unused    = 0
+            |      |  iv_update_flag= iv_update_in_progress
+            |      |  key_refresh_flag= True
+            |      |  nid       = 0xff046958233db014
+            |      |  ivi       = 0x0
+            |      |  authentication_value= b'\xf8z\xf13\xccZ<A'
+
+Sniffing with keys and decryption
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``wsniff`` allows the sniffing with decryption and reassembly of BTMesh packets. This is only informational as reassembled and decrypted packets do not exist as is in the protocol.
+Thus if decryption is activated, you cannot pipe ``wsniff`` to other tools.
+
+It will output application level messages (Model messages) or control messages after reassembly and decryption.
+
+.. code-block:: text
+
+    $ wsniff -i uart1 --format=show btmesh -d -a 63964771734fbd76e3b40519d1d94a48 -n f7a2a44f8e8a8029064f173ddc1e2b00 -x 0
+    [ raw=True, decrypted=True, timestamp=367699854, channel=37, rssi=-17, direction=0, connection_handle=0, is_crc_valid=True, relative_timestamp=0, encrypt=False ]
+    ###[ BT4LE ]###
+    access_addr= 0x8e89bed6
+    crc       = 0xa8fe24
+    ###[ Bluetooth Mesh Access Message ]###
+        opcode    = 33282
+    ###[ Bluetooth Mesh Model Generic OnOff Set ]###
+            onoff     = on
+            transaction_id= 1
+            transition_time= None

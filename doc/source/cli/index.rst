@@ -51,6 +51,15 @@ Logitech Unifying tools
     unifying/wuni-mouse
     unifying/wuni-keyboard
 
+Bluetooth Mesh tools
+--------------------------
+
+.. toctree::
+    :maxdepth: 1
+
+    btmesh/btmesh
+
+
 
 
 Tool chaining and packet processing chain

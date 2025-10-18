@@ -1,0 +1,690 @@
+"""
+Mesh Model Generic classes.
+"""
+
+import logging
+from threading import Lock, Timer, Event
+from whad.scapy.layers.btmesh import BTMesh_Model_Message
+from whad.btmesh.crypto import compute_virtual_addr_from_label_uuid
+from whad.btmesh.models.constants import MODEL_ID_TO_NAME
+
+
+logger = logging.getLogger(__name__)
+
+
+class ModelState(object):
+    """
+    This class implements a State that will sit in a Server Model or Subnet.
+
+    Is inherited by actual states implementations
+    """
+
+    def __init__(self, name="myState", default_value=None):
+        """
+        ModelState init.
+        No lock mechanism since Access layer should maange only ONE MESSAGE AT A TIME
+
+        :param name: Name of the State. Used to access it in bound states and in Models
+        :type name: str
+        :param default_value: In the case of a non composite state, the default_value of the state. Should be None otherwise.
+        :type default_value: int, optional, defaults to None
+        """
+
+        self.__name = name
+
+        # Dictionary to store human readable name of fields to the corresponding value.
+        # If only one field state, then only has one value with name "default"
+        self.values = {"default": default_value}
+
+        # Dictionary of bound states (name_state -> state)
+        # For composite states, STORES THE SUB STATE DIRECTLY
+        self.bound_states = {}
+
+    @property
+    def name(self):
+        return self.__name
+
+    def add_bound_state(self, state):
+        self.bound_states[state.name] = state
+
+    def commit_to_bound_states(self):
+        """
+        Function called when value set to change the value of bound states.
+        """
+        pass
+
+    def __set_value(self, value, name):
+        self.values[name] = value
+        self.commit_to_bound_states()
+
+    def set_value(self, value, field_name="default", delay=0, transition_time=0):
+        """
+        Sets the value of a state's field.
+        TRANSITION TIME NOT SUPPORTED
+
+        :param value: Value of the sub State
+        :type value: Any
+        :param field_name: Name of the field witin the State (if there are fields), defaults to "default"
+        :type field_name: optional
+        :param delay: Delay before initiating the set, in ms, defaults to 0
+        :type delay: int, optional
+        :param transition_time: transition_time to get to the target value, in ms, defaults to 0
+        :type transition_time: int, optional
+        """
+        t = Timer(delay / 1000, self.__set_value, args=[value, field_name])
+        t.start()
+
+    def remove_value(self, field_name):
+        """
+        Removes the value with field_name from this state and returns it.
+        None if the field_name doesnt exist in this state
+
+        :param field_name: The value's field_name to remove
+        :type field_name: int
+        :returns: The value removed or None if not found
+        :rtype: Any
+        """
+        if field_name in self.values.keys():
+            return self.values.pop(field_name)
+        else:
+            return None
+
+    def get_value(self, field_name="default"):
+        """
+        Gets the value of a State.
+        Gets the current value of the State, no Lock in place.
+
+        :param field_name: Name of the field for multiple fields State, defaults to "default"
+        :type field_name: str, optional
+        :returns: Return Field value, None if doesnt exist
+        """
+        if field_name in self.values.keys():
+            return self.values[field_name]
+        else:
+            return None
+
+    def get_all_values(self):
+        """
+        Returns the full list of values.
+        """
+        values = list(self.values.values())
+        values.remove(
+            None
+        )  # remove default value if it is None (no state should have None value)
+        return values
+
+    def remove_value(self, field_name="default"):
+        """
+        Removes the State from the values dictionary
+
+        :param field_name: Field name to remove
+        :type field_name: Any
+        :returns: The removed State or None if doesnt exist
+        """
+        if field_name in self.values.keys():
+            return self.values.pop(field_name)
+        else:
+            return None
+
+
+class CompositeModelState:
+    """
+    Helper class to group sub states of a composite State
+    Should be inherited to create the classes for the actual Compisite State
+
+    """
+
+    def __init__(self, name, sub_states_cls):
+        """
+        Creates a CompositeModelState composed of multiple ModelStates classes
+        that will be automatically instanced
+
+        :param name: Name of the composite state
+        :type name: str
+        :param sub_states_cls: List of the classes of the sub states
+        :type sub_states_cls: Any
+        :param net_key_index: If state bound to a subnet, net_key_index of the subnet, defaults to None
+        :type net_key_index: int, optional
+        """
+        self.__name = name
+
+        # Dict of sub states compositing that composite State
+        self.sub_states = {}
+
+        for _cls in sub_states_cls:
+            state = _cls()
+            self.sub_states[state.name] = state
+
+    @property
+    def name(self):
+        return self.__name
+
+    def get_sub_state(self, name):
+        try:
+            return self.sub_states[name]
+        except Exception:
+            return None
+
+    def get_all_sub_states(self):
+        """
+        Returns a list of all the sub states of the CompositeModelState
+
+        :returns: A list of the the substates of the object
+        :rtype: List(ModelState)
+        """
+        return list(self.sub_states.values())
+
+
+# metaclass to implemenet Singleton
+class SingletonMeta(type):
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            instance = super().__call__(*args, **kwargs)
+            cls._instances[cls] = instance
+        return cls._instances[cls]
+
+
+def lock(f):
+    """
+    Decorator to lock the seq_number
+
+    :param f: [TODO:description]
+    :type f: [TODO:type]
+    """
+
+    def _wrapper(self, *args, **kwargs):
+        self.lock_seq()
+        result = f(self, *args, **kwargs)
+        self.unlock_seq()
+        return result
+
+    return _wrapper
+
+
+class StatesManager:
+    """
+    Parent class for objects that manage states. (Subnet and ModelServer).
+    """
+
+    def __init__(self):
+        # States bound to this model. Field Name is the name of the State, value is a ModelState object
+        self.states = {}
+
+    def __init_states(self):
+        """
+        Initializes the states of the object (for models, the ones that belong to the model/subnet directly, not the ones of the base models)
+        Called in init
+        """
+        pass
+
+    def add_state(self, state):
+        """
+        Adds the state to the list, bound to the object instance
+
+        :param state: State to Add
+        :type state: State | CompositeModelState
+        """
+        self.states[state.name] = state
+
+    def get_state(self, state_name):
+        """
+        Retrieves the state object that corresponds to the given name.
+
+        :param state_name: Name of the ModelState
+        :type state_name: str
+        :returns: The state corrsponding to the name on the model. Searches for states in parent models if not found on this one. None if not found
+        :rtype: ModelState | CompositeModelState | None
+        """
+        if (state_name) in self.states.keys():
+            return self.states[state_name]
+        else:
+            for rel in self.relationships:
+                # only check base models that this model extends ...
+                if rel.mod_ext.model_id == self.model_id:
+                    state = rel.mod_ext.get_state(state_name)
+                    if state is not None:
+                        return state
+            return None
+
+    def get_all_states(self):
+        """
+        Return a list of all ModelState and CompositeModelState of the object
+
+        :returns: List of the states of the object
+        :rtype: List(ModelState|CompositeModelState)
+        """
+        return list(self.states.values())
+
+
+class Model(object):
+    """
+    This class represents a Model defined in SIG Bluetooth spec (no support for vendor specific models yet).
+    For local node Models, always use subclasses ModelServer and ModelClient.
+
+    Use this class directly to stored distant node models (for information only).
+    """
+
+    def __init__(
+        self, model_id, name="No Name", allows_dev_keys=False, is_vendor_model=False
+    ):
+        """
+        Creates the Model Object
+
+        :param model_id: The model unique identifier (see BLE Assigned Numbers)
+        :type model_id: int
+        :param name: Name (if not standard), default to "No Name"
+        :type name: str
+        :param allows_dev_keys: Does the model allow messages to be received via a devkey, defaults to False
+        :param allows_dev_keys: bool, optional
+        :param is_vendor_model: Is this model a vendore specific model (not supported yet), default to False
+        :type is_vendor_model: False
+        """
+        self.model_id = model_id
+
+        if model_id in MODEL_ID_TO_NAME.keys():
+            self.name = MODEL_ID_TO_NAME[model_id]
+
+        # belongs the element at index n (set automatically by the element when model registered)
+        self.element_index = None
+
+        # If set to true, need to add corresponding state subscription_list
+        self.supports_subscribe = False
+
+        # List of handlers for incoming messages. Opcode -> handler
+        # For ModelClient, handler lists opcode of response messages
+        self.rx_handlers = {}
+
+        # If this attribute if True, Model will allows sending/receiving with DevKey
+        # If Server model, only with our own DevKey. If Client Model, with any DevKey we have
+        self.allows_dev_keys = allows_dev_keys
+
+        self.is_vendor_model = is_vendor_model
+
+    def handle_message(self, message):
+        """
+        Handles the received message based on the model handlers
+        (in sub classes)
+
+        :param message: Message received by the Access layer
+        :type message: (BTMesh_Model_Message, MeshMessageContext)
+        """
+        return None
+
+
+class ModelServer(StatesManager, Model):
+    """
+    This class implements a generic Server Model.
+    """
+
+    def __init__(
+        self,
+        model_id,
+        name="No Name Server",
+        allows_dev_keys=False,
+        corresponding_group_id=None,
+    ):
+        """
+        Creates the ModelServer Object
+
+        :param model_id: The model unique identifier (see BLE Assigned Numbers)
+        :type model_id: int
+        :param name: Name (if not standard), default to "No Name Server"
+        :type name: str
+        :param allows_dev_keys: Does the model allow messages to be received via the local devkey, defaults to False
+        :param allows_dev_keys: bool, optional
+        :param corresponding_group_id: [TODO:description]
+        """
+
+        super().__init__()
+        super(StatesManager, self).__init__(model_id, name, allows_dev_keys)
+
+        # if model part of a corresponding_group, add its id
+        self.corresponding_group_id = corresponding_group_id
+
+        # List of ModelRelationships object where this model is the base model (or any model if corresponding rel)
+        self.relationships = []
+
+    def add_relationship(self, model_relationship):
+        self.relationships.append(model_relationship)
+
+    def handle_message(self, message):
+        """
+        Handles the received message based on the model handlers
+
+        :param message: Message received by the Access layer
+        :type message: (BTMesh_Model_Message, MeshMessageContext)
+        """
+        pkt, ctx = message
+        if pkt.opcode in self.rx_handlers.keys():
+            response = self.rx_handlers[pkt.opcode]((pkt[1], ctx))
+            if response is not None:
+                response = BTMesh_Model_Message() / response
+            return response
+        return None
+
+
+class ModelClient(Model):
+    """
+    ModelClient, model that sends messages at will and only receives responses (no unexepected messages received in theory)
+    Every message valid in Tx should be listed in self.tx_handlers object with prototype lambda (message, access_layer, is_acked, timeout): pass
+    generic function of this is self.send_message
+
+    Message handled in Rx are listed in self.rx_handlers, function is handler. Can be used to change a state, try to resend somthing ...
+    Most of the time, if response is not needed/not special processing, set to `lambda message: None`
+    """
+
+    # lock for sending packet, only one at a time (and only one response waiting at a time)
+    def clientlock(f):
+        def _wrapper(self, *args, **kwargs):
+            self.lock()
+            result = f(self, *args, **kwargs)
+            self.unlock()
+            return result
+
+        return _wrapper
+
+    def lock(self):
+        self._lock.acquire()
+
+    def unlock(self):
+        self._lock.release()
+
+    def __init__(self, model_id, name="No Name Client", allows_dev_keys=False):
+        """
+        Creates the ModelClient Object
+
+        :param model_id: The model unique identifier (see BLE Assigned Numbers)
+        :type model_id: int
+        :param name: Name (if not standard), default to "No Name Client"
+        :type name: str
+        :param allows_dev_keys: Does the model allow messages to be received via the distant node devkey, defaults to False
+        :param allows_dev_keys: bool, optional
+        :param corresponding_group_id: [TODO:description]
+        """
+
+        super().__init__(model_id, name, allows_dev_keys)
+
+        # Event used to notify the sending thread (in Access Layer) a response message has been received (in response to a sent message)
+        self._response_event = Event()
+        # Expected packet class of the response to receive
+        self._expected_response_clazz = None
+        # The response message received and its Context (a Status messahe usually)
+        self._response = None
+
+        # Custom handlers for the messages in emission. Should behave like send_message with same prototype, but with custom things if needed
+        self.tx_handlers = {}
+
+        self._lock = Lock()
+
+    @property
+    def expected_response_clazz(self):
+        return self._expected_response_clazz
+
+    @expected_response_clazz.setter
+    def expected_response_clazz(self, value):
+        self._expected_response_clazz = value
+
+    @clientlock
+    def message_sending_setup(self, message):
+        """
+        Setup of a message to be sent by this model. Should be called by the Access Layer.
+
+        :param message: The Model message to send.
+        :type message: (BTMesh_Model_Message, MeshMessageContext)
+        """
+        pkt, ctx = message
+        self._response = None
+
+        # If custom handler exists in model, use it to setup the message, and expected response
+        # Be careful, in the the Access layer `send_access_message` function, you specified a one time _expected_response_clazz
+        # it will overwrite the one set in custom handler !
+        if pkt.opcode in self.tx_handlers.keys():
+            self.tx_handlers[pkt.opcode](message)
+
+        return None
+
+    def handle_message(self, message):
+        """
+        Handles the received message. Always a response to a packet sent, since we are in ModelClient.
+
+        :param message: Message received by the Access layer
+        :type message: (BTMesh_Model_Message, MeshMessageContext)
+        """
+        pkt, ctx = message
+        if self._expected_response_clazz is not None and isinstance(
+            pkt[1], self._expected_response_clazz
+        ):
+            if callable(self.rx_handlers[pkt.opcode]):
+                self.rx_handlers[pkt.opcode]((pkt[1], ctx))
+
+        # Notify the thread that initiated the sending if it was waiting
+        self.notify_response(message)
+
+        return None
+
+    @clientlock
+    def wait_response(self, timeout):
+        """
+        Function called by thread initiating the sending of a message to wait for the response (Status/Acknoledgment)
+
+        :param timeout: The timeout before we exit the wait
+        :returns: The response packet and its context (only Application layer) or None if no reception
+        :rtype: (Packet, MeshMessageContext) | None
+        """
+        self._response = None
+        self._response_event.wait(timeout)
+        self._response_event.clear()
+        return self._response
+
+    def notify_response(self, message):
+        """
+        Notify a response has been received for an awaited message.
+
+        :param message: The received packet corresponding to the awaited packet from the model, with its context
+        :type message: (Packet, MeshMessageContext)
+        """
+        self._response = message
+        self._response_event.set()
+        self._response_event.clear()
+
+
+class Element(object):
+    """
+    This class represents one element of the device. Each element is assigned an address (254 max per device, sub-addr of the Unicast addr of the device).
+    """
+
+    def __init__(self, index=None, is_primary=False, models=[]):
+        """
+        Element init. Creates an element and assigns it an address.
+
+        :param index: Index of the element (in the profile). If index is 1, then its address is primary_unicast_addr + 1, defaults to None
+        :type addr: int | None, optional
+        :param is_primary: Is this element primary (only one per device). True if yes., optional defaults to False
+        :type is_primary: bool
+        :param models: List of model objects registered to this model if provided, defaults to []
+        :type models: List[Models]
+        """
+
+        self.is_primary = is_primary
+
+        # Number of models in the element
+        self.model_count = 0
+
+        self.index = index
+
+        # Number of vendor model count. Not used yet.
+        self.vnd_model_count = 0
+
+        # location descriptor, not used except in Composition Data
+        self.loc = 0
+
+        # List of models in the Element. List of Model objects (ModelClient|ModelServer,or Model if distant node).
+        # Order after init should never change since we use the index to access Models
+        self.models = []
+
+        # Like self.models but for vendor models
+        self.vnd_models = []
+
+        # Dictionary of opcode to model index (in self.models) that refers to the model that handle this message.
+        self.opcode_to_model_index = {}
+
+        for model in models:
+            self.register_model(model)
+
+    def register_model(self, model):
+        """
+        Adds a model to this element. Associate the opcodes allowed in Rx to this model instance.
+
+        Vendor models not supported (TODO: Composition Page 1 generation for VND models)
+
+        :param model: The Model object to add
+        :type model: Model
+        """
+
+        # Set the element_index of the model
+        model.element_index = self.index
+
+        if model.is_vendor_model:
+            self.vnd_models.append(model)
+            self.vnd_model_count += 1
+        else:
+            self.models.append(model)
+            self.model_count += 1
+
+        # Register the opcodes supported in reception by the model
+        model_index = len(self.models) - 1
+        model_opcodes = model.rx_handlers.keys()
+        already_registered_opcodes = self.opcode_to_model_index.keys()
+
+        for opcode in model_opcodes:
+            if opcode not in already_registered_opcodes:
+                self.opcode_to_model_index[opcode] = model_index
+
+    def get_index_of_model(self, model):
+        """
+        Returns the index of the model (index in the self.models list) or None if not in list
+
+        :param model: Model in question
+        :type model: Model
+        :returns: The index of the Model or None if not found[TODO:type]
+        :rtype: int | None
+        """
+        try:
+            return self.models.index(model)
+        except ValueError:
+            return None
+
+    def get_index_of_vnd_model(self, model):
+        """
+        Returns the index of the vendor model (index in the self.vnd_models list) or None if not in list
+
+        :param model: Model in question
+        :type model: Model
+        :returns: The index of the Model or None if not found[TODO:type]
+        :rtype: int | None
+        """
+        try:
+            return self.vnd_models.index(model)
+        except ValueError:
+            return None
+
+    def get_model_by_id(self, model_id):
+        """
+        Returns the model with the model id in argument that lives in the Element
+
+        :param model_id: Model ID of the model searched
+        :type model_id: int
+        :returns: The model associated with the model id
+        :rtype: Model | None
+        """
+        for model in self.models + self.vnd_models:
+            if model.model_id == model_id:
+                return model
+        return None
+
+    def get_model_for_opcode(self, opcode):
+        """
+        For a received message with an opocode, returns the model in the Element that managed it in reception (if any)
+
+        :param opcode: The opcode of the Access message
+        :type opcode: int | None
+        :returns: The model instance that will handle the message. None if no model to handle the message
+        :rtype: Model | None
+        """
+        if opcode not in self.opcode_to_model_index:
+            logger.debug(
+                "NO MODEL IN ELEMENT "
+                + str(self.index)
+                + " CAN HANDLE OPCODE "
+                + str(opcode)
+            )
+            return None
+
+        return self.models[self.opcode_to_model_index[opcode]]
+
+    def check_group_subscription(self, addr):
+        """
+        Checks if any model server in the element is subscribed to the addr in parameter
+        THE ADDR IS A GROUP ADDR IN THIS FUNCTION
+
+        :param addr: Group Addr to check
+        :type addr: Bytes
+        :returns: True is one model in the Element is subscribed to the addr, False otherwise
+        """
+        res = False
+        for model in self.models + self.vnd_models:
+            if isinstance(model, ModelServer) and model.supports_subscribe:
+                sub_list = model.get_state("subscription_list").get_value("group_addrs")
+                if addr in sub_list:
+                    res = True
+                    break
+        return res
+
+    def check_virt_subscription(self, addr):
+        """
+        Checks if any model server in the element is subscribed to the addr in parameter
+        THE ADDR IS A VIRTUAL ADDR IN THIS FUNCTION
+
+        :param addr: Virtual Addr to check
+        :type addr: Bytes
+        :returns: True is one model in the Element is subscribed to the addr, False otherwise
+        """
+        res = False
+        for model in self.models + self.vnd_models:
+            if isinstance(model, ModelServer) and model.supports_subscribe:
+                sub_list = model.get_state("subscription_list").get_value("label_uuids")
+                for label in sub_list:
+                    if compute_virtual_addr_from_label_uuid(label) == addr:
+                        res = True
+                        break
+        return res
+
+
+class ModelRelationship(object):
+    def __init__(
+        self,
+        elem_base=None,
+        elem_ext=None,
+        mod_base=None,
+        mod_ext=None,
+    ):
+        """
+        Model Relationship. Registers the extension relationship that a Model has with another
+        The ModelRelationship object shoukd live in the extending moddel (the "child") only.
+        Check Mesh Prt Spec Section 4.2.2.2
+
+        :param elem_base: Element where the base model lives, defaults to None
+        :type elem_base: Element, optional
+        :param elem_ext: Element where the model extending the other lives, defaults to None
+        :type elem_ext: Element, optional
+        :param mod_id_base: Model object of the base model, defaults to None
+        :type mod_id_base: Model, optional
+        :param mod_id_ext: Model object of the extending model, defaults to None
+        :type mod_id_ext: Model, optional
+        """
+        self.elem_base = elem_base
+        self.elem_ext = elem_ext
+        self.mod_base = mod_base
+        self.mod_ext = mod_ext

@@ -1037,6 +1037,17 @@ class BleDomain(Registry):
             ediv=ediv
         )
 
+@pb_bind(ProtocolHub, name="btmesh", version=1)
+class BTMeshDomain(BleDomain):
+    NAME = 'btmesh'
+    VERSIONS = {}
+
+    def __init__(self, version: int):
+        """Initializes a BTMesh domain instance
+        """
+        super().__init__(version)
+
+
 from .address import SetBdAddress
 from .sniffing import SniffAdv, SniffConnReq, SniffAccessAddress, SniffActiveConn, \
     AccessAddressDiscovered
