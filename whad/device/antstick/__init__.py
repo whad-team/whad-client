@@ -10,7 +10,7 @@ from struct import pack
 from usb.util import find_descriptor, endpoint_direction, ENDPOINT_IN, ENDPOINT_OUT
 from usb.core import find, USBError, USBTimeoutError
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
-from whad.device import VirtualDevice
+from ..device import VirtualDevice
 
 from whad.hub.ant import Commands
 from whad.hub.ant import ChannelType as WhadChannelType
@@ -36,9 +36,9 @@ from whad.scapy.layers.antstick import ANTStick_Message, ANTStick_Command_Reques
     ANTStick_RSSI_Data_Extension, ANTStick_Timestamp_Data_Extension, \
     ANTStick_Data_Burst_Data, ANTStick_Data_Extension, ANTStick_Advanced_Data_Burst_Data
 
-from whad.device.virtual.antstick.constants import AntStickIds
-from whad.device.virtual.antstick.channel import ChannelStatus, ChannelType, Channel
-from whad.device.virtual.antstick.network import Network
+from .constants import AntStickIds
+from .channel import ChannelStatus, ChannelType, Channel
+from .network import Network
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ def get_antstick(index=0, bus=None, address=None):
 
 
 
-class ANTStickDevice(VirtualDevice):
+class ANTStick(VirtualDevice):
     """ANTStick virtual device implementation.
     """
 
@@ -91,7 +91,7 @@ class ANTStickDevice(VirtualDevice):
                     find_all=True
                 ))
             ):
-                available_devices.append(ANTStickDevice(bus=antstick.bus, address=antstick.address))
+                available_devices.append(ANTStick(bus=antstick.bus, address=antstick.address))
         except ValueError:
             logger.warning("Cannot access ANTStick, root privileges may be required.")
 
@@ -1065,8 +1065,3 @@ class ANTStickDevice(VirtualDevice):
                 ), no_response = True
             )
             self._send_whad_command_result(CommandResult.SUCCESS)
-            
-
-
-if __name__ == '__main__':
-    print(ANTStickDevice.list())
