@@ -11,10 +11,21 @@ from whad.hub.esb import Commands as EsbCommands
 from whad.hub.unifying import Commands as UnifyingCommands
 from whad.hub.phy import Commands as PhyCommands
 
+# Bluetooth LE
 DLT_BLUETOOTH_LE_LL_WITH_PHDR   = 256
+
+# IEEE 802.15.4
+DLT_IEEE802_15_4_LINUX          = 191
+DLT_IEEE802_15_4_WITHFCS        = 195
+DLT_IEEE802_15_4_NONASK_PHY     = 215
+DLT_IEEE802_15_4_NOFCS          = 230
 DLT_IEEE802_15_4_TAP            = 283
+
+# WHAD ESB
 DLT_RESERVED_02                 = 148
 DLT_RESERVED_03                 = 149
+
+# WHAD PHY
 DLT_RESERVED_06                 = 152
 
 CAPABILITIES = {
@@ -32,6 +43,20 @@ CAPABILITIES = {
             Domain.BtLE : (
                 (Capability.Inject),
                 [BleCommands.SendPDU, BleCommands.Start, BleCommands.Stop]
+            )
+        }
+    ),
+    DLT_IEEE802_15_4_WITHFCS: (
+        {
+            Domain.Dot15d4 : (
+                (Capability.Sniff),
+                [Dot15d4Commands.Sniff, Dot15d4Commands.Start, Dot15d4Commands.Stop]
+            )
+        },
+        {
+            Domain.Dot15d4 : (
+                (Capability.Inject),
+                [Dot15d4Commands.Send,Dot15d4Commands.Start, Dot15d4Commands.Stop]
             )
         }
     ),
