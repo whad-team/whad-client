@@ -162,7 +162,7 @@ class PduReceived(PbMessageWrapper):
         if packet.metadata.rssi is not None:
             msg.rssi = packet.metadata.rssi
         if packet.metadata.timestamp is not None:
-            msg.rssi = packet.metadata.timestamp
+            msg.timestamp = packet.metadata.timestamp
         if packet.metadata.is_fcs_valid is not None:
             msg.fcs_validity = packet.metadata.is_fcs_valid
 

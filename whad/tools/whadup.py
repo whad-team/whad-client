@@ -19,6 +19,7 @@ from whad.hub.dot15d4 import Commands as Dot15d4Commands
 from whad.hub.esb import Commands as ESBCommands
 from whad.hub.unifying import Commands as UnifyingCommands
 from whad.hub.phy import Commands as PhyCommands
+from whad.hub.ant import Commands as AntCommands
 from whad.hub.discovery import Domain, Capability
 
 
@@ -166,12 +167,37 @@ PHY_COMMANDS = {
     PhyCommands.Stop: "Stop: can stop depending on the current mode",
 }
 
+ANT_COMMANDS = {
+    AntCommands.SetDeviceNumber: "SetDeviceNumber: can select a device number",
+    AntCommands.SetDeviceType: "SetDeviceType: can select a device type",
+    AntCommands.SetTransmissionType: "SetTransmissionType: can select a transmission type",
+    AntCommands.SetChannelPeriod: "SetChannelPeriod: can set a channel period",
+    AntCommands.SetNetworkKey: "SetNetworkKey: can configure a network key",
+    AntCommands.AssignChannel: "AssignChannel: can assign a channel",
+    AntCommands.UnassignChannel: "UnassignChannel: can unassign a channel",
+    AntCommands.OpenChannel: "OpenChannel: can open a channel",
+    AntCommands.CloseChannel: "CloseChannel: can close a channel",
+    AntCommands.SetRFChannel: "SetRFChannel: can select a given RF channel",
+    AntCommands.ListChannels: "ListChannels: can list available channels",
+    AntCommands.ListNetworks: "ListNetworks: can list available networks",
+    AntCommands.Sniff: "Sniff: can sniff an ANT channel",
+    AntCommands.Jam: "Jam: can jam an ANT channel",
+    AntCommands.Send: "Send: can send ANT PDU",
+    AntCommands.SendRaw: "SendRaw: can send raw ANT PDU",
+    AntCommands.MasterMode: "MasterMode: can act as a master node",
+    AntCommands.SlaveMode: "SlaveMode: can act as a slave node",
+    AntCommands.Start: "Start: can start depending on the current mode",
+    AntCommands.Stop: "Stop: can stop depending on the current mode",
+
+}
+
 COMMANDS = {
     Domain.BtLE: BLE_COMMANDS,
     Domain.Esb: ESB_COMMANDS,
     Domain.Dot15d4: DOT15D4_COMMANDS,
     Domain.LogitechUnifying: UNIFYING_COMMANDS,
-    Domain.Phy: PHY_COMMANDS
+    Domain.Phy: PHY_COMMANDS, 
+    Domain.ANT: ANT_COMMANDS
 
 }
 

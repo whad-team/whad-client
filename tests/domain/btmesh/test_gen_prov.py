@@ -313,7 +313,7 @@ class TestBTMeshGenericProvisioning(BTMeshGenericProvisioningTest):
                 GenericProvisioningMessage(tx_pkt3, trans_nb),
             )
         )
-        # Send the ack to complte the transaction for rest of tests
+        # Send the ack to complete the transaction for rest of tests
         pb_adv_layer.send(
             pb_adv_layer.target,
             GenericProvisioningMessage(

@@ -102,6 +102,10 @@ class ProtocolHub(Registry):
         return self.get('esb')
 
     @property
+    def ant(self):
+        return self.get('ant')
+
+    @property
     def unifying(self):
         return self.get('unifying')
 
@@ -134,7 +138,9 @@ class ProtocolHub(Registry):
         elif factory == 'unifying':
             from .unifying import UnifyingDomain
             return UnifyingDomain
-
+        elif factory == 'ant':
+            from .ant import AntDomain
+            return AntDomain
         # Not found
         logger.warning(
             "[protohub::load()] cannot dynamically load message definitions for domain %s !",
@@ -197,6 +203,9 @@ class ProtocolHub(Registry):
         elif self.esb.is_packet_compat(packet):
             logger.debug('[hub] convert_packet(): packet is ESB')
             msg = self.esb.convert_packet(packet)
+        elif self.ant.is_packet_compat(packet):
+            logger.debug('[hub] convert_packet(): packet is ANT')
+            msg = self.ant.convert_packet(packet)
         elif self.phy.is_packet_compat(packet):
             logger.debug('[hub] convert_packet(): packet is PHY')
             msg = self.phy.convert_packet(packet)

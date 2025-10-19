@@ -70,6 +70,13 @@ def get_hci(index):
     '''
     Returns an HCI socket based on adapter index.
     '''
+    # Make sure Python installation is built with Bluetooth support
+    try:
+        from socket import AF_BLUETOOTH
+    except ImportError as e:
+        logger.error("Python interpreter is built without Bluetooth support, cannot use HCI devices")
+        return None
+
     try:
         logger.debug("Creating bluetooth socket ...")
         socket = BluetoothUserSocket(index)

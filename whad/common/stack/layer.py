@@ -405,7 +405,7 @@ class Layer(object):
                 setattr(contextual_clazz, 'INSTCOUNT', 0)
                 instcount = 0
             instance_name = '%s#%d' % (contextual_clazz.alias, instcount)
-
+            
             # Create layer with this new instance name.
             return self.create_layer(contextual_clazz, instance_name)
         else:
@@ -619,9 +619,9 @@ class Layer(object):
             handler = target_layer.get_handler(source_layer, tag)
             if handler is not None:
                 if handler.is_contextual:
-                    handler(source, data, **kwargs)
+                    return handler(source, data, **kwargs)
                 else:
-                    handler(data, **kwargs)
+                    return handler(data, **kwargs)
             else:
                 print('[oops] No handler found in layer %s to process messages from %s' % (destination, source))
         else:

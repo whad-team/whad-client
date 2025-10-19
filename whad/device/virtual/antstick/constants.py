@@ -1,0 +1,4 @@
+class AntStickIds:
+    ANTSTICK_ID_VENDOR      = 0x0FCF
+    ANTSTICK_ID_PRODUCT     = 0x1008
+    ANTSTICK2_ID_PRODUCT    = 0x1009
