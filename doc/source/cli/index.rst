@@ -57,7 +57,8 @@ Bluetooth Mesh tools
 .. toctree::
     :maxdepth: 1
 
-    btmesh/btmesh
+    btmesh/btmesh-provisionee
+    btmesh/btmesh-provisioner
 
 
 

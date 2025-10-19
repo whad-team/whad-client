@@ -1,16 +1,14 @@
-wbtmesh-provisionee | wbtmesh-provisioner: Bluetooth Mesh interactive shell
-===========================================================================
+wbtmesh-provisionee: Bluetooth Mesh Provisionee Node
+====================================================
 
 ``wbtmesh-provisionee`` and ``wbtmesh-provisioner`` commands launch an interactive shell
 allowing the user to create a BTMesh node and use it to interact with the network. This tool must be used with a device
 supporting the *Bluetooth Low Energy* domain.
 
-Both commands ``wbtmesh-provisionee`` and ``wbtmesh-provisioner`` share most of the same behaviour. Their only difference
-lie in the provisioning commands. ``wbtmesh-provisionee`` is a node that can be provisioner by a provisioner, while ``wbtmesh-provisioner``
-can act as a provisioner (but cannot be provisioned by another provisioner).
+Note that both commands ``wbtmesh-provisionee`` and ``wbtmesh-provisioner`` share most of the same behaviour. Their only difference
+lie in the provisioning commands. 
 
-For simplicity, The ``wbtmesh-provisionee`` command will be used as an example but ``wbtmesh-provisioner`` can be also be used. Sections about
-provisioning will differentiate both commands.
+``wbtmesh-provisionee`` is a node that can be provisioned by a provisioner.
 
 .. contents:: Table of Contents
     :local:
@@ -22,7 +20,7 @@ Usage
 
 .. code-block:: text
 
-    wble-provisionee -i <interface name>
+    wbtmesh-provisionee -i <interface name>
 
 ``wbtmesh-provisionee`` command only supports a single mandatory argument with ``--interface`` (``-i``) to specify the 
 WHAD interface to use. This command only functions in interactive mode.
@@ -82,14 +80,13 @@ For that, WHAD allows you to either :
 * **Auto provision the node**, that is use a set a provided keys to provision the node without an external provisioner
 * **Real provisioning** via an external provisioner (provisionee node only !)
 
-.. _auto-prov:
+.. _provisionee-auto-prov:
 
 Auto Provisioning
 ^^^^^^^^^^^^^^^^^
 
-This feature allows the local node to be provisioned with a preset of keys and address without any exterior device.
-A provisioner node using ``wbtmesh-provisioner`` can only be provisioned with this method.
-
+This feature allows the local node to be provisioned with a preset of keys and address without requiring an interaction 
+with an external device.
 
 The ``auto-prov`` command allows the user to set the values for the auto-provisioning and launch it.
 
@@ -111,8 +108,8 @@ The options for auto-provisioning are :
 
 Then, auto-provisioning can be started via ``auto-prov start``.
 
-Normal Provisioning (provisionee perspective)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Normal Provisioning
+^^^^^^^^^^^^^^^^^^^
 
 A provisionee node (launched with ``wbtmesh-provisionee``) can be provisioned via an external provisioner.
 The external provisioner can be another WHAD device or a device running the esp-idf/Zephyr OS BTMesh stacks.
@@ -155,33 +152,13 @@ value provided by the provisioner via the ``prov auth`` command :
     Node is provisioned
     wbtmesh-provisionee [running]>
 
-Normal Provisioning (provisioner perspective)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-A provisioner can provisioner other nodes. The provisioner itself has to be auto-provisioned such as described in :ref:`auto-prov`.
-
-The following example show how to listen for beacons and provision a node. The authentication and capabilities settings/usages are the same as the previous section.
-
-.. code-block:: text
-
-    wbtmesh-provisioner> auto_prov start
-    Node has been successfully auto provisioned
-    wbtmesh-provisioner [running]> listen_beacons on
-    Successfully started the beacons listening
-    wbtmesh-provisioner [running]> list_unprov
-    Index | Device UUID
-    |─ 0 : ddddaaaa-aaaa-aa01-0000-000000000000
-    wbtmesh-provisioner [running]> prov start 0
-    Node is provisioned
-    wbtmesh-provisioner [running]>
-
 Sending an application message to the network
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 With a provisioned node, we can send a message to the network using our node.
 
 The main parameters of a message can be set using the ``msg_context`` command.
-This command allows to see and set the source, destination, ttl, keys,... to use for the message.
+This command allows to see and set the source, destination, TTL, keys,... to use for the message.
 
 For example, to see the current parameters and change the destination address : 
 
@@ -303,7 +280,7 @@ The ``resume`` command is used to go from **Element** and **Attack** modes to **
     help <command>
 
 address
-^^^^^^^
+~~~~~~~~
 
 **Started** mode only.
 
@@ -322,7 +299,7 @@ Without any argument, it prints the address of the node.
     Address of the device is now : 0x3
     wbtmesh-provisionee [running]>
 
-.. _appkeys_command:
+.. _provisionee_appkeys_commands:
 
 app_keys
 ~~~~~~~~
@@ -360,7 +337,7 @@ The `remove` action can be used to remove an AppKey :
     wbtmesh-provisionee [running]> app_keys remove 1 0
     Successfully removed AppKey with index 1 bound to NetKey 0
 
-Finally, to send an AppKey to a distant node (with their DevKey), use the `send` command. See how to list and manage distant nodes in the :ref:`nodes_command`.
+Finally, to send an AppKey to a distant node (with their DevKey), use the `send` command. See how to list and manage distant nodes in the :ref:`provisionee_nodes_command`.
 
 .. code-block:: text
 
@@ -377,10 +354,10 @@ net_keys
 
     net_keys [ACTION] [NET_KEY_IDX] [NET_KEY_VALUE]
 
-This command can add/update and remove NetKeys. This command is very similar to the :ref:`appkeys_command`.
+This command can add/update and remove NetKeys. This command is very similar to the :ref:`provisionee_appkeys_commands`.
 The ony differences lie in that the `net_keys` command only needs one key index per command, and that we cannot send a net_key using this command.
 
-.. _nodes_command:
+.. _provisionee_nodes_command:
 
 nodes
 ~~~~~
@@ -509,7 +486,7 @@ bind_app_keys
 
     bind_app_keys NODE_PRIMARY_ADDRESS ELEMENT_IDX MODEL_ID APP_KEY_IDX
 
-This command allows the local node to send a Configuration message to a distant node. The distant node needs to be added/present (see :ref:`nodes_command`).
+This command allows the local node to send a Configuration message to a distant node. The distant node needs to be added/present (see :ref:`provisionee_nodes_command`).
 The message sent is a `Config Model App Bind` message sent using the stored DevKey for the destination node.
 
 If a success, we receive a Status message and a success message is displayed.
@@ -521,7 +498,7 @@ If a success, we receive a Status message and a success message is displayed.
     Successfully binded the app key to the model.
 
 
-.. _msg_context_command:
+.. _provisionee_msg_context_command:
 
 msg_context
 ~~~~~~~~~~~
@@ -560,7 +537,7 @@ onoff
 
     onoff ["1"|"0"]
 
-This command allows to send, using the parameters set with :ref:`msg_context_command`, a `Generic On/Off Set Message`.
+This command allows to send, using the parameters set with :ref:`provisionee_msg_context_command`, a `Generic On/Off Set Message`.
 The value in parameter is whether we send an `on` or `off` message. Tnis message expects an Status message in response and if received, interface displays it.
 
 
@@ -602,7 +579,7 @@ send_raw_access
 
     send_raw_access RAW_MESSAGE
 
-This commands sends an Access message using the parameters set via :ref:`msg_context_command`. The argument is the hex string of the Model message.
+This commands sends an Access message using the parameters set via :ref:`provisionee_msg_context_command`. The argument is the hex string of the Model message.
 In python, in order to get the raw message, you can create it in the interpreter, for example :
 
 .. code-block:: python
@@ -791,7 +768,7 @@ The `write` action permits to write a value in a state.
     Successfully set the value for the state.
 
 
-.. _network_discovery_command:
+.. _provisionee_network_discovery_command:
 
 network_discovery
 ~~~~~~~~~~~~~~~~~
@@ -805,7 +782,7 @@ network_discovery
 This command performs a discovery of the nodes present within the network when the nodes are configured to use Directed Forwarding (DF).
 This methods tries to create a DF path for all adresses between the arguments `addr_low` and `addr_high`. Only the nodes that exist will respond.
 
-The result of the discovery will be displayed when using the :ref:`nodes_command`. The `delay` argument is used to customize the delay between the creation of 2 consecutive paths (a longer delay avoids collision of packets/failure of path creation).
+The result of the discovery will be displayed when using the :ref:`provisionee_nodes_command`. The `delay` argument is used to customize the delay between the creation of 2 consecutive paths (a longer delay avoids collision of packets/failure of path creation).
 
 .. code-block:: text
 
@@ -824,10 +801,10 @@ get_hops
 
     get_hops
 
-This command should be used after the usage of :ref:`network_discovery_command`. It uses another set of Directed Forwarding feature to 
-estimate the distance (in number of hops) between the local WHAD node and every node discovered via :ref:`network_discovery_command`.
+This command should be used after the usage of :ref:`provisionee_network_discovery_command`. It uses another set of Directed Forwarding feature to 
+estimate the distance (in number of hops) between the local WHAD node and every node discovered via :ref:`provisionee_network_discovery_command`.
 
-The results are available using the :ref:`nodes_command`.
+The results are available using the :ref:`provisionee_nodes_command`.
 
 .. code-block:: text
 
@@ -847,10 +824,6 @@ auto_prov
 .. code-block:: text
 
     auto_prov ["net_key"|"dev_key"|"app_key"|"unicast_addr"|"start"] VALUE
-
-
-This command can be used with ``wbtmesh-provisionee`` or ``wbtmesh-provisioner`` commands. In the case of the ``wbtmesh-provisioner``
-mode, the `auto_prov` command is the only way to provision the node.
 
 In order to set parameters before performing the auto_provisioning, the `auto_prov <field> <value>` syntax can be used.
 
@@ -879,8 +852,7 @@ prov_capabilities
 
 
 This command allows to see and set the provisioning capabilities values of the local node. For a provisionee node, this will be
- used once when provisioned. For a provisioner node, this will be used everytime a node is provisioned by it. 
-
+ used once when provisioned. 
 
 .. code-block:: text
 
@@ -900,7 +872,7 @@ This command allows to see and set the provisioning capabilities values of the l
 prov
 ~~~~
 
-**Normal** mode only. ``wbtmesh-provisionee`` only.
+**Normal** mode only. 
 
 .. code-block:: text
 
@@ -929,77 +901,3 @@ In the case where OOB authentication is used, the provisionee might have to inpu
     wbtmesh-provisionee> prov auth 9557
     Node is provisioned
     wbtmesh-provisionee [running]>
-
-
-.. _listen_beacons_command:
-
-listen_beacons
-~~~~~~~~~~~~~~
-
-**Started** mode only. ``wbtmesh-provisioner`` only.
-
-.. code-block:: text
-
-    listen_beacons ["on"/"off"]
-
-On a provisioned Provisioner node, this command actiavates or deativates the monitoring of `Unprovisioned Device Beacons`.
-`Unprovisioned Device Beacon` received will be available with the :ref:`list_unprov_command`.
-
-.. code-block:: text
-
-    wbtmesh-provisioner [running]> listen_beacons on
-    Successfully started the beacons listening
-
-
-.. _list_unprov_command:
-
-list_unprov
-~~~~~~~~~~~
-
-**Started** mode only. ``wbtmesh-provisioner`` only.
-
-.. code-block:: text
-
-    list_unprov
-
-This command allows to see the list if devices wainting for a provisioning that we can provision.
-A device is added to the list when it sends an `Unprovisioned Device Beacon` and we are listening for beacons (see :ref:`listen_beacons_command`).
-
-.. code-block:: text
-
-    wbtmesh-provisioner [running]> list_unprov
-    Index | Device UUID
-    |─ 0 : ddddaaaa-aaaa-aa01-0000-000000000000
-
-When a device is provisioned by the WHAD provisioner node, it is removed from the list.
-
-
-prov_distant
-~~~~~~~~~~~~
-
-**Started** mode only. ``wbtmesh-provisioner`` only.
-
-.. code-block:: text
-
-    prov_distant ["start"|"auth"] index|value
-
-
-This command is used by a Provisoner node to provision a distant node that sent an `Unprovisioned Device Beacon` we received.
-Using the :ref:`list_unprov_command`, choose the index of the device to provision t start it with the `start` action.
-
-
-.. code-block:: text
-
-    wbtmesh-provisioner [running]> prov_distant start 0
-    Node is provisioned
-
-The information about the distant provisioned node is available with the :ref:`nodes_command`.
-
-If OOB is used, the Provisioner might need to enter an authentication pin in the console. Use the `auth` action for that.
-
-.. code-block:: text
-
-    wbtmesh-provisioner [running]> prov_distant start 0
-    /!\ You need to type the authentication value provided by the Provisioner via OOB canal. Use command 'prov auth VALUE' to resume provisioning
-    wbtmesh-provisioner [running]> prov_distant auth Z7Jg
-    Distant Node is provisioned
