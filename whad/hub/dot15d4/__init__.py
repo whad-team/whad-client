@@ -125,18 +125,24 @@ class Dot15d4Metadata(Metadata):
     def convert_from_header(cls, pkt) -> "Dot15d4Metadata":
         """Load metadata from packet header into a Dot15d4Metadata structure
         """
-        rssi = None
-        lqi = None
-        channel = None
-        for layer in pkt[Dot15d4TAP_Hdr].data:
-            if Dot15d4TAP_Received_Signal_Strength in layer:
-                rssi = layer.rss
-            elif Dot15d4TAP_Link_Quality_Indicator in layer:
-                lqi = layer.lqi
-            elif Dot15d4TAP_Channel_Assignment in layer:
-                channel = layer.channel_number
-            else:
-                pass
+        # Default values for DLTs that do not have any metadata.
+        rssi = 0
+        lqi = 200
+        channel = 15
+
+        # Packets from PCAP with DLT 283 (IEEE 802.15.4 TAP)
+        # Other DLTs don't have any metadata about RSSI, LQI or channel.
+        if Dot15d4TAP_Hdr in pkt:
+            for layer in pkt[Dot15d4TAP_Hdr].data:
+                if Dot15d4TAP_Received_Signal_Strength in layer:
+                    rssi = layer.rss
+                elif Dot15d4TAP_Link_Quality_Indicator in layer:
+                    lqi = layer.lqi
+                elif Dot15d4TAP_Channel_Assignment in layer:
+                    channel = layer.channel_number
+                else:
+                    pass
+
         return Dot15d4Metadata(
             rssi = int(rssi),
             lqi = lqi,
