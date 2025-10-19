@@ -15,9 +15,7 @@ from whad.ble.profile.advdata import (
     AdvUuid16List, AdvDataError
 )
 from whad.ble.connector.base import BLE
-from whad.ble.connector import (
-    Central, Peripheral, Sniffer, Hijacker, Injector, Scanner, PeripheralClient, Scanner
-)
+from whad.ble.connector import Central, Peripheral, Sniffer, Hijacker, Injector, Scanner, PeripheralClient, Advertiser
 from whad.ble.utils.phy import PHYS
 
 def is_bdaddr_valid(bd_addr):
@@ -61,5 +59,6 @@ __all__ = [
     'PHYS',
     'ConnectionEventTrigger',
     'ManualTrigger',
-    'ReceptionTrigger'
+    'ReceptionTrigger',
+    'Advertiser'
 ]

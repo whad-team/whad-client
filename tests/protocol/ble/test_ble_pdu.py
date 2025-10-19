@@ -12,7 +12,7 @@ BD_ADDRESS_DEFAULT = bytes([0x11, 0x22, 0x33, 0x44, 0x55, 0x66])
 @pytest.fixture
 def set_adv_data():
     msg = Message()
-    msg.ble.set_adv_data.scan_data = b'TEST'
+    msg.ble.set_adv_data.adv_data = b'TEST'
     msg.ble.set_adv_data.scanrsp_data = b'RESPONSE'
     return msg
 
@@ -25,17 +25,17 @@ class TestSetAdvData(object):
         """
         parsed_obj = SetAdvData.parse(1, set_adv_data)
         assert isinstance(parsed_obj, SetAdvData)
-        assert parsed_obj.scan_data == b'TEST'
+        assert parsed_obj.adv_data == b'TEST'
         assert parsed_obj.scanrsp_data == b'RESPONSE'
 
     def test_crafting(self):
         """Check SetAdvData crafting
         """
         msg = SetAdvData(
-            scan_data=b'HELLOWORLD',
+            adv_data=b'HELLOWORLD',
             scanrsp_data=b'FOOBAR'
         )
-        assert msg.scan_data == b'HELLOWORLD'
+        assert msg.adv_data == b'HELLOWORLD'
         assert msg.scanrsp_data == b'FOOBAR'
 
 @pytest.fixture

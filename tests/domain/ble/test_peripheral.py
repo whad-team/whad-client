@@ -8,6 +8,7 @@ from scapy.layers.bluetooth import (
     ATT_Read_By_Type_Response, ATT_Hdr
 )
 
+from whad.hub.ble import AdvType, ChannelMap
 from whad.ble.mock.peripheral import PeripheralMock
 from whad.ble import BDAddress, Peripheral
 
@@ -106,13 +107,17 @@ def test_advertising(periph_mock):
         AdvFlagsField(),
         AdvShortenedLocalName(b"TestPeriph")
     )
-    _ = Peripheral(periph_mock, adv_data=periph_adv)
+    _ = Peripheral(periph_mock, adv_data=periph_adv, adv_type=AdvType.ADV_NONCONN_IND, channels=[37,39],
+                   interval=(0x42, 0x2000))
     adv_data = AdvDataFieldList.from_bytes(periph_mock.get_adv_data())
     assert adv_data.get(AdvFlagsField) is not None
     assert adv_data.get(AdvShortenedLocalName) is not None
     short_local_name = adv_data.get(AdvShortenedLocalName)
     assert isinstance(short_local_name, AdvShortenedLocalName)
     assert short_local_name.name == b"TestPeriph"
+    assert periph_mock.get_adv_type() == AdvType.ADV_NONCONN_IND
+    assert periph_mock.get_adv_channel_map() == ChannelMap([37,39])
+    assert periph_mock.get_adv_interval() == (0x42, 0x2000)
 
 def test_start(periph_mock):
     """Test peripheral mode start."""

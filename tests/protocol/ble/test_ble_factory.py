@@ -6,7 +6,7 @@ from whad.protocol.whad_pb2 import Message
 from whad.protocol.ble.ble_pb2 import JamAdvCmd, CentralModeCmd, StartCmd, StopCmd
 from whad.hub.ble import BleDomain, SetBdAddress, SniffAdv, SniffConnReq, \
     SniffAccessAddress, SniffActiveConn, AccessAddressDiscovered, JamAdv, \
-    JamAdvChan,JamConn, ScanMode, AdvMode, CentralMode, PeriphMode, SetAdvData, \
+    JamAdvChan,JamConn, ScanMode, AdvMode, AdvModeV3, CentralMode, PeriphMode, PeriphModeV3, SetAdvData, \
     SendBleRawPdu, SendBlePdu, BleAdvPduReceived,AddressType, \
     BlePduReceived, BleRawPduReceived, ConnectTo, Disconnect, Connected, Disconnected, \
     BleStart, BleStop, HijackMaster, HijackSlave, HijackBoth, Hijacked, ReactiveJam, \
@@ -15,7 +15,7 @@ from whad.hub.ble import BleDomain, SetBdAddress, SniffAdv, SniffConnReq, \
     SetEncryption
 
 from whad.hub.ble.bdaddr import BDAddress
-from whad.hub.ble.chanmap import DefaultChannelMap
+from whad.hub.ble.chanmap import DefaultChannelMap, ChannelMap
 
 class TestBleDomainFactory(object):
     """Test BleDomain factory
@@ -23,7 +23,17 @@ class TestBleDomainFactory(object):
 
     @pytest.fixture
     def factory(self):
+        """ Create a BleDomain instance with WHAD
+        protocol version 1 (and 2)
+        """
         return BleDomain(1)
+
+    @pytest.fixture
+    def factory_v3(self):
+        """ Create a BleDomain class instance with WHAD
+        protocol version 3.
+        """
+        return BleDomain(3)
 
     def test_SetBdAddress(self, factory: BleDomain):
         """Test creation of SetBdAddress message
@@ -103,11 +113,39 @@ class TestBleDomainFactory(object):
         obj = factory.create_scan_mode(active=True)
         assert isinstance(obj, ScanMode)
 
-    def test_AdvMode(self, factory: BleDomain):
-        """Test creation of AdvMode message
+    def test_AdvMode_v1(self, factory: BleDomain):
+        """Test creation of AdvMode message for proto v1
         """
         obj = factory.create_adv_mode(adv_data=b"FOOBAR")
         assert isinstance(obj, AdvMode)
+
+    def test_AdvMode_v3(self, factory_v3: BleDomain):
+        """Test creation of AdvMode message for proto v1
+        """
+        obj = factory_v3.create_adv_mode(adv_data=b"FOOBAR", inter_min=0x40,
+                                      inter_max=0x1337, channel_map=ChannelMap([37,38,39]))
+        assert isinstance(obj, AdvModeV3)
+
+    def test_AdvMode_v3_bad_inter_min(self, factory_v3: BleDomain):
+        """Test creation of AdvMode message with bad interval minimal value"""
+        with pytest.raises(ValueError):
+            factory_v3.create_adv_mode(b"FOOBAR", inter_min=0, inter_max=0x4000)
+
+    def test_AdvMode_v3_bad_inter_max(self, factory_v3: BleDomain):
+        """Test creation of AdvMode message with bad interval minimal value"""
+        with pytest.raises(ValueError):
+            factory_v3.create_adv_mode(b"FOOBAR", inter_min=0x20, inter_max=0)
+
+    def test_AdvMode_v3_bad_interval_range(self, factory_v3: BleDomain):
+        """Test creation of AdvMode message with bad interval minimal value"""
+        with pytest.raises(ValueError):
+            factory_v3.create_adv_mode(b"FOOBAR", inter_min=0x1000, inter_max=0x20)
+
+    def test_AdvMode_v3_bad_channel_map(self, factory_v3: BleDomain):
+        """Test creation of AdvMode message with bad interval minimal value"""
+        with pytest.raises(ValueError):
+            factory_v3.create_adv_mode(b"FOOBAR", channel_map=ChannelMap([1,2,3]))
+
 
     def test_CentralMode(self, factory: BleDomain):
         """Test creation of CentralMode message
@@ -120,6 +158,37 @@ class TestBleDomainFactory(object):
         """
         obj = factory.create_periph_mode(adv_data=b"FOOBAR")
         assert isinstance(obj, PeriphMode)
+        assert obj.adv_type == AdvType.ADV_IND
+        assert obj.channel_map == ChannelMap([37, 38, 39]).value
+        assert obj.inter_min == 0x20
+        assert obj.inter_max == 0x20
+
+    def test_Periph_v3(self, factory_v3: BleDomain):
+        """Test creation of PeriphMode message
+        """
+        obj = factory_v3.create_periph_mode(adv_data=b"FOOBAR", inter_min=0x40,
+                                            inter_max=0x1337, channel_map=ChannelMap([37,38,39]))
+        assert isinstance(obj, PeriphModeV3)
+
+    def test_Periph_v3_bad_inter_min(self, factory_v3: BleDomain):
+        """Test creation of PeriphMode message with bad interval minimal value"""
+        with pytest.raises(ValueError):
+            factory_v3.create_periph_mode(b"FOOBAR", inter_min=0, inter_max=0x4000)
+
+    def test_Periph_v3_bad_inter_max(self, factory_v3: BleDomain):
+        """Test creation of PeriphMode message with bad interval minimal value"""
+        with pytest.raises(ValueError):
+            factory_v3.create_periph_mode(b"FOOBAR", inter_min=0x20, inter_max=0)
+
+    def test_Periph_v3_bad_interval_range(self, factory_v3: BleDomain):
+        """Test creation of PeriphMode message with bad interval minimal value"""
+        with pytest.raises(ValueError):
+            factory_v3.create_periph_mode(b"FOOBAR", inter_min=0x1000, inter_max=0x20)
+
+    def test_Periph_v3_bad_channel_map(self, factory_v3: BleDomain):
+        """Test creation of PeriphMode message with bad interval minimal value"""
+        with pytest.raises(ValueError):
+            factory_v3.create_periph_mode(b"FOOBAR", channel_map=ChannelMap([1,2,3]))
 
     def test_Start(self, factory: BleDomain):
         """Test creation of BleStart message
@@ -158,7 +227,7 @@ class TestBleDomainFactory(object):
             21,
             DefaultChannelMap,
             0xaabbcc
-        )   
+        ) 
         assert isinstance(obj, Synchronized)
 
     def test_Connected(self, factory: BleDomain):

@@ -1,5 +1,6 @@
 """WHAD Protocol Bluetooth Low Energy domain message abstraction layer.
 """
+import logging
 from typing import List, Optional
 from dataclasses import dataclass, field, fields
 
@@ -13,6 +14,8 @@ from whad.hub.registry import Registry
 from whad.hub.message import HubMessage, pb_bind
 from whad.hub import ProtocolHub
 from whad.hub.metadata import Metadata
+
+logger = logging.getLogger(__name__)
 
 class Commands:
     """BLE Commands
@@ -66,7 +69,7 @@ class AdvType:
 class AddressType:
     PUBLIC = BleAddrType.PUBLIC
     RANDOM = BleAddrType.RANDOM
-    
+
 @dataclass(repr=False)
 class BLEMetadata(Metadata):
     direction : BleDirection = None
@@ -428,7 +431,10 @@ class BleDomain(Registry):
             active=active
         )
 
-    def create_adv_mode(self, adv_data: bytes, scan_rsp: bytes = None) -> HubMessage:
+    def create_adv_mode(self, adv_data: bytes, scanrsp_data: Optional[bytes] = None,
+                        adv_type: BleAdvType = BleAdvType.ADV_IND,
+                        channel_map: Optional[ChannelMap] =  None,
+                        inter_min: int = 0x20, inter_max: int = 0x4000) -> HubMessage:
         """Create an AdvMode message.
 
         :param adv_data: Advertisement data (31 bytes max)
@@ -439,10 +445,40 @@ class BleDomain(Registry):
         :rtype: AdvMode
         """
         message = BleDomain.bound('adv_mode', self.proto_version)(
-            scan_data=adv_data
+            adv_data=adv_data,
         )
-        if scan_rsp is not None:
-            message.scanrsp_data = scan_rsp
+
+        # Set scan response if provided
+        if scanrsp_data is not None:
+            message.scanrsp_data = scanrsp_data
+
+        # Set advertisement type and interval range
+        message.adv_type = adv_type
+        if inter_min not in range(0x20, 0x4001):
+            logger.error("create_periph_mode: invalid minimal interval value, must be in range 0x20 ... 0x4000.")
+            raise ValueError()
+        if inter_max not in range(0x20, 0x4001):
+            logger.error("create_periph_mode: invalid maximal interval value, must be in range 0x20 ... 0x4000.")
+            raise ValueError()
+        if inter_min > inter_max:
+            logger.error("create_periph_mode: invalid `inter_min` value, must be lower or equal to interval max.")
+            raise ValueError()
+        if inter_max < inter_max:
+            logger.error("create_periph_mode: invalid `inter_max` value, must be greater or equal to interval min.")
+            raise ValueError()
+        message.inter_min = inter_min
+        message.inter_max = inter_max
+
+        # Check specified channels and build channel map
+        if channel_map is None:
+            channel_map = ChannelMap([37, 38, 39])
+        else:
+            channel_map.filter(lambda x: x in (37, 38, 39))
+            if len(channel_map) == 0:
+                raise ValueError()
+        message.channel_map = channel_map.value
+
+        # Return generated message
         return message
 
     def create_central_mode(self) -> HubMessage:
@@ -453,22 +489,56 @@ class BleDomain(Registry):
         """
         return BleDomain.bound('central_mode', self.proto_version)()
 
-    def create_periph_mode(self, adv_data: bytes = None, scan_rsp: bytes = None) -> HubMessage:
+    def create_periph_mode(self, adv_data: bytes, scan_rsp: Optional[bytes] = None, adv_type: BleAdvType = BleAdvType.ADV_IND,
+                           channel_map: Optional[ChannelMap] = None, inter_min: int = 0x20, inter_max: int = 0x4000) -> HubMessage:
         """Create an PeriphMode message.
 
         :param adv_data: Advertisement data (31 bytes max)
         :type adv_data: bytes
         :param scan_rsp: Scan response data (31 bytes max)
         :type scan_rsp: bytes, optional
+        :param adv_type: Advertisement type
+        :type  adv_type: BleAdvType, optional
+        :param channel_map: Channel map specifying the advertising channels to use
+        :type  channels: ChannelMap, optional
+        :param inter_min: Minimum interval value for advertising (0x20 <= value <=0x4000)
+        :type  inter_min: int, optional
+        :param inter_max: Maximum interval value for advertising (inter_min <= value <= 0x4000)
         :return: instance of PeriphMode message
         :rtype: PeriphMode
         """
         message = BleDomain.bound('periph_mode', self.proto_version)(
         )
         if adv_data is not None:
-            message.scan_data = adv_data
+            message.adv_data = adv_data
         if scan_rsp is not None:
             message.scanrsp_data = scan_rsp
+
+        # Set advertisement type and interval range
+        message.adv_type = adv_type
+        if inter_min not in range(0x20, 0x4001):
+            logger.error("create_periph_mode: invalid minimal interval value, must be in range 0x20 ... 0x4000.")
+            raise ValueError()
+        if inter_max not in range(0x20, 0x4001):
+            logger.error("create_periph_mode: invalid maximal interval value, must be in range 0x20 ... 0x4000.")
+            raise ValueError()
+        if inter_min > inter_max:
+            logger.error("create_periph_mode: invalid `inter_min` value, must be lower or equal to interval max.")
+            raise ValueError()
+        message.inter_min = inter_min
+        message.inter_max = inter_max
+
+        # Check specified channels and build channel map
+        if channel_map is None:
+            channel_map = ChannelMap([37, 38, 39])
+        else:
+            channel_map.filter(lambda x: x in (37, 38, 39))
+            if len(channel_map) == 0:
+                logger.error("create_periph_mode: invalid channel map.")
+                raise ValueError()
+        message.channel_map = channel_map.value
+
+        # Return message
         return message
 
     def create_start(self) -> HubMessage:
@@ -634,7 +704,7 @@ class BleDomain(Registry):
         :rtype: SetAdvData
         """
         message = BleDomain.bound("set_adv_data", self.proto_version)(
-            scan_data=adv_data
+            adv_data=adv_data
         )
 
         # Set scan response data if provided
@@ -1052,8 +1122,10 @@ from .address import SetBdAddress
 from .sniffing import SniffAdv, SniffConnReq, SniffAccessAddress, SniffActiveConn, \
     AccessAddressDiscovered
 from .jamming import JamAdv, JamAdvChan, JamConn, ReactiveJam
-from .mode import ScanMode, AdvMode, CentralMode, PeriphMode, BleStart, BleStop, \
+from .mode import (
+    ScanMode, AdvMode, AdvModeV3, CentralMode, PeriphMode, PeriphModeV3, BleStart, BleStop,
     SetEncryption
+)
 from .pdu import SetAdvData, SendBleRawPdu, SendBlePdu, BleAdvPduReceived, BlePduReceived, \
     BleRawPduReceived, Injected
 from .connect import ConnectTo, Disconnect, Connected, Disconnected, Synchronized, \

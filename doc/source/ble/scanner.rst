@@ -1,4 +1,4 @@
-Device Scanning
+Device scanning
 ===============
 
 Bluetooth Low Energy scanning is provided by a dedicated connector, :class:`~whad.ble.connector.Scanner`,

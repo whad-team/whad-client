@@ -32,6 +32,7 @@ Welcome to WHAD's documentation!
 
     ble/started
     ble/scanner
+    ble/advertiser
     ble/central
     ble/peripheral
     ble/profile
