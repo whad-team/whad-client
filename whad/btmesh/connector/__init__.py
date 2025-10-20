@@ -37,7 +37,7 @@ class BTMesh(BLE):
         """
         super().__init__(device)
 
-        if not self.can_sniff_advertisements:
+        if not self.can_sniff_advertisements() and not self.can_scan():
             raise UnsupportedCapability("SniffAdvertisements")
 
     def bt_mesh_filter(self, packet, ignore_regular_adv=True):

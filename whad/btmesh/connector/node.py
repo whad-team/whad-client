@@ -72,8 +72,8 @@ class BTMeshNode(BTMesh):
         :raises UnsupportedCapability: Device Cannot inject
         """
         super().__init__(device)
-        if not self.can_inject():
-            raise UnsupportedCapability("Inject")
+        #if not self.can_inject():
+        #    raise UnsupportedCapability("Inject")
 
         # Queue of received messages, filled in on reception callback
         self.__queue = Queue()
@@ -156,7 +156,10 @@ class BTMeshNode(BTMesh):
         if not self.is_listening:
             super().start()
             self.is_listening = True
-            self.sniff_advertisements(channel=self.channel)
+            if self.can_sniff_advertisements():
+                self.sniff_advertisements(channel=self.channel)
+            else:
+                self.enable_scan_mode()
             if self.sniffing_event is not None:
                 self.sniffing_event.set()
                 self.sniffing_event = None
