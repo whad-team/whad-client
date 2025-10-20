@@ -659,10 +659,8 @@ class Device:
         """
         if self.__iface_in is not None:
             self.__iface_in.cancel()
-            self.__iface_in.join()
         if self.__iface_out is not None:
             self.__iface_out.cancel()
-            self.__iface_out.join()
 
     ##
     # Device specific methods
