@@ -127,8 +127,7 @@ class DevInThread(Thread):
     """
 
     def __init__(self, device = None):
-        super().__init__()
-        self.daemon = True
+        super().__init__(daemon=True)
         self.__iface = device
         self.__canceled = False
 
@@ -200,8 +199,7 @@ class DevOutThread(Thread):
     to the device object.
     """
     def __init__(self, device = None):
-        super().__init__()
-        self.daemon = True
+        super().__init__(daemon=True)
         self.__iface = device
         self.__canceled = False
 
@@ -666,10 +664,8 @@ class Device:
         """
         if self.__iface_in is not None:
             self.__iface_in.cancel()
-            self.__iface_in.join()
         if self.__iface_out is not None:
             self.__iface_out.cancel()
-            self.__iface_out.join()
 
     ##
     # Device specific methods
