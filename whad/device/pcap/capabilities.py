@@ -29,6 +29,7 @@ DLT_RESERVED_03                 = 149
 DLT_RESERVED_06                 = 152
 
 CAPABILITIES = {
+    # Bluetooth Low Energy
     DLT_BLUETOOTH_LE_LL_WITH_PHDR : (
         {
             Domain.BtLE : (
@@ -43,6 +44,50 @@ CAPABILITIES = {
             Domain.BtLE : (
                 (Capability.Inject),
                 [BleCommands.SendPDU, BleCommands.Start, BleCommands.Stop]
+            )
+        }
+    ),
+
+    # IEEE 802.15.4 - Various DLTs
+    DLT_IEEE802_15_4_NONASK_PHY: (
+        {
+            Domain.Dot15d4 : (
+                (Capability.Sniff),
+                [Dot15d4Commands.Sniff, Dot15d4Commands.Start, Dot15d4Commands.Stop]
+            )
+        },
+        {
+            Domain.Dot15d4 : (
+                (Capability.Inject),
+                [Dot15d4Commands.Send,Dot15d4Commands.Start, Dot15d4Commands.Stop]
+            )
+        }
+    ),
+    DLT_IEEE802_15_4_LINUX: (
+        {
+            Domain.Dot15d4 : (
+                (Capability.Sniff),
+                [Dot15d4Commands.Sniff, Dot15d4Commands.Start, Dot15d4Commands.Stop]
+            )
+        },
+        {
+            Domain.Dot15d4 : (
+                (Capability.Inject),
+                [Dot15d4Commands.Send,Dot15d4Commands.Start, Dot15d4Commands.Stop]
+            )
+        }
+    ),
+    DLT_IEEE802_15_4_NOFCS: (
+        {
+            Domain.Dot15d4 : (
+                (Capability.Sniff),
+                [Dot15d4Commands.Sniff, Dot15d4Commands.Start, Dot15d4Commands.Stop]
+            )
+        },
+        {
+            Domain.Dot15d4 : (
+                (Capability.Inject),
+                [Dot15d4Commands.Send,Dot15d4Commands.Start, Dot15d4Commands.Stop]
             )
         }
     ),
@@ -74,6 +119,8 @@ CAPABILITIES = {
             )
         }
     ),
+
+    # Enhanced ShockBurst
     DLT_RESERVED_02 : (
         {
             Domain.Esb : (
@@ -96,6 +143,8 @@ CAPABILITIES = {
             )
         }
     ),
+
+    # WHAD PHY
     DLT_RESERVED_06 : (
         {
             Domain.Phy : (
