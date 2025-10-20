@@ -13,6 +13,8 @@ from whad.ble.connector.base import BLE
 from whad.exceptions import UnsupportedCapability
 from whad.exceptions import WhadDeviceDisconnected
 
+from scapy.layers.bluetooth4LE import BTLE_ADV, BTLE_ADV_NONCONN_IND
+from whad.hub.ble import Direction as BleDirection
 
 class BTMesh(BLE):
     """
@@ -36,9 +38,76 @@ class BTMesh(BLE):
         :raises UnsupportedCapability: Device Cannot sniff
         """
         super().__init__(device)
+        
+        self.is_listening = False
 
-        if not self.can_sniff_advertisements() and not self.can_scan():
-            raise UnsupportedCapability("SniffAdvertisements")
+        # Default BD address to facilitate filtering
+        self.mesh_bd_address = "AB:CD:EF:AB:CD:EF"
+
+        super().set_bd_address(self.mesh_bd_address, public=False)
+
+
+    # TODO: move to send_adv_bearer( ... ) and send( ... )
+    def send_raw(self, packet, channel=None, repeat=2):
+        """
+        Sends the packet through the BLE advertising bearer
+
+        :param packet: Packet to send
+        :type packet: Packet (EIR_Element subclass)
+        :param channel: [TODO:description], defaults to 37
+        :type channel: [TODO:type], optional
+        """
+
+        # If channel is None, transmit on every channel 37,38 & 39
+        if channel is None:
+            channel = 0
+
+        adv_pdu = BTLE_ADV_NONCONN_IND(
+                AdvA=self.mesh_bd_address,
+                data=packet
+        )
+        for _ in range(repeat):
+            res = self.send_adv_pdu(
+                    adv_pdu,
+                    channel = channel
+            )
+        
+        
+        return res
+
+
+    def on_adv_pdu(self, packet):
+        """
+        Process a received advertising Mesh packet.
+        Adds it to queue
+        """
+        if not self.bt_mesh_filter(packet, True):
+            return
+        #self.__queue.put(packet)
+        self.process_rx_packets(packet)
+
+    def start_adv_bearer(self):
+        """
+        Start the adv bearer. 
+        """
+
+        if not self.can_scan():
+            raise UnsupportedCapability("Scan")
+
+        scan_mode = self.enable_scan_mode(interval=20)
+        if not scan_mode:
+            print("here")
+            return False
+
+
+        if super().start():
+            self.is_listening = True
+
+            return True
+        return False
+
+    def start(self):
+        return self.start_adv_bearer()
 
     def bt_mesh_filter(self, packet, ignore_regular_adv=True):
         """

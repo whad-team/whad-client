@@ -207,7 +207,7 @@ class GenericProvisioningLayer(ContextualLayer):
         """
         Activate thread that sends all the fragments (Start and Continuation).
         """
-        self.state.sending_thread = Thread(target=self.send_packet_thread)
+        self.state.sending_thread = Thread(target=self.send_packet_thread, daemon=True)
         self.state.is_thread_running = True
         self.state.sending_thread.start()
 
@@ -519,7 +519,7 @@ class GenericProvisioningLayerProvisioner(GenericProvisioningLayer):
         Activate thread to send Link Open packets
         """
         self.state.is_link_open_thread_running = True
-        self.state.link_open_thread = Thread(target=self.send_link_open_thread)
+        self.state.link_open_thread = Thread(target=self.send_link_open_thread, daemon=True)
         self.state.link_open_thread.start()
 
     def on_link_close(self, message):

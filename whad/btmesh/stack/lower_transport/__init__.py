@@ -704,33 +704,39 @@ class LowerTransportLayer(Layer):
                     transaction.sending_thread = Thread(
                         target=self.sending_thread_ctl_unicast_segmented,
                         args=(transaction, transaction.event),
+                        daemon=True
                     )
                 else:
                     transaction.sending_thread = Thread(
                         target=self.sending_thread_access_unicast_segmented,
                         args=(transaction, transaction.event),
+                        daemon=True
                     )
             else:
                 if transaction.ctx.is_ctl:
                     transaction.sending_thread = Thread(
                         target=self.sending_thread_ctl_multicast_segmented,
                         args=(transaction, transaction.event),
+                        daemon=True
                     )
                 else:
                     transaction.sending_thread = Thread(
                         target=self.sending_thread_access_multicast_segmented,
                         args=(transaction, transaction.event),
+                        daemon=True
                     )
         else:
             if transaction.ctx.is_ctl:
                 transaction.sending_thread = Thread(
                     target=self.sending_thread_ctl_unsegmented,
                     args=(transaction, transaction.event),
+                    daemon=True
                 )
             else:
                 transaction.sending_thread = Thread(
                     target=self.sending_thread_access_unsegmented,
                     args=(transaction, transaction.event),
+                    daemon=True
                 )
 
         transaction.sending_thread.start()
