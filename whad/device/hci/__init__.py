@@ -1568,7 +1568,11 @@ class Hci(VirtualDevice):
     def _on_whad_ble_send_pdu(self, message):
         """Send a given PDU into the active connection
         """
-        print("hci::send_pdu")
+        # debug: 
+        #print("hci::send_pdu", message)
+        #from scapy.all import BTLE_ADV 
+        #BTLE_ADV(message.pdu).show()
+        
         # Make sure we have an active connection
         if self.__conn_state == HCIConnectionState.ESTABLISHED:
             logger.debug("[%s] Received WHAD BLE send_pdu message", self.interface)
@@ -1605,9 +1609,49 @@ class Hci(VirtualDevice):
                 logger.debug("wrong state or packet direction.")
                 self._send_whad_command_result(CommandResult.ERROR)
         else:
-            # Not connected
-            logger.debug("[%s] Cannot send PDU: no connection.", self.interface)
-            self._send_whad_command_result(CommandResult.ERROR)
+            # Not connected, assume we want to send an unconnectable advertisement
+            if len(message.pdu) > 0:
+                # If we were previously in scan mode, turn it off temporarily
+                if self.__internal_state == HCIInternalState.SCANNING:
+                    self._set_scan_mode(False)
+
+                # update advertising data with ADV payload
+                success = self._set_advertising_data(message.pdu[8:])
+
+                # Connection handle contains channel, use it as channel map
+                channels = [message.conn_handle]
+                chanmap = 0
+                if 37 in channels:
+                    chanmap |= 1
+                if 38 in channels:
+                    chanmap |= 2
+                if 39 in channels:
+                    chanmap |= 4
+
+                # We use NONCONN_ADV_IND by default
+                success = success and self.set_advertising_parameters(
+                    interval_min = 0x0020,
+                    interval_max = 0x0030,                    
+                    adv_type=3, 
+                    channel_map=chanmap
+                )
+                
+                # Ugly but seems to be the legitimate way to handle this
+                self._set_advertising_mode(True)
+                sleep(0.01)
+                self._set_advertising_mode(False)
+
+                # Re-enable scanning if needed
+                if self.__internal_state == HCIInternalState.SCANNING:
+                    self._set_scan_mode(True)
+                
+                self._send_whad_command_result(CommandResult.SUCCESS)
+            else:
+                # Not connected
+                logger.debug("[%s] Cannot send PDU: no connection.", self.interface)
+                self._send_whad_command_result(CommandResult.ERROR)
+            
+        
 
     def _on_whad_ble_set_bd_addr(self, message):
         logger.debug("Received WHAD BLE set_bd_addr message")
