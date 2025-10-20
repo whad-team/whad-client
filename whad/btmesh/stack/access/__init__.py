@@ -91,6 +91,7 @@ class AccessLayer(Layer):
                 thread = Thread(
                     target=self.process_access_message,
                     args=(self.__queue.get_nowait(),),
+                    daemon=True
                 )
                 thread.start()
             except Exception:

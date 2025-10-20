@@ -190,11 +190,12 @@ class Sniffer(BTMesh, EventsManager):
         # network cache reset
         self.__cache = deque(maxlen=100)
 
-        if self.can_sniff_advertisements():
-            self.sniff_advertisements(channel=self.__configuration.channel)
-        else:
-            self.enable_scan_mode()
-
+        #if self.can_sniff_advertisements():
+        #    self.sniff_advertisements(channel=self.__configuration.channel)
+        #else:
+        #self.enable_scan_mode(interval=20)
+        self.start_adv_bearer()
+        
     def __check_nid(
         self, net_pdu
     ) -> tuple[NetworkLayerCryptoManager | None, bytes | None]:

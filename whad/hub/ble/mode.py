@@ -13,6 +13,14 @@ class ScanMode(PbMessageWrapper):
     """
     active = PbFieldBool('ble.scan_mode.active_scan')
 
+
+@pb_bind(BleDomain, 'scan_mode', version=3)
+class ScanModeV3(PbMessageWrapper):
+    """BLE scan mode message class
+    """
+    active = PbFieldBool('ble.scan_mode.active_scan')
+    interval = PbFieldInt('ble.scan_mode.interval')
+
 @pb_bind(BleDomain, 'adv_mode', 1)
 class AdvMode(PbMessageWrapper):
     """BLE advertising mode message class

@@ -137,43 +137,6 @@ class BTMeshNode(BTMesh):
     def prov_stack(self, value):
         self._prov_stack = value
 
-    def lock_tx(self):
-        self.__tx_lock.acquire()
-
-    def unlock_tx(self):
-        self.__tx_lock.release()
-
-    def on_adv_pdu(self, packet):
-        """
-        Process a received advertising Mesh packet.
-        Adds it to queue
-        """
-        if not self.bt_mesh_filter(packet, True):
-            return
-        self.__queue.put(packet)
-
-    def start(self):
-        if not self.is_listening:
-            super().start()
-            self.is_listening = True
-            if self.can_sniff_advertisements():
-                self.sniff_advertisements(channel=self.channel)
-            else:
-                self.enable_scan_mode()
-            if self.sniffing_event is not None:
-                self.sniffing_event.set()
-                self.sniffing_event = None
-
-            self.sniffing_event = Event()
-            self.polling_rx_packets_thread = Thread(
-                target=self.polling_rx_packets, args=(self.sniffing_event,)
-            )
-            self.polling_rx_packets_thread.start()
-
-            self.sniffer_channel_switch_thread = Thread(
-                target=self.change_sniffing_channel, args=(self.sniffing_event,)
-            )
-            self.sniffer_channel_switch_thread.start()
 
     def stop(self):
         if self.is_listening:
@@ -183,6 +146,7 @@ class BTMeshNode(BTMesh):
 
             super().stop()
 
+    
     def polling_rx_packets(self, sniffing_event):
         while not sniffing_event.is_set():
             try:
@@ -222,46 +186,6 @@ class BTMeshNode(BTMesh):
         """
         pass
 
-    @txlock
-    def send_raw(self, packet, channel=37):
-        """
-        Sends the packet through the BLE advertising bearer
-
-        :param packet: Packet to send
-        :type packet: Packet (EIR_Element subclass)
-        :param channel: [TODO:description], defaults to 37
-        :type channel: [TODO:type], optional
-        """
-        # AdvA = randbytes(6).hex(":")  # random in spec
-        AdvA = (self.profile.get_primary_element_addr() & 0xFF).to_bytes(
-            1, "big"
-        ) + b"\xaa\xaa\xaa\xaa\xaa"
-        adv_pkt = BTLE_ADV(
-            TxAdd=0, RxAdd=0, ChSel=0, RFU=0, PDU_type=2
-        ) / BTLE_ADV_NONCONN_IND(AdvA=AdvA, data=packet)
-        for i in range(0, 2):
-            self.send_pdu(
-                adv_pkt,
-                access_address=0x8E89BED6,
-                conn_handle=39,
-                direction=BleDirection.UNKNOWN,
-            )
-            sleep(0.005)
-            self.send_pdu(
-                adv_pkt,
-                access_address=0x8E89BED6,
-                conn_handle=37,
-                direction=BleDirection.UNKNOWN,
-            )
-            sleep(0.002)
-            res = self.send_pdu(
-                adv_pkt,
-                access_address=0x8E89BED6,
-                conn_handle=38,
-                direction=BleDirection.UNKNOWN,
-            )
-            sleep(0.007)
-        return res
 
     def change_sniffing_channel(self, sniffing_event):
         channels = [37, 38, 39]
@@ -440,3 +364,116 @@ class BTMeshNode(BTMesh):
                 ).discovery_get_hops_thread
             )
             thread.start()
+
+
+
+    # TO DEPRECATE
+        """
+    def lock_tx(self):
+        self.__tx_lock.acquire()
+
+    def unlock_tx(self):
+        self.__tx_lock.release()
+
+    def start2(self):
+        
+        if not self.is_listening:
+            super().start()
+            self.is_listening = True
+
+            self.start_adv_bearer()
+
+            '''
+            self.can_sniff_advertisements()
+            if self.can_sniff_advertisements():
+                self.sniff_advertisements(channel=self.channel)
+
+                if self.sniffing_event is not None:
+                    self.sniffing_event.set()
+                    self.sniffing_event = None
+
+                self.sniffing_event = Event()
+
+
+                self.sniffing_event = Event()
+                self.polling_rx_packets_thread = Thread(
+                    target=self.polling_rx_packets, args=(self.sniffing_event,), 
+                    daemon=True
+                )
+                self.polling_rx_packets_thread.start()
+
+
+
+                self.sniffer_channel_switch_thread = Thread(
+                    target=self.change_sniffing_channel, args=(self.sniffing_event,),
+                    daemon=True
+                )
+                self.sniffer_channel_switch_thread.start()
+
+            else:
+                self.enable_scan_mode()
+
+
+                self.sniffing_event = Event()
+                self.polling_rx_packets_thread = Thread(
+                    target=self.polling_rx_packets, args=(self.sniffing_event,),
+                    daemon=True
+                )
+                self.polling_rx_packets_thread.start()
+
+
+            
+            if self.sniffing_event is not None:
+                self.sniffing_event.set()
+                self.sniffing_event = None
+
+            self.sniffing_event = Event()
+            self.polling_rx_packets_thread = Thread(
+                target=self.polling_rx_packets, args=(self.sniffing_event,)
+            )
+            self.polling_rx_packets_thread.start()
+            '''
+    """
+    '''
+    @txlock
+    def send_raw(self, packet, channel=37):
+        """
+        Sends the packet through the BLE advertising bearer
+
+        :param packet: Packet to send
+        :type packet: Packet (EIR_Element subclass)
+        :param channel: [TODO:description], defaults to 37
+        :type channel: [TODO:type], optional
+        """
+        # AdvA = randbytes(6).hex(":")  # random in spec
+        AdvA = (self.profile.get_primary_element_addr() & 0xFF).to_bytes(
+            1, "big"
+        ) + b"\xaa\xaa\xaa\xaa\xaa"
+        adv_pkt = BTLE_ADV(
+            TxAdd=0, RxAdd =0, ChSel=0, RFU=0, PDU_type=2
+        ) / BTLE_ADV_NONCONN_IND(AdvA=AdvA, data=packet)
+        
+        for i in range(0, 2):
+            self.send_pdu(
+                adv_pkt,
+                access_address=0x8E89BED6,
+                conn_handle=39,
+                direction=BleDirection.UNKNOWN,
+            )
+            sleep(0.005)
+            self.send_pdu(
+                adv_pkt,
+                access_address=0x8E89BED6,
+                conn_handle=37,
+                direction=BleDirection.UNKNOWN,
+            )
+            sleep(0.002)
+            res = self.send_pdu(
+                adv_pkt,
+                access_address=0x8E89BED6,
+                conn_handle=38,
+                direction=BleDirection.UNKNOWN,
+            )
+            sleep(0.007)
+        return res
+    '''

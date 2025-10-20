@@ -419,16 +419,19 @@ class BleDomain(Registry):
             position=position
         )
 
-    def create_scan_mode(self, active: bool = False) -> HubMessage:
+    def create_scan_mode(self, active: bool = False, interval : int = 20) -> HubMessage:
         """Create a ScanMode message.
 
         :param active: Enable active scan mode
         :type active: bool
+        :param interval: scanning interval
+        :type interval: int
         :return: instance of ScanMode
         :rtype: ScanMode
         """
         return BleDomain.bound('scan_mode', self.proto_version)(
-            active=active
+            active=active, 
+            interval=interval
         )
 
     def create_adv_mode(self, adv_data: bytes, scanrsp_data: Optional[bytes] = None,

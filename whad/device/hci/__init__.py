@@ -1060,13 +1060,19 @@ class Hci(VirtualDevice):
         return True
 
     @req_cmd("le_set_scan_parameters")
-    def _set_scan_parameters(self, active=True):
+    def _set_scan_parameters(self, active=True, interval=0x10*1250):
         """
         Configure Scan parameters for HCI device.
         """
         logger.debug("[%s] Setting LE Scan Parameters (active:%s) ...", self.interface, 
                      active)
-        response = self._write_command(HCI_Cmd_LE_Set_Scan_Parameters(type=int(active)))
+                     
+        response = self._write_command(HCI_Cmd_LE_Set_Scan_Parameters(
+                type=int(active),
+                interval=int(interval), 
+                window=int(interval) # continuous reception between scan interval
+            )
+        )
         return response is not None and response.status == 0x00
 
     @req_cmd("le_set_scan_enable")
@@ -1500,7 +1506,8 @@ class Hci(VirtualDevice):
     def _on_whad_ble_scan_mode(self, message):
         if Commands.ScanMode in self._dev_capabilities[Domain.BtLE][1]:
             active_scan = message.active
-            if self._set_scan_parameters(active_scan):
+            interval = (message.interval * 1000) // 625
+            if self._set_scan_parameters(active_scan, interval):
                 self.__internal_state = HCIInternalState.SCANNING
                 self._send_whad_command_result(CommandResult.SUCCESS)
                 return
@@ -1569,10 +1576,7 @@ class Hci(VirtualDevice):
         """Send a given PDU into the active connection
         """
         # debug: 
-        #print("hci::send_pdu", message)
-        #from scapy.all import BTLE_ADV 
-        #BTLE_ADV(message.pdu).show()
-        
+        #print("hci::send_pdu", message)        
         # Make sure we have an active connection
         if self.__conn_state == HCIConnectionState.ESTABLISHED:
             logger.debug("[%s] Received WHAD BLE send_pdu message", self.interface)
@@ -1617,9 +1621,13 @@ class Hci(VirtualDevice):
 
                 # update advertising data with ADV payload
                 success = self._set_advertising_data(message.pdu[8:])
-
-                # Connection handle contains channel, use it as channel map
-                channels = [message.conn_handle]
+                
+                if message.conn_handle == 0:
+                    # Transmit on a complete cycle
+                    channels = [37,38,39]
+                else:
+                    # If a channel is provided as connection handle, use it directly
+                    channels = [message.conn_handle]
                 chanmap = 0
                 if 37 in channels:
                     chanmap |= 1
@@ -1638,7 +1646,9 @@ class Hci(VirtualDevice):
                 
                 # Ugly but seems to be the legitimate way to handle this
                 self._set_advertising_mode(True)
-                sleep(0.01)
+
+                # Wait just enough to make sure it has been transmitted
+                sleep(0.05)
                 self._set_advertising_mode(False)
 
                 # Re-enable scanning if needed

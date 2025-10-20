@@ -538,12 +538,12 @@ class BLE(Connector):
         # Cannot set BD address
         return False
 
-    def enable_scan_mode(self, active=False):
+    def enable_scan_mode(self, active=False, interval=20):
         """
         Enable Bluetooth Low Energy scanning mode.
         """
         # Create a ScanMode message
-        msg = self.hub.ble.create_scan_mode(active=active)
+        msg = self.hub.ble.create_scan_mode(active=active, interval=interval)
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
@@ -899,6 +899,22 @@ class BLE(Connector):
         """
         return
 
+    def send_adv_pdu(self, pdu, channel = None):
+        """Send ADV PDU
+        """
+        # If channel is not provided, use all channels by default
+        if channel is None:
+            channel = 0
+            logger.info("send advertisement on all primary advertising channels. ")
+        else:
+            logger.info("send advertisement on primary advertising channel #%d . ", channel)
+
+        return self.send_pdu(
+            BTLE_ADV() / pdu, 
+            conn_handle = channel, 
+            direction=Direction.UNKNOWN
+        )
+
     def send_ctrl_pdu(self, pdu, conn_handle=0, direction=Direction.MASTER_TO_SLAVE,
                       access_address=0x8e89bed6, encrypt=None):
         """Send control PDU
@@ -1099,6 +1115,7 @@ class BLENew(Connector):
         """
         # Retrieve supported commands
         commands = self.device.get_domain_commands(Domain.BtLE)
+        
         return (
             (commands & (1 << Commands.ScanMode))>0 and
             (commands & (1 << Commands.Start))>0 and
@@ -1483,12 +1500,12 @@ class BLENew(Connector):
         # Cannot set BD address
         return False
 
-    def enable_scan_mode(self, active=False):
+    def enable_scan_mode(self, active=False, interval = 10):
         """
         Enable Bluetooth Low Energy scanning mode.
         """
         # Create a ScanMode message
-        msg = self.hub.ble.create_scan_mode(active=active)
+        msg = self.hub.ble.create_scan_mode(active=active, interval = interval)
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
