@@ -72,7 +72,7 @@ profile
 
 .. code-block:: text
 
-    $ wble-central -i <interface> -b <bdaddress> scan
+    $ wble-central -i <interface> -b <bdaddress> profile
 
 The ``profile`` command connects to a specific Bluetooth Low Energy device and queries its
 services and characteristics. The ``--interface`` and ``--bdaddr`` options must be provided.
