@@ -429,7 +429,7 @@ class NetworkLayer(Layer):
         """
 
     def sending_thread(self, pkt):
-        self.__connector.send_raw(pkt)
+        self.__connector.send(pkt)
 
 
 NetworkLayer.add(LowerTransportLayer)

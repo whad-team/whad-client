@@ -215,4 +215,4 @@ class PBAdvBearerLayer(Layer):
         thread.start()
 
     def sending_thread(self, pkt):
-        self.state.connector.send_raw(pkt)
+        self.state.connector.send(pkt)
