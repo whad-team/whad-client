@@ -18,13 +18,22 @@ from whad.hub.ble import Direction as BleDirection
 
 
 class Bearer:
+    """
+    This class defines a Mesh bearer, abstracting the physical layer out of the the BTMesh connector.
+    
+    This class must NOT be used directly, but inherited by the concrete implementation of the bearer.
+
+    The child classes should defines at least three main methods:
+    - start(): start the bearer (according to the configuration loaded in configuration dictionary stored as attribute)
+    - stop(): stop the bearer
+    - send(pdu): send a PDU though the bearer
+    """
     def __init__(self, connector):
         self.connector = connector
         self.configuration = {}
 
     def configure(self, **kwargs):
         for name, value in kwargs.items():
-            print(name, "=>", value)
             self.configuration[name] = value
 
     def start(self):
@@ -38,20 +47,33 @@ class Bearer:
 
 
 class AdvBearer(Bearer):
-    
+    """
+    Implements a basic ADV bearer for Bluetooth mesh.
+    """
+
     def __init__(self, connector):
         super().__init__(connector)
+        # Attribute indicating the state of the bearer
         self.__started = False
 
+        # Configuration of the advertising bearer
         self.configuration = {
+            # BD address in use by the bearer, default is random
             "bd_address" : "AA:BB:CC:DD:EE:FF", 
+            # Channel in use, if None use three primary advertising channels
             "channel" : None,
+            # Default scanning interval
             "interval" : 50,
+            # Minimal number of repeatition for an outgoing packet transmission
             "repeat" : 2
         }
 
 
     def configure(self, **kwargs):
+        """
+        Updates the configuration in use by the ADV Bearer according to the provided named parameters.
+        """
+
         super().configure(**kwargs)
         if "bd_address" in kwargs:
             self.connector.set_bd_address(kwargs["bd_address"], public=False)
@@ -61,9 +83,7 @@ class AdvBearer(Bearer):
         Sends the packet through the BLE advertising bearer
 
         :param packet: Packet to send
-        :type packet: Packet (EIR_Element subclass)
-        :param channel: [TODO:description], defaults to 37
-        :type channel: [TODO:type], optional
+        :type packet: Packet (`EIR_Element` subclass)
         """
 
         # If channel is None, transmit on every channel 37,38 & 39
@@ -71,12 +91,15 @@ class AdvBearer(Bearer):
         if channel is None:
             channel = 0
 
+        # Forge an ADV_NONCONN_IND PDU with configured BD address
         adv_pdu = BTLE_ADV_NONCONN_IND(
                 AdvA=self.configuration["bd_address"],
                 data=packet
         )
 
+        # Repeated transmission
         for _ in range(self.configuration["repeat"]):
+            # Calls the underlying BLE `send_adv_pdu` method 
             res = self.connector.send_adv_pdu(
                     adv_pdu,
                     channel = channel
@@ -87,7 +110,7 @@ class AdvBearer(Bearer):
 
     def start(self):
         """
-        Start the adv bearer. 
+        Start the ADV bearer. 
         """
 
         if not self.connector.can_scan():
@@ -170,64 +193,55 @@ class BTMesh(BLE):
         """
         super().__init__(device)
         
+        # By default, use the ADV bearer
         self.set_bearer(AdvBearer)
+        
+        # Configure a default random address 
         self.bearer.configure(bd_address="AA:BB:CC:DD:EE:FF")
 
     def set_bearer(self, bearer):
+        """
+        Configure and instantiate the bearer in use by the connector.
+
+        :param bearer: `Bearer` class
+        :type bearer: `Bearer`
+        """
         self.bearer = bearer(self)
 
     def on_adv_pdu(self, packet):
         """
         Process a received advertising Mesh packet.
-        Adds it to queue
+        
+        
         """
         if self.bearer is not None:
+            # Redirect the PDU through the bearer if available
             self.bearer.on_adv_pdu(packet)
 
     def send(self, packet):
+        """
+        Send a Mesh PDU through the bearer (if instantiated).
+
+        :param packet: Mesh PDU to transmit
+        :type packet: bytes
+        """
         if self.bearer is not None:
             return self.bearer.send(packet)
 
         return False
 
     def start(self):
+        """
+        Start the underlying bearer.
+        """
         if self.bearer is not None:
             return self.bearer.start()
         return False
 
     def stop(self):
+        """
+        Stop the underlying bearer.
+        """
         if self.bearer is not None:
             return self.bearer.stop()
         return False
-    
-    '''
-
-    def send_raw(self, packet, channel=None, repeat=2):
-        return self.send_adv_bearer(packet, channel=channel, repeat=repeat)
-
-    def send_adv_bearer(self, packet, channel=None, repeat=2):
-        """
-        Sends the packet through the BLE advertising bearer
-
-        :param packet: Packet to send
-        :type packet: Packet (EIR_Element subclass)
-        :param channel: [TODO:description], defaults to 37
-        :type channel: [TODO:type], optional
-        """
-
-        # If channel is None, transmit on every channel 37,38 & 39
-        if channel is None:
-            channel = 0
-
-        adv_pdu = BTLE_ADV_NONCONN_IND(
-                AdvA=self.mesh_bd_address,
-                data=packet
-        )
-        for _ in range(repeat):
-            res = self.send_adv_pdu(
-                    adv_pdu,
-                    channel = channel
-            )
-        
-        return res
-        '''
