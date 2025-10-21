@@ -15,7 +15,17 @@ from whad.exceptions import WhadDeviceDisconnected
 
 from scapy.layers.bluetooth4LE import BTLE_ADV, BTLE_ADV_NONCONN_IND
 from whad.hub.ble import Direction as BleDirection
+'''
+class Bearer:
+    def __init__(self, connector):
+        self.connector = connector
 
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+'''
 class BTMesh(BLE):
     """
     Connector class for Bluetooth Mesh device.
@@ -44,11 +54,44 @@ class BTMesh(BLE):
         # Default BD address to facilitate filtering
         self.mesh_bd_address = "AB:CD:EF:AB:CD:EF"
 
+        # We use a random address by default
         super().set_bd_address(self.mesh_bd_address, public=False)
 
 
-    # TODO: move to send_adv_bearer( ... ) and send( ... )
+    def on_adv_pdu(self, packet):
+        """
+        Process a received advertising Mesh packet.
+        Adds it to queue
+        """
+        if not self.bt_mesh_filter(packet, True):
+            return
+        
+        self.process_rx_packets(packet)
+
+    def start_adv_bearer(self):
+        """
+        Start the adv bearer. 
+        """
+
+        if not self.can_scan():
+            raise UnsupportedCapability("Scan")
+
+        scan_mode = self.enable_scan_mode(interval=20)
+        if not scan_mode:
+            return False
+
+
+        if super().start():
+            self.is_listening = True
+
+            return True
+        return False
+
+
     def send_raw(self, packet, channel=None, repeat=2):
+        return self.send_adv_bearer(packet, channel=channel, repeat=repeat)
+        
+    def send_adv_bearer(self, packet, channel=None, repeat=2):
         """
         Sends the packet through the BLE advertising bearer
 
@@ -72,40 +115,8 @@ class BTMesh(BLE):
                     channel = channel
             )
         
-        
         return res
-
-
-    def on_adv_pdu(self, packet):
-        """
-        Process a received advertising Mesh packet.
-        Adds it to queue
-        """
-        if not self.bt_mesh_filter(packet, True):
-            return
-        #self.__queue.put(packet)
-        self.process_rx_packets(packet)
-
-    def start_adv_bearer(self):
-        """
-        Start the adv bearer. 
-        """
-
-        if not self.can_scan():
-            raise UnsupportedCapability("Scan")
-
-        scan_mode = self.enable_scan_mode(interval=20)
-        if not scan_mode:
-            print("here")
-            return False
-
-
-        if super().start():
-            self.is_listening = True
-
-            return True
-        return False
-
+    
     def start(self):
         return self.start_adv_bearer()
 
