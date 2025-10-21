@@ -1615,10 +1615,7 @@ class Hci(VirtualDevice):
         else:
             # Not connected, assume we want to send an unconnectable advertisement
             if len(message.pdu) > 0:
-                # If we were previously in scan mode, turn it off temporarily
-                if self.__internal_state == HCIInternalState.SCANNING:
-                    self._set_scan_mode(False)
-
+                
                 # update advertising data with ADV payload
                 success = self._set_advertising_data(message.pdu[8:])
                 
@@ -1648,13 +1645,9 @@ class Hci(VirtualDevice):
                 self._set_advertising_mode(True)
 
                 # Wait just enough to make sure it has been transmitted
-                sleep(0.05)
+                sleep(0.004)
                 self._set_advertising_mode(False)
 
-                # Re-enable scanning if needed
-                if self.__internal_state == HCIInternalState.SCANNING:
-                    self._set_scan_mode(True)
-                
                 self._send_whad_command_result(CommandResult.SUCCESS)
             else:
                 # Not connected
