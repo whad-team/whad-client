@@ -1636,7 +1636,7 @@ class Hci(VirtualDevice):
                 # We use NONCONN_ADV_IND by default
                 success = success and self.set_advertising_parameters(
                     interval_min = 0x0020,
-                    interval_max = 0x0030,                    
+                    interval_max = 0x0020,                    
                     adv_type=3, 
                     channel_map=chanmap
                 )

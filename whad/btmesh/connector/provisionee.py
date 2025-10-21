@@ -189,5 +189,5 @@ class Provisionee(BTMeshNode):
         for i in range(20):
             if not self._unprov_beacons_sending:
                 return
-            self.send_raw(pkt_beacon)
+            self.send(pkt_beacon)
             sleep(2)
