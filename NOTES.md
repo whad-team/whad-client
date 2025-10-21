@@ -9,7 +9,6 @@ Bugfixes
 - BLE sniffer and scanner connectors have been improved to support Python's `with` statement
 - `wanalyze` documentation has been updated to reflect recently added options (`--set`)
 
-
 New features
 ------------
 
@@ -33,6 +32,24 @@ with Scanner(Device.create("hci0")) as scanner:
     for device in scanner.discover_devices():
         print(device)
 ```
+
+### New IEEE 802.15.4 DLTs supported by wplay
+
+Previous versions were only able to read PCAP files containing IEEE 802.15.4 frames stored
+using the `LINKTYPE_IEEE802_15_4_TAP` format (type 283), this version adds support of the following
+link types:
+
+- `LINKTYPE_IEEE802_15_4_LINUX` (191)
+- `LINKTYPE_IEEE802_15_4_WITHFCS` (195)
+- `LINKTYPE_IEEE802_15_4_NONASK_PHY` (215)
+- `LINKTYPE_IEEE802_15_4_NOFCS` (230)
+
+### Improved performance
+
+Version 1.2.11 also improves performance of the whole framework. We identified some bottlenecks
+that led the framework to take seconds to completely load and modified the way it works to
+significantly speed up its loading time. Its post-execution cleanup code has also been
+improved to reduce the latency observed with most command-line tools when they were terminating.
 
 
 Important changes
