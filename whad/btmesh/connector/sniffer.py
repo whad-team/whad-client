@@ -12,7 +12,7 @@ from time import time
 from scapy.packet import Packet, Raw
 
 from scapy.layers.bluetooth4LE import BTLE_ADV, EIR_Hdr
-from whad.exceptions import WhadDeviceDisconnected
+from whad.exceptions import WhadDeviceDisconnected, UnsupportedCapability
 from whad.helpers import message_filter
 from whad.hub.ble.pdu import BleAdvPduReceived, BleRawPduReceived
 from whad.scapy.layers.btmesh import (
@@ -23,7 +23,7 @@ from whad.scapy.layers.btmesh import (
     BTMesh_Upper_Transport_Access_PDU,
     BTMesh_Model_Message,
 )
-from whad.btmesh.connector import BTMesh
+from whad.btmesh.connector import BTMesh, AdvBearer
 from whad.scapy.layers.btmesh import (
     BTMesh_Obfuscated_Network_PDU,
     BTMesh_Network_Clear_PDU,
@@ -97,7 +97,7 @@ class Sniffer(BTMesh, EventsManager):
 
     def configure(
         self,
-        channel=37,
+        channel=0xFF,
         net_keys=["f7a2a44f8e8a8029064f173ddc1e2b00"],
         app_keys=["63964771734fbd76e3b40519d1d94a48"],
         iv_indexes=["00000000"],
@@ -190,11 +190,10 @@ class Sniffer(BTMesh, EventsManager):
         # network cache reset
         self.__cache = deque(maxlen=100)
 
-        #if self.can_sniff_advertisements():
-        #    self.sniff_advertisements(channel=self.__configuration.channel)
-        #else:
-        #self.enable_scan_mode(interval=20)
-        self.start_adv_bearer()
+
+        self.set_bearer(AdvBearer)
+        self.bearer.configure(channel=self.__configuration.channel)
+        self.bearer.start()
         
     def __check_nid(
         self, net_pdu
@@ -259,7 +258,7 @@ class Sniffer(BTMesh, EventsManager):
         :param packet: Packet received
         :type packet: Packet
         """
-        if not self.bt_mesh_filter(packet, True):
+        if not self.bearer.bt_mesh_filter(packet, True):
             return None
 
         # if the packet is a Network PDU, we process it before sending
