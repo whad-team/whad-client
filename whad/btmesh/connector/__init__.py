@@ -113,13 +113,21 @@ class AdvBearer(Bearer):
         Start the ADV bearer. 
         """
 
-        if not self.connector.can_scan():
-            raise UnsupportedCapability("Scan")
+        if self.configuration["channel"] is None:
+            if not self.connector.can_scan():
+                raise UnsupportedCapability("Scan")
 
-        scan_mode = self.connector.enable_scan_mode(
-            interval=self.configuration["interval"]
-        )
-        if not scan_mode:
+            success = self.connector.enable_scan_mode(
+                interval=self.configuration["interval"]
+            )
+        elif self.configuration["channel"] in (37,38,39):
+            success = self.connector.sniff_advertisements(
+                channel=self.configuration["channel"]
+            )
+        else:
+            raise UnsupportedCapability("SniffingAdvertisements")
+
+        if not success:
             return False
 
         if super(BTMesh, self.connector).start():
@@ -144,9 +152,16 @@ class AdvBearer(Bearer):
         if self.bt_mesh_filter(packet):
             self.connector.process_rx_packets(packet)
 
-    def bt_mesh_filter(self, packet, ignore_regular_adv=True):
+    def bt_mesh_filter(self, packet, ignore_regular_adv=True) -> bool:
         """
         Filter out non Mesh advertising packets
+
+        :param packet: incoming packet
+        :type packet: bytes
+        :param ignore_regular_adv: boolean indicating if regular advertisements must be ignored
+        :type ignore_regular_adv: bool
+        :return: `True` if incoming packet is a valid BT Mesh packet, `False` otherwise.
+        :rtype: bool
         """
         if BTLE_ADV in packet:
             if hasattr(packet, "data"):
