@@ -62,6 +62,8 @@ from typing import Generator, Callable, Union, Type, Optional
 from threading import Thread, Lock
 from queue import Queue, Empty
 
+from packaging.version import Version
+
 from whad.helpers import message_filter
 from whad.exceptions import (
     WhadDeviceNotReady, WhadDeviceError, WhadDeviceTimeout, WhadDeviceDisconnected,
@@ -70,7 +72,7 @@ from whad.exceptions import (
 from whad.hub import ProtocolHub
 from whad.hub.message import HubMessage
 from whad.hub.generic.cmdresult import CommandResult
-from whad.hub.discovery import InfoQueryResp, DomainInfoQueryResp, DeviceReady
+from whad.hub.discovery import InfoQuery, InfoQueryResp, DomainInfoQuery, DomainInfoQueryResp, DeviceReady
 from whad.hub.discovery import DeviceType
 
 from .info import DeviceInfo
@@ -646,7 +648,7 @@ class Device:
         logger.debug("Releasing lock ...")
         self.__lock.release()
 
-    def __start_io_threads(self):
+    def _start_io_threads(self):
         """Start background IO threads
         """
         self.__iface_in = DevInThread(self)
@@ -654,7 +656,7 @@ class Device:
         self.__iface_out= DevOutThread(self)
         self.__iface_out.start()
 
-    def __stop_io_threads(self):
+    def _stop_io_threads(self):
         """Stop background IO threads
         """
         if self.__iface_in is not None:
@@ -670,7 +672,7 @@ class Device:
         """Handle device open
         """
         # Create interface I/O threads and start them.
-        self.__start_io_threads()
+        self._start_io_threads()
 
         # Ask interface for a reset
         try:
@@ -679,7 +681,7 @@ class Device:
             self.reset()
         except Empty as err:
             # Device is unresponsive, shutdown IO threads
-            self.__stop_io_threads()
+            self._stop_io_threads()
 
             raise WhadDeviceNotReady() from err
 
@@ -699,7 +701,7 @@ class Device:
         logger.info("closing WHAD interface")
 
         # Cancel I/O thread if required
-        self.__stop_io_threads()
+        self._stop_io_threads()
         self.__opened = False
 
         # Notify connector that device has closed
@@ -1061,82 +1063,317 @@ class Device:
             message_filter(DeviceReady)
         )
 
+
+class VirtDevInThread(Thread):
+    """Internal thread processing data sent by the connector to the
+    hardware interface.
+    """
+
+    def __init__(self, device: Device):
+        super().__init__()
+        self.daemon = True
+        self.__iface = device
+        self.__canceled = False
+
+    def cancel(self):
+        """Cancel thread
+        """
+        self.__canceled = True
+
+    def run(self):
+        """Out thread main task.
+        """
+        while not self.__canceled:
+            # Wait for a message to send to interface (blocking)
+            logger.debug("[%s][in_thread] waiting for message to send", self.__iface.interface)
+            try:
+                with self.__iface.get_pending_message(timeout=1.0) as message:
+                    # Read data from device (may block)
+                    try:
+                        logger.debug("[%s][in_thread] sending message %s",
+                                     self.__iface.interface, message)
+
+                        # Notify the device that we received a specific message from
+                        # our connector:
+                        self.__iface.on_connector_message(message)
+
+                        # Notify message has correctly been sent, from a dedicated
+                        # thread.
+                        if message.has_callback():
+                            Thread(target=message.sent).start()
+                    except WhadDeviceNotReady:
+                        if message.has_callback():
+                            Thread(target=message.error, args=[1]).start()
+
+                        # Exit processing loop
+                        return
+                    except WhadDeviceDisconnected:
+                        if message.has_callback():
+                            Thread(target=message.error, args=[2]).start()
+
+                        # Exit processing loop
+                        return
+            except Empty:
+                pass
+
+class VirtDevOutThread(Thread):
+    """Internal thread processing data sent by the hardware interface
+    to the device object.
+    """
+
+    def __init__(self, device):
+        super().__init__()
+        self.daemon = True
+        self.__iface = device
+        self.__canceled = False
+
+    def cancel(self):
+        """Cancel thread
+        """
+        self.__canceled = True
+
+    def run(self):
+        """Out thread main task.
+        """
+        while not self.__canceled:
+            # Read data from device (may block)
+            try:
+                # Check if our mock device needs to fake a message sent by our
+                # device.
+                messages = self.__iface.read()
+                if messages is not None:
+                    if isinstance(messages, HubMessage):
+                        # Register message into the device queue
+                        self.__iface.put_message(messages)
+                    elif isinstance(messages, list):
+                        for msg in messages:
+                            # Register message into the device queue
+                            self.__iface.put_message(msg)
+            except WhadDeviceNotReady:
+                break
+            except WhadDeviceDisconnected:
+                # Device has disconnected, notify interface by injecting a
+                # `Disconnected` event message in its output message queue.
+                # This event message will be filtered out by the Interface class
+                # when called from our connector thread, and it will exit
+                # gracefully
+                logger.debug("[iface][%s] Device disconnected, sending event to connector.",
+                             self.__iface.interface)
+                self.__iface.put_message(Disconnected(self.__iface))
+                break
+
+
+
 class VirtualDevice(Device):
     """
     Virtual interface implementation.
-    
+
     This variant of the base Interface class provides a way to emulate an interface
     compatible with WHAD. This emulated compatible interface is used as an adaptation
     layer between WHAD's core and third-party hardware that does not run a WHAD-enabled
     firmware.
     """
+
+    class route:
+        """Virtual device message routing decorator
+
+        This decorator registered the decorated function as a callback for a
+        specific message type.
+        """
+
+        def __init__(self, message_type):
+            """Initialize decorator."""
+            self.__msg_type = message_type
+
+        def __call__(self, callback):
+            """Called to decorate a specific callback"""
+            setattr(callback, "_MESSAGE_TYPE", self.__msg_type)
+            return callback
+
     def __init__(self, index: int = None):
-        self._dev_type = None
-        self._dev_id = None
-        self._fw_author = None
-        self._fw_url = None
-        self._fw_version = (0, 0, 0)
-        self._dev_capabilities = {}
+        """Initialize a virtual device.
+
+        :param index: Virtual device index
+        :type  index: int
+        """
+        # Loop over each method and registers those decorated with @route()
+        self.__handlers = {}
+        for prop_name in dir(self):
+            try:
+                prop_obj = getattr(self, prop_name)
+                # If property is a method
+                if callable(prop_obj) and hasattr(prop_obj, "_MESSAGE_TYPE"):
+                    self.__handlers[getattr(prop_obj, "_MESSAGE_TYPE")] = prop_obj
+            except AttributeError:
+                pass
+
+        # Initialize our properties
+        self.__dev_type = None
+        self.__dev_id = None
+        self.__fw_author = b''
+        self.__fw_url = None
+        self.__fw_version = (0, 0, 0)
+        self.__capabilities = {}
         self.__lock = Lock()
+
+        # Call parent class init.
         super().__init__(index)
 
-    def send_message(self, message, keep=None):
-        """Send message to host.
+    @property
+    def dev_type(self) -> int:
+        """Device type"""
+        return self.__dev_type
+
+    @dev_type.setter
+    def dev_type(self, value: int):
+        """Set device type."""
+        self.__dev_type = value
+
+    @property
+    def dev_id(self) -> bytes:
+        """Device ID"""
+        return self.__dev_id
+
+    @dev_id.setter
+    def dev_id(self, value: bytes):
+        """Set device ID"""
+        self.__dev_id = value
+
+    @property
+    def author(self) -> str:
+        """Firmware author name"""
+        return self.__fw_author.decode('utf-8')
+
+    @author.setter
+    def author(self, name: str):
+        """Set firmware author name"""
+        self.__fw_author = name.encode('utf-8')
+
+    @property
+    def url(self) -> str:
+        """Firmware URL"""
+        return self.__fw_url.decode('utf-8')
+
+    @url.setter
+    def url(self, url: str):
+        """Set firmware URL"""
+        self.__fw_url = url.encode('utf-8')
+
+    @property
+    def version(self) -> tuple[int, int, int]:
+        """Firmware version"""
+        return self.__fw_version
+
+    @version.setter
+    def version(self, value: tuple[int, int, int]):
+        """Set firmware version"""
+        if not isinstance(value, tuple):
+            raise ValueError()
+        if len(value) != 3:
+            raise ValueError()
+        self.__fw_version = value
+
+    @property
+    def capabilities(self) -> dict[int, tuple[int, list[int]]]:
+        """Device capabilities"""
+        return self.__capabilities
+
+    @capabilities.setter
+    def capabilities(self, value: dict[int, tuple[int, list[int]]]):
+        """Set device capabilities"""
+        if not isinstance(value, dict):
+            raise ValueError()
+        self.__capabilities = value
+
+
+    ##
+    # Device operation
+    ##
+
+    def _start_io_threads(self):
+        """Start background IO threads
         """
-        logger.debug("[virtual_iface][%s] send_message(%s)", self.interface, message)
-        with self.__lock:
-            super().set_queue_filter(keep)
-            self._on_whad_message(message)
+        self.__iface_in = VirtDevInThread(self)
+        self.__iface_in.start()
+        self.__iface_out= VirtDevOutThread(self)
+        self.__iface_out.start()
 
-    def _on_whad_message(self, message):
-        """TODO: associate callbacks with classes ?
+    def _stop_io_threads(self):
+        """Stop background IO threads
         """
-        logger.debug("on_whad_message: %s", message)
-        category = message.message_type
-        message_type = message.message_name
+        if self.__iface_in is not None:
+            self.__iface_in.cancel()
+        if self.__iface_out is not None:
+            self.__iface_out.cancel()
 
-        callback_name = f"_on_whad_{category}_{message_type}"
-        if hasattr(self, callback_name) and callable(getattr(self, callback_name)):
-            getattr(self, callback_name)(message)
-        else:
-            logger.info("unhandled message: %s", message)
-            self._send_whad_command_result(CommandResult.ERROR)
+    ##
+    # Message hooks
+    ##
 
-    def _on_whad_discovery_info_query(self, _):
-        major, minor, revision = self._fw_version
-        msg = self.hub.discovery.create_info_resp(
+    def on_interface_message(self) -> Optional[HubMessage]:
+        """Called to check if the hardware interface needs to report something.
+        This callback is mostly blocking by default, most of the processing
+        using directly the device's `put_message` method to enqueue a message
+        for the connector.
+
+        However, it could be used to send notifications at a custom pace, if
+        needed, depending on the subclass.
+        """
+        self.__blocking_event.wait()
+        return None
+
+    def on_connector_message(self, message: HubMessage):
+        """Called whenever our output thread processes a message sent by a
+        connector.
+
+        :param message: Message to process
+        :type message: HubMessage
+        """
+        # Do we have a haself.__handlers[type(message)]ndler registered for this specific message ?
+        if type(message) in self.__handlers:
+            logger.debug("[virtualdevice] Found handler associated with message type %s: %s", type(message), self.__handlers[type(message)])
+
+            # Call message handler
+            resp = self.__handlers[type(message)](message)
+
+            # If handler returned a single message or a list of messages,
+            # send them to the connector
+            if isinstance(resp, HubMessage):
+                self.put_message(resp)
+            elif isinstance(resp, list):
+                for m in resp:
+                    if isinstance(m, HubMessage):
+                        self.put_message(m)
+
+    @route(InfoQuery)
+    def on_info_query(self, msg: InfoQuery):
+        """Process InfoQuery request."""
+        major, minor, revision = self.__fw_version
+        return self.hub.discovery.create_info_resp(
             DeviceType.VirtualDevice,
-            self._dev_id,
-            0x0100,
+            self.__dev_id,
+            (ProtocolHub.LAST_VERSION << 8),
             0,
-            self._fw_author,
-            self._fw_url,
+            self.__fw_author,
+            self.__fw_url,
             major, minor, revision,
-            [dom | (cap[0] & 0xFFFFFF) for dom, cap in self._dev_capabilities.items()]
+            [dom | (cap[0] & 0xFFFFFF) for dom, cap in self.__capabilities.items()]
         )
-        self._send_whad_message(msg)
 
-    def _on_whad_discovery_domain_query(self, message):
+    @route(DomainInfoQuery)
+    def on_domain_query(self, msg: DomainInfoQuery):
+        """Process DomainInfoQuery message."""
         # Compute supported commands for domain
         commands = 0
-        supported_commands = self._dev_capabilities[message.domain][1]
+        supported_commands = self.__capabilities[msg.domain][1]
         for command in supported_commands:
             commands |= (1 << command)
 
-        # Create a DomainResp message and send it
-        msg = self.hub.discovery.create_domain_resp(
-            message.domain,
+        # Return a DomainResp message and send it
+        return self.hub.discovery.create_domain_resp(
+            msg.domain,
             commands
         )
-        self._send_whad_message(msg)
-
-
-    def _send_whad_message(self, message):
-        self.put_message(message)
-
-    def _send_whad_command_result(self, code):
-        msg = self.hub.generic.create_command_result(code)
-        self._send_whad_message(msg)
 
 
 class WhadDevice(Device):

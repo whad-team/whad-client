@@ -18,14 +18,37 @@ from scapy.utils import PcapReader
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
     WhadDeviceDisconnected, WhadDeviceError
 
-from whad.hub.generic.cmdresult import CommandResult
+from whad.hub.generic.cmdresult import Success, ParameterError
+from whad.hub.phy.freq import GetSupportedFreqs
 from whad.scapy.layers.phy import Phy_Packet
-from whad.hub.dot15d4 import Dot15d4Metadata
-from whad.hub.ble import BLEMetadata
-from whad.hub.esb import ESBMetadata
-from whad.hub.phy import PhyMetadata, Modulation, Endianness
-from whad.hub.unifying import UnifyingMetadata
+from whad.hub.dot15d4 import (
+    Dot15d4Metadata, Start as Dot15Start, Stop as Dot15Stop,
+    SniffMode as Dot15Sniff, SendRawPdu as Dot15SendRaw
+)
+from whad.hub.ble import (
+    BLEMetadata, BleStart, BleStop, SniffAdv, SniffConnReq
+)
+from whad.hub.esb import (
+    ESBMetadata, EsbStart, EsbStop,
+    SniffMode as EsbSniffMode, SendRawPdu as EsbSendRaw
+)
+from whad.hub.phy import (
+    PhyMetadata, Modulation, Endianness,
+    Start as PhyStart, Stop as PhyStop,
+    SendRawPacket as PhySendRaw, GetSupportedFreqs,
+    SendPacket as PhySend, SetFreq as PhySetFreq,
+    SetDatarate as PhySetDatarate, SetEndianness as PhySetEndianness,
+    SetPacketSize as PhySetPacketSize, SetAskMod as PhySetAskMod,
+    Set4FskMod as PhySet4FskMod, SetFskMod as PhySetFskMod,
+    SetGfskMod as PhySetGfskMod, SetSyncWord as PhySetSyncWord,
+    SniffMode as PhySniff, SetTxPower as PhySetTxPower,
+)
+from whad.hub.unifying import (
+    UnifyingMetadata, UnifyingStart as UniStart, UnifyingStop as UniStop,
+    SendRawPdu as UniSendRaw, SniffMode as UniSniffMode,
+)
 from whad.hub.discovery import Domain
+from whad.hub.message import HubMessage
 from whad.ble.utils.phy import FieldsSize
 
 from ..device import VirtualDevice
@@ -130,12 +153,11 @@ class Pcap(VirtualDevice):
         except Exception as access_error:
             raise WhadDeviceAccessDenied("pcap") from access_error
 
-        self._dev_id = self._get_serial_number()
-        self._fw_author = self._get_manufacturer()
-        self._fw_url = self._get_url()
-        self._fw_version = self._get_firmware_version()
-        self._dev_capabilities = self._get_capabilities()
-        #self.__flush = False
+        self.dev_id = self._get_serial_number()
+        self.author = self._get_manufacturer()
+        self.url = self._get_url()
+        self.version = self._get_firmware_version()
+        self.capabilities = self._get_capabilities()
         self.__opened = True
         # Ask parent class to run a background I/O thread
         super().open()
@@ -144,7 +166,7 @@ class Pcap(VirtualDevice):
         if not self.__opened:
             raise WhadDeviceNotReady()
 
-    def read(self) -> bytes:
+    def read(self):
         """Read packets from PCAP file and replay them
         """
         if not self.__opened:
@@ -194,7 +216,7 @@ class Pcap(VirtualDevice):
                 self.__last_timestamp = 0
             sleep((timestamp - self.__last_timestamp)/100000)
 
-    def __to_raw_message(self, pkt) -> bytes:
+    def __to_raw_message(self, pkt) -> HubMessage:
         msg = None
         if self.__domain == Domain.Dot15d4:
             metadata = self._generate_metadata(pkt)
@@ -227,21 +249,7 @@ class Pcap(VirtualDevice):
             self.__last_timestamp = metadata.timestamp
             msg = self.__to_whad_phy_pdu(pkt, metadata)
 
-        if msg is not None:
-            # Serialize protobuf message
-            raw_msg = msg.serialize()
-
-            # Define header
-            header = [
-                0xAC, 0xBE,
-                len(raw_msg) & 0xff,
-                (len(raw_msg) >> 8) & 0xff
-            ]
-
-            # Build the final payload
-            return bytes(header) + raw_msg
-        else:
-            return b""
+        return msg
 
     def __to_whad_phy_pdu(self, packet, metadata):
         return self.hub.phy.create_packet_received(
@@ -320,53 +328,64 @@ class Pcap(VirtualDevice):
 
         return msg
 
-
+    ##
     # Virtual device whad message callbacks
-    def _on_whad_ble_stop(self, message): # pylint: disable=W0613
-        self.__started = False
-        self._send_whad_command_result(CommandResult.SUCCESS)
+    ##
 
+    # BLE
+
+    @VirtualDevice.route(BleStop)
+    def on_ble_stop(self, message): # pylint: disable=W0613
+        self.__started = False
+        return Success()
+
+    @VirtualDevice.route(BleStart)
     def _on_whad_ble_start(self, message): # pylint: disable=W0613
         self.__started = True
-        self._send_whad_command_result(CommandResult.SUCCESS)
+        return Success()
 
+    @VirtualDevice.route(SniffAdv)
     def _on_whad_ble_sniff_adv(self, message): # pylint: disable=W0613
-        self._send_whad_command_result(CommandResult.SUCCESS)
+        return Success()
 
+    @VirtualDevice.route(SniffConnReq)
     def _on_whad_ble_sniff_conn(self, message): # pylint: disable=W0613
-        self._send_whad_command_result(CommandResult.SUCCESS)
+        return Success()
 
 
-    def _on_whad_phy_stop(self, message): # pylint: disable=W0613
+    # PHY
+    @VirtualDevice.route(PhyStop)
+    def on_phy_stop(self, message): # pylint: disable=W0613
         self.__started = False
-        self._send_whad_command_result(CommandResult.SUCCESS)
+        return Success()
 
-    def _on_whad_phy_send_raw(self, message): # pylint: disable=W0613
-        self._send_whad_command_result(CommandResult.SUCCESS)
+    @VirtualDevice.route(PhySendRaw)
+    def on_phy_send_raw(self, message): # pylint: disable=W0613
+        return Success()
 
-    def _on_whad_phy_sniff(self, message): # pylint: disable=W0613
-        self._send_whad_command_result(CommandResult.SUCCESS)
+    @VirtualDevice.route(PhySniff)
+    def on_phy_sniff(self, message): # pylint: disable=W0613
+        return Success()
 
-    def _on_whad_phy_start(self, message): # pylint: disable=W0613
+    @VirtualDevice.route(PhyStart)
+    def on_phy_start(self, message): # pylint: disable=W0613
         self.__started = True
-        self._send_whad_command_result(CommandResult.SUCCESS)
+        return Success()
 
-
-    def _on_whad_phy_get_supported_freq(self, message): # pylint: disable=W0613
+    @VirtualDevice.route(GetSupportedFreqs)
+    def on_phy_get_supported_freq(self, message): # pylint: disable=W0613
         # Create a SupportedFreqRanges
-        msg = self.hub.phy.create_supported_freq_ranges(
+        return self.hub.phy.create_supported_freq_ranges(
             self.__supported_frequency_range
         )
 
-        # Send message
-        self._send_whad_message(msg)
-
-    def _on_whad_phy_send(self, message):
+    @VirtualDevice.route(PhySend)
+    def on_phy_send(self, message):
         self._send_packet(message.packet)
-        self._send_whad_command_result(CommandResult.SUCCESS)
+        return Success()
 
-
-    def _on_whad_phy_set_freq(self, message):
+    @VirtualDevice.route(PhySetFreq)
+    def on_phy_set_freq(self, message):
         found = False
         for supported_range in self.__supported_frequency_range:
             range_start, range_end = supported_range[0], supported_range[1]
@@ -374,83 +393,109 @@ class Pcap(VirtualDevice):
                 found = True
                 break
         if found:
-            self._send_whad_command_result(CommandResult.SUCCESS)
+            return Success()
         else:
-            self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
+            return ParameterError()
 
-    def _on_whad_phy_datarate(self, message): # pylint: disable=W0613
-        self._send_whad_command_result(CommandResult.SUCCESS)
+    @VirtualDevice.route(PhySetDatarate)
+    def on_phy_datarate(self, message): # pylint: disable=W0613
+        return Success()
 
-    def _on_whad_phy_packet_size(self, message): # pylint: disable=W0613
-        self._send_whad_command_result(CommandResult.SUCCESS)
+    @VirtualDevice.route(PhySetPacketSize)
+    def on_phy_packet_size(self, message): # pylint: disable=W0613
+        return Success()
 
-    def _on_whad_phy_endianness(self, message): # pylint: disable=W0613
-        self._send_whad_command_result(CommandResult.SUCCESS)
+    @VirtualDevice.route(PhySetEndianness)
+    def on_phy_endianness(self, message): # pylint: disable=W0613
+        return Success()
 
-    def _on_whad_phy_tx_power(self, message): # pylint: disable=W0613
-        self._send_whad_command_result(CommandResult.SUCCESS)
+    @VirtualDevice.route(PhySetTxPower)
+    def on_phy_tx_power(self, message): # pylint: disable=W0613
+        return Success()
 
-    def _on_whad_phy_mod_ask(self, message): # pylint: disable=W0613
-        self._send_whad_command_result(CommandResult.SUCCESS)
+    @VirtualDevice.route(PhySetAskMod)
+    def on_phy_mod_ask(self, message): # pylint: disable=W0613
+        return Success()
 
-    def _on_whad_phy_mod_4fsk(self, message): # pylint: disable=W0613
-        self._send_whad_command_result(CommandResult.SUCCESS)
+    @VirtualDevice.route(PhySet4FskMod)
+    def on_phy_mod_4fsk(self, message): # pylint: disable=W0613
+        return Success()
 
-    def _on_whad_phy_mod_fsk(self, message): # pylint: disable=W0613
-        self._send_whad_command_result(CommandResult.SUCCESS)
+    @VirtualDevice.route(PhySetFskMod)
+    def on_phy_mod_fsk(self, message): # pylint: disable=W0613
+        return Success()
 
-    def _on_whad_phy_mod_gfsk(self, message): # pylint: disable=W0613
-        self._send_whad_command_result(CommandResult.SUCCESS)
+    @VirtualDevice.route(PhySetGfskMod)
+    def on_phy_mod_gfsk(self, message): # pylint: disable=W0613
+        return Success()
 
-    def _on_whad_phy_sync_word(self, message): # pylint: disable=W0613
-        self._send_whad_command_result(CommandResult.SUCCESS)
+    @VirtualDevice.route(PhySetSyncWord)
+    def on_phy_sync_word(self, message): # pylint: disable=W0613
+        return Success()
 
+    # Dot15d4
 
-    def _on_whad_dot15d4_stop(self, message): # pylint: disable=W0613
+    @VirtualDevice.route(Dot15Stop)
+    def on_dot15d4_stop(self, message): # pylint: disable=W0613
         self.__started = False
-        self._send_whad_command_result(CommandResult.SUCCESS)
+        return Success()
 
-    def _on_whad_dot15d4_send_raw(self, message): # pylint: disable=W0613
-        self._send_whad_command_result(CommandResult.SUCCESS)
+    @VirtualDevice.route(Dot15SendRaw)
+    def on_dot15d4_send_raw(self, message): # pylint: disable=W0613
+        return Success()
 
-    def _on_whad_dot15d4_sniff(self, message): # pylint: disable=W0613
-        self._send_whad_command_result(CommandResult.SUCCESS)
+    @VirtualDevice.route(Dot15Sniff)
+    def on_dot15d4_sniff(self, message): # pylint: disable=W0613
+        return Success()
 
-    def _on_whad_dot15d4_start(self, message): # pylint: disable=W0613
+    @VirtualDevice.route(Dot15Start)
+    def on_dot15d4_start(self, message): # pylint: disable=W0613
         self.__started = True
-        self._send_whad_command_result(CommandResult.SUCCESS)
+        return Success()
 
-    def _on_whad_esb_stop(self, message): # pylint: disable=W0613
+    # ESB
+
+    @VirtualDevice.route(EsbStop)
+    def on_esb_stop(self, message): # pylint: disable=W0613
         self.__started = False
-        self._send_whad_command_result(CommandResult.SUCCESS)
+        return Success()
 
-    def _on_whad_esb_send_raw(self, message): # pylint: disable=W0613
-        self._send_whad_command_result(CommandResult.SUCCESS)
+    @VirtualDevice.route(EsbSendRaw)
+    def on_esb_send_raw(self, message): # pylint: disable=W0613
+        return Success()
 
-    def _on_whad_esb_sniff(self, message): # pylint: disable=W0613
-        self._send_whad_command_result(CommandResult.SUCCESS)
+    @VirtualDevice.route(EsbSniffMode)
+    def on_esb_sniff(self, message): # pylint: disable=W0613
+        return Success()
 
-    def _on_whad_esb_start(self, message): # pylint: disable=W0613
+    @VirtualDevice.route(EsbStart)
+    def on_esb_start(self, message): # pylint: disable=W0613
         self.__started = True
-        self._send_whad_command_result(CommandResult.SUCCESS)
+        return Success()
 
-    def _on_whad_unifying_stop(self, message): # pylint: disable=W0613
+    # Unifying
+
+    @VirtualDevice.route(UniStop)
+    def on_unifying_stop(self, message): # pylint: disable=W0613
         self.__domain = Domain.LogitechUnifying
         self.__started = False
-        self._send_whad_command_result(CommandResult.SUCCESS)
+        return Success()
 
-    def _on_whad_unifying_send_raw(self, message): # pylint: disable=W0613
+    @VirtualDevice.route(UniSendRaw)
+    def on_unifying_send_raw(self, message): # pylint: disable=W0613
         self.__domain = Domain.LogitechUnifying
-        self._send_whad_command_result(CommandResult.SUCCESS)
+        return Success()
 
-    def _on_whad_unifying_sniff(self, message): # pylint: disable=W0613
+    @VirtualDevice.route(UniSniffMode)
+    def on_unifying_sniff(self, message): # pylint: disable=W0613
         self.__domain = Domain.LogitechUnifying
-        self._send_whad_command_result(CommandResult.SUCCESS)
+        return Success()
 
-    def _on_whad_unifying_start(self, message): # pylint: disable=W0613
+    @VirtualDevice.route(UniStart)
+    def on_unifying_start(self, message): # pylint: disable=W0613
         self.__domain = Domain.LogitechUnifying
         self.__started = True
-        self._send_whad_command_result(CommandResult.SUCCESS)
+        return Success()
 
     # Discovery related functions
     def _get_capabilities(self):
@@ -459,7 +504,7 @@ class Pcap(VirtualDevice):
         return capabilities
 
     def _get_manufacturer(self):
-        return "whad-team".encode('utf-8')
+        return "whad-team"
 
     def _get_serial_number(self):
         return bytes.fromhex("00" * 16)
@@ -468,4 +513,4 @@ class Pcap(VirtualDevice):
         return (0, 0, 0)
 
     def _get_url(self):
-        return "https://github.com/whad-team/whad-client".encode('utf-8')
+        return "https://github.com/whad-team/whad-client"
