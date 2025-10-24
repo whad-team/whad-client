@@ -344,32 +344,20 @@ class Pcap(VirtualDevice):
         self.__started = True
         return Success()
 
-    @VirtualDevice.route(SniffAdv)
+    @VirtualDevice.route(SniffAdv, SniffConnReq)
     def _on_whad_ble_sniff_adv(self, message): # pylint: disable=W0613
         return Success()
 
-    @VirtualDevice.route(SniffConnReq)
-    def _on_whad_ble_sniff_conn(self, message): # pylint: disable=W0613
-        return Success()
-
-
     # PHY
-    @VirtualDevice.route(PhyStop)
-    def on_phy_stop(self, message): # pylint: disable=W0613
-        self.__started = False
-        return Success()
-
-    @VirtualDevice.route(PhySendRaw)
-    def on_phy_send_raw(self, message): # pylint: disable=W0613
-        return Success()
-
-    @VirtualDevice.route(PhySniff)
-    def on_phy_sniff(self, message): # pylint: disable=W0613
-        return Success()
 
     @VirtualDevice.route(PhyStart)
     def on_phy_start(self, message): # pylint: disable=W0613
         self.__started = True
+        return Success()
+
+    @VirtualDevice.route(PhyStop)
+    def on_phy_stop(self, message): # pylint: disable=W0613
+        self.__started = False
         return Success()
 
     @VirtualDevice.route(GetSupportedFreqs)
@@ -397,80 +385,43 @@ class Pcap(VirtualDevice):
         else:
             return ParameterError()
 
-    @VirtualDevice.route(PhySetDatarate)
-    def on_phy_datarate(self, message): # pylint: disable=W0613
-        return Success()
-
-    @VirtualDevice.route(PhySetPacketSize)
-    def on_phy_packet_size(self, message): # pylint: disable=W0613
-        return Success()
-
-    @VirtualDevice.route(PhySetEndianness)
-    def on_phy_endianness(self, message): # pylint: disable=W0613
-        return Success()
-
-    @VirtualDevice.route(PhySetTxPower)
-    def on_phy_tx_power(self, message): # pylint: disable=W0613
-        return Success()
-
-    @VirtualDevice.route(PhySetAskMod)
-    def on_phy_mod_ask(self, message): # pylint: disable=W0613
-        return Success()
-
-    @VirtualDevice.route(PhySet4FskMod)
-    def on_phy_mod_4fsk(self, message): # pylint: disable=W0613
-        return Success()
-
-    @VirtualDevice.route(PhySetFskMod)
-    def on_phy_mod_fsk(self, message): # pylint: disable=W0613
-        return Success()
-
-    @VirtualDevice.route(PhySetGfskMod)
-    def on_phy_mod_gfsk(self, message): # pylint: disable=W0613
-        return Success()
-
-    @VirtualDevice.route(PhySetSyncWord)
-    def on_phy_sync_word(self, message): # pylint: disable=W0613
+    @VirtualDevice.route(PhySendRaw, PhySniff, PhySetDatarate,
+                         PhySetPacketSize, PhySetEndianness, PhySetTxPower,
+                         PhySetAskMod, PhySet4FskMod , PhySetFskMod,
+                         PhySetGfskMod, PhySetSyncWord)
+    def on_phy_other_messages(self, message): # pylint: disable=W0613
         return Success()
 
     # Dot15d4
-
-    @VirtualDevice.route(Dot15Stop)
-    def on_dot15d4_stop(self, message): # pylint: disable=W0613
-        self.__started = False
-        return Success()
-
-    @VirtualDevice.route(Dot15SendRaw)
-    def on_dot15d4_send_raw(self, message): # pylint: disable=W0613
-        return Success()
-
-    @VirtualDevice.route(Dot15Sniff)
-    def on_dot15d4_sniff(self, message): # pylint: disable=W0613
-        return Success()
 
     @VirtualDevice.route(Dot15Start)
     def on_dot15d4_start(self, message): # pylint: disable=W0613
         self.__started = True
         return Success()
 
+    @VirtualDevice.route(Dot15Stop)
+    def on_dot15d4_stop(self, message): # pylint: disable=W0613
+        self.__started = False
+        return Success()
+
+    @VirtualDevice.route(Dot15SendRaw, Dot15Sniff)
+    def on_dot15d4_other_messages(self, message): # pylint: disable=W0613
+        return Success()
+
     # ESB
+
+    @VirtualDevice.route(EsbStart)
+    def on_esb_start(self, message): # pylint: disable=W0613
+        self.__started = True
+        return Success()
 
     @VirtualDevice.route(EsbStop)
     def on_esb_stop(self, message): # pylint: disable=W0613
         self.__started = False
         return Success()
 
-    @VirtualDevice.route(EsbSendRaw)
-    def on_esb_send_raw(self, message): # pylint: disable=W0613
-        return Success()
-
-    @VirtualDevice.route(EsbSniffMode)
-    def on_esb_sniff(self, message): # pylint: disable=W0613
-        return Success()
-
-    @VirtualDevice.route(EsbStart)
-    def on_esb_start(self, message): # pylint: disable=W0613
-        self.__started = True
+    @VirtualDevice.route(EsbSendRaw, EsbSniffMode)
+    def on_esb_other_messages(self, message): # pylint: disable=W0613
         return Success()
 
     # Unifying
