@@ -1181,16 +1181,16 @@ class VirtualDevice(Device):
         specific message type.
         """
 
-        def __init__(self, message_type):
+        def __init__(self, *types: Type[HubMessage]):
             """Initialize decorator."""
-            self.__msg_type = message_type
+            self.__msg_types = types
 
         def __call__(self, callback):
             """Called to decorate a specific callback"""
-            setattr(callback, "_MESSAGE_TYPE", self.__msg_type)
+            setattr(callback, "_MESSAGE_TYPES", self.__msg_types)
             return callback
 
-    def __init__(self, index: int = None):
+    def __init__(self, index: Optional[int] = None):
         """Initialize a virtual device.
 
         :param index: Virtual device index
@@ -1202,8 +1202,9 @@ class VirtualDevice(Device):
             try:
                 prop_obj = getattr(self, prop_name)
                 # If property is a method
-                if callable(prop_obj) and hasattr(prop_obj, "_MESSAGE_TYPE"):
-                    self.__handlers[getattr(prop_obj, "_MESSAGE_TYPE")] = prop_obj
+                if callable(prop_obj) and hasattr(prop_obj, "_MESSAGE_TYPES"):
+                    for msg_type in getattr(prop_obj, "_MESSAGE_TYPES"):
+                        self.__handlers[msg_type] = prop_obj
             except AttributeError:
                 pass
 
