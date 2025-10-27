@@ -7,7 +7,6 @@ Manages basic Tx/Rx. (Based on BLE sniffer because it works)
 from whad.ble.connector.base import BLE
 from whad.exceptions import UnsupportedCapability, RequiredImplementation, \
     WhadDeviceDisconnected
-
 from whad.hub.ble import Direction as BleDirection
 
 from whad.btmesh.connector.bearer import Bearer, AdvBearer

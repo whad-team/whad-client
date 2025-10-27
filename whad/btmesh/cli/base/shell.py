@@ -2392,3 +2392,15 @@ class BTMeshBaseShell(InteractiveShell):
             )
         else:
             return type_hint.__name__
+
+    def do_quit(self, _):
+        """close BT Mesh node.
+        """
+        if self._connector is not None:
+            self._connector.close()
+        return True
+
+    def do_exit(self, arg):
+        """alias for <ansicyan>quit</ansicyan>
+        """
+        return self.do_quit(arg)
