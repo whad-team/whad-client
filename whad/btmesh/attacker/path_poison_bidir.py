@@ -18,7 +18,6 @@ from whad.btmesh.stack.constants import DIRECTED_FORWARDING_CREDS
 
 from time import sleep
 from random import uniform
-from threading import Thread, Event
 from copy import copy
 
 logger = logging.getLogger(__name__)

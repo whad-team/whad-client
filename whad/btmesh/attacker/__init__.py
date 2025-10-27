@@ -153,7 +153,7 @@ class Attacker:
 
         if asynch:
             self._event.set()
-            thread = Thread(target=self._attack_runner)
+            thread = Thread(target=self._attack_runner, daemon=True)
             thread.start()
             return True
         else:

@@ -210,6 +210,7 @@ class PBAdvBearerLayer(Layer):
         thread = Thread(
             target=self.sending_thread,
             args=(pkt),
+            daemon=True
         )
 
         thread.start()

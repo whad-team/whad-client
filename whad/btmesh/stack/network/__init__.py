@@ -420,7 +420,7 @@ class NetworkLayer(Layer):
             obfuscated_data=obfu_data,
             enc_dst_enc_transport_pdu_mic=enc,
         )
-        thread = Thread(target=self.sending_thread, args=EIR_Hdr(type=0x2A) / pkt)
+        thread = Thread(target=self.sending_thread, args=EIR_Hdr(type=0x2A) / pkt, daemon=True)
         thread.start()
 
         """
