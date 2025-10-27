@@ -37,16 +37,6 @@ from whad.btmesh.profile import BaseMeshProfile
 from copy import copy
 
 
-# lock for sending to not skip packets ?
-def txlock(f):
-    def _wrapper(self, *args, **kwargs):
-        self.lock_tx()
-        result = f(self, *args, **kwargs)
-        self.unlock_tx()
-        return result
-
-    return _wrapper
-
 
 class BTMeshNode(BTMesh):
     """

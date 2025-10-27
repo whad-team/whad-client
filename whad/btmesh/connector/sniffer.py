@@ -23,7 +23,8 @@ from whad.scapy.layers.btmesh import (
     BTMesh_Upper_Transport_Access_PDU,
     BTMesh_Model_Message,
 )
-from whad.btmesh.connector import BTMesh, AdvBearer
+from whad.btmesh.connector import BTMesh
+from whad.btmesh.connector.bearer import AdvBearer
 from whad.scapy.layers.btmesh import (
     BTMesh_Obfuscated_Network_PDU,
     BTMesh_Network_Clear_PDU,
