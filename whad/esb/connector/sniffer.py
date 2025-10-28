@@ -16,6 +16,7 @@ from typing import Generator
 
 from scapy.packet import Packet
 
+from whad.device.connector import Connector
 from whad.device import Device
 from whad.exceptions import WhadDeviceDisconnected, UnsupportedCapability
 from whad.common.sniffing import EventsManager
