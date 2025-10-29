@@ -336,7 +336,7 @@ class Sniffer(BLE, EventsManager):
         start = time()
         try:
             if self.__configuration.access_addresses_discovery:
-                for message in super().sniff(messages=(AccessAddressDiscovered), timeout=timeout):
+                for message in super().capture(messages=(AccessAddressDiscovered), timeout=timeout):
                     if message is not None:
                         rssi = None
                         timestamp = None
@@ -360,9 +360,9 @@ class Sniffer(BLE, EventsManager):
                         break
 
             elif self.__configuration.active_connection is not None:
-                message = self.wait_for_message(keep=message_filter(Synchronized),
-                                                timeout=0.1)
-
+                #message = self.wait_for_message(keep=message_filter(Synchronized),
+                #                                timeout=0.1)
+                message = super().capture(messages=(Synchronized), timeout=0.1)
                 if message is not None:
                     if message.hop_increment > 0:
                         if self.support_raw_pdu():
@@ -372,7 +372,7 @@ class Sniffer(BLE, EventsManager):
                         else:
                             message_type = BleAdvPduReceived
 
-                        for message in super().sniff(messages=(message_type), timeout=timeout):
+                        for message in super().capture(messages=(message_type), timeout=timeout):
                             if message is not None:
                                 packet = message.to_packet()
                                 if packet is not None:
@@ -391,7 +391,7 @@ class Sniffer(BLE, EventsManager):
                 else:
                     message_type = BleAdvPduReceived
 
-                for message in super().sniff(messages=(message_type), timeout=timeout):
+                for message in super().capture(messages=(message_type), timeout=timeout):
                     if message is not None:
                         packet = message.to_packet()
                         if packet is not None:
