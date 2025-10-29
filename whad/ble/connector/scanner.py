@@ -167,7 +167,7 @@ class Scanner(BLE):
         start_anchor = time()
         while True:
             # Switch to sniffing mode
-            for message in super().sniff(messages=(message_type), timeout=timeout):
+            for message in super().capture(messages=(message_type), timeout=timeout):
                 # Convert message from rebuilt PDU
                 packet = message.to_packet()
                 if packet is not None:
