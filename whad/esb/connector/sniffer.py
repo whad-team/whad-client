@@ -137,7 +137,7 @@ class Sniffer(ESB, EventsManager):
             message_type = PduReceived
 
         try:
-            for message in Connector.sniff(self, messages=(message_type), timeout=timeout):
+            for message in super().capture(messages=(message_type), timeout=timeout):
                 if message is not None and issubclass(message, AbstractPacket):
                     packet = message.to_packet()
                     if packet is not None:

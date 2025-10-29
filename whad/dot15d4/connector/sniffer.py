@@ -91,12 +91,12 @@ class Sniffer(Dot15d4, EventsManager):
                     message_type = PduReceived
 
                 # Wait for a message to be received
-                message = self.wait_for_message(keep=message_filter(message_type), timeout=1)
-                if message is not None:
-                    packet = message.to_packet()
-                    if packet is not None:
-                        self.monitor_packet_rx(packet)
-                        yield packet
+                for message in super().capture((message_type), timeout=1):
+                    if message is not None:
+                        packet = message.to_packet()
+                        if packet is not None:
+                            self.monitor_packet_rx(packet)
+                            yield packet
 
                 # Check if timeout has been reached (if provided)
                 if timeout is not None:
