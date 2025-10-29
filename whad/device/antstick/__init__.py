@@ -1,6 +1,6 @@
-"""
+'''
 ANT Stick adaptation layer for WHAD.
-"""
+'''
 import logging
 from threading import  Lock
 from time import sleep, time
@@ -36,7 +36,7 @@ from whad.scapy.layers.antstick import ANTStick_Message, ANTStick_Command_Reques
     ANTStick_RSSI_Data_Extension, ANTStick_Timestamp_Data_Extension, \
     ANTStick_Data_Burst_Data, ANTStick_Data_Extension, ANTStick_Advanced_Data_Burst_Data
 
-from .constants import AntStickIds
+from .constants import AntStickIds, AntMessageCode
 from .channel import ChannelStatus, ChannelType, Channel
 from .network import Network
 
@@ -46,6 +46,7 @@ def get_antstick(index=0, bus=None, address=None):
     '''
     Returns an ANTStick USB object based on index or bus & address.
     '''
+    # We have two generations of ANTStick dongle, match them all
     devices = list(find(idVendor=AntStickIds.ANTSTICK_ID_VENDOR,
                         idProduct=AntStickIds.ANTSTICK_ID_PRODUCT,find_all=True)) 
 
@@ -67,8 +68,8 @@ def get_antstick(index=0, bus=None, address=None):
 
 
 class ANTStick(VirtualDevice):
-    """ANTStick virtual device implementation.
-    """
+    '''ANTStick virtual device implementation.
+    '''
 
     INTERFACE_NAME = "antstick"
 
@@ -107,25 +108,32 @@ class ANTStick(VirtualDevice):
 
 
     def __init__(self, index=0, bus=None, address=None):
-        """
+        '''
         Create device connection
-        """
+        '''
         device = get_antstick(index,bus=bus,address=address)
+        # Check the presence of dongle, or raises an WhadDeviceNotFound exception
         if device is None:
             raise WhadDeviceNotFound
+
         _, self.__antstick = device
+
+        # Dongle related variables
         self.__antstick_capabilities = None
         self.__opened = False
         self.__opened_stream = False
         self.__lock = Lock()
-
         self.__in_buffer = b""
+
+        # Dongle related event & packets queues
         self.__event_queue = Queue()
         self.__pdu_queue = Queue()
         self.__response_queue = Queue()
         self.__ack_queue = Queue()
 
+        # Variables linked to ANT protocol management
         self.__last_timestamp = time() * 1000
+        # we need to generate the sync value according to the network key algorithm
         self.__sync = generate_sync_from_network_key(ANT_PLUS_NETWORK_KEY)
         self.__rf_channel = 57
         self.__number_of_channels = 0
@@ -133,13 +141,18 @@ class ANTStick(VirtualDevice):
         self.__channels = {}
         self.__networks = {}
         self.__reload_channel = None
+        # Call VirtualDevice init
         super().__init__()
 
     def reset(self):
+        '''Reset the ANTStick dongle.
+        '''
         self.__antstick.reset()
 
     def _configure_endpoints(self):
-        # Code from openant project
+        '''Configure the available in & out endpoints
+        '''
+        # Code inspired by openant project: https://github.com/Tigge/openant
         cfg = self.__antstick.get_active_configuration()
         intf = cfg[(0, 0)]
 
@@ -152,7 +165,7 @@ class ANTStick(VirtualDevice):
 
         self.__in_endpoint = find_descriptor(
             intf,
-            # match the first OUT endpoint
+            # match the first IN endpoint
             custom_match=lambda e: endpoint_direction(e.bEndpointAddress)
             == ENDPOINT_IN,
         )
@@ -160,22 +173,27 @@ class ANTStick(VirtualDevice):
 
 
     def open(self):
-        # Try detach any kernel driver
+        '''Open the ANTStick device.
+        '''
+
+        # We need to detach the kernel module linked to dongle before use
         if self.__antstick.is_kernel_driver_active(0):
             self.__antstick.detach_kernel_driver(0)
         try:
             self.__antstick.set_configuration()
         except USBError as err:
+            # Check if we are allowed to access the driver by OS
             if err.errno == 13:
                 raise WhadDeviceAccessDenied("antstick") from err
+            # Otherwise, raises a generic WhadDeviceNotReady exception
             raise WhadDeviceNotReady() from err
 
+        # Reset the dongle, then configure endpoints
         self.__antstick.reset()
         self._configure_endpoints()
-        self._antstick_reset()
 
-
-        # Ask parent class to run a background I/O thread
+        # Get all relevant informations about the dongle: serial number, manufacturer, firmware version ...
+        logger.debug("Recovering serial number, manufacturer, firmware version...")
         serial_number = self._get_serial_number()
         if serial_number is not None:
             self._dev_id = self._get_ant_version()[:12] + pack("<I", serial_number)
@@ -184,6 +202,9 @@ class ANTStick(VirtualDevice):
         self._fw_author = self._get_manufacturer()
         self._fw_url = self._get_url()
         self._fw_version = self._get_firmware_version()
+
+        # Recover capabilities
+        logger.debug("Recovering capabilities.")
         self._dev_capabilities = self._get_capabilities()
 
         self._initialize_channels()
@@ -191,15 +212,17 @@ class ANTStick(VirtualDevice):
         self._configure_extension_mode(enable=True)
         self._configure_lib(rssi=True, channel_id=True, timestamp=True)
         self.pending_burst_packets = []
+
+        # Ask parent class to run a background I/O thread
         self.__opened = True
         super().open()
 
        
 
     def close(self):
-        """
+        '''
         Close current device.
-        """
+        '''
         # Ask parent class to stop I/O thread
         super().close()
 
@@ -207,6 +230,8 @@ class ANTStick(VirtualDevice):
         self.__opened = False
         
     def _initialize_channels(self):
+        '''Initialize the internal structure linked to channels
+        '''
         for channel_number in range(self.__number_of_channels):
             self.__channels[channel_number] = Channel(
                 status = ChannelStatus.UNASSIGNED, 
@@ -221,6 +246,8 @@ class ANTStick(VirtualDevice):
             )
         
     def _initialize_networks(self):
+        '''Initialize the internal structure linked to networks
+        '''
         for network_number in range(self.__number_of_networks):
             self.__networks[network_number] = Network(
                 network_key = None
@@ -228,64 +255,139 @@ class ANTStick(VirtualDevice):
 
 
     def _reload_channel(self, channel_number):
+        ''' Reload the configuration for a given channel number.
+
+        :param channel_number: integer representing the id of selected channel
+        :type channel_number: int
+        '''
+        logger.debug("Reload the ANT channel...")
+
+        # Mark it as closed
         self.__channels[channel_number].opened = False
+
+        # Configure the channel ID (chan number, dev number, transmission type)
         self._set_channel_id(
             channel_number = channel_number, 
             device_number = self.__channels[channel_number].device_number, 
             device_type = self.__channels[channel_number].device_type, 
             transmission_type = self.__channels[channel_number].transmission_type
         )
+        # Configure the RF channel (frequency)
         self._set_channel_rf_channel(
             channel_number = channel_number, 
             rf_channel = self.__channels[channel_number].rf_channel, 
         )
 
+        # Configure the channel period (time between time slots)
         self._set_channel_period(
             channel_number = channel_number, 
             period = self.__channels[channel_number].period, 
         )
+
+        # Open the channel
         self._open_channel(channel_number)
 
 
     def read(self):
-        """Read incoming data
-        """
+        '''Read incoming data. 
 
+        This is the main thread responsible for processing incoming data (D->H).
+        '''
+
+        # We check if it is opened
         if not self.__opened:
             raise WhadDeviceNotReady()
         else:
+            # Should we reload the channel ? 
             if self.__reload_channel is not None:
                 self.__opened = False
                 self._reload_channel(self.__reload_channel)
                 self.__reload_channel = None
                 self.__opened = True
+
+            # Ask to read an incoming ANTStick message
             self._antstick_read_message()
 
+            # If the stream is marked as open
             if self.__opened_stream:
+
+                # Process events
                 while not self.__event_queue.empty():
                     event = ANTStick_Message(self.__event_queue.get())
-                    if event.message_code in (2,3,5,6,10):
-                        self._send_whad_ant_channel_event(event.channel_number, event.message_code)
-                    #print("Event:", repr(event))
-                    if event.message_code == 7 and self.__channels[event.channel_number].opened: # event_channel_closed
-                        self.__reload_channel = event.channel_number
-                    elif event.message_code in (5,6) + (4,10,17):
+                    logger.debug("Processing event : " + repr(event))
 
+                    if event.message_code in (
+                        AntMessageCode.EVENT_RX_FAIL,
+                        AntMessageCode.EVENT_TX,
+                        AntMessageCode.EVENT_TRANSFER_TX_COMPLETED, 
+                        AntMessageCode.EVENT_TRANSFER_TX_FAILED,
+                        AntMessageCode.EVENT_TRANSFER_TX_START
+                    ):
+                        # Filter only channel event 
+                        logger.debug("Event filtered as channel event, signaling the event.")
+                        self._send_whad_ant_channel_event(event.channel_number, event.message_code)
+                    
+                    # Regularly, the channel is automatically closed, re-open it as soon as 
+                    # possible by reloading the channel.
+                    if (
+                        event.message_code == AntMessageCode.EVENT_CHANNEL_CLOSED and 
+                        self.__channels[event.channel_number].opened
+                    ):
+                        logger.debug("Event indicating a channel closed is detected, reloading channel...")
+                        self.__reload_channel = event.channel_number
+
+                    
+                    elif event.message_code in (
+                        AntMessageCode.EVENT_TRANSFER_TX_COMPLETED,
+                        AntMessageCode.EVENT_TRANSFER_TX_FAILED,
+                        AntMessageCode.EVENT_TRANSFER_RX_FAILED,
+                        AntMessageCode.EVENT_TRANSFER_TX_START,
+                        AntMessageCode.EVENT_TRANSFER_NEXT_DATA_BLOCK
+                    ):
+                        # Add to the ACK queue any event related to transfer management.
+                        logger.debug("Event related to transfer management, adding to ACK queue...")
                         self.__ack_queue.put(bytes(event))
-                    # acked: event_transfer_tx_completed or event_transfer_tx_failed  
+
+                # Process PDU
                 while not self.__pdu_queue.empty():
+                    # Recover incoming data PDU
                     data = ANTStick_Message(self.__pdu_queue.get())
-                    #print(repr(data))
-                    if data is not None:# and ANTStick_Data_Broadcast_Data in data:
-                        cn = data.channel_number & 0b11111
+                    logger.debug("Processing incoming PDU : " + repr(data))
+
+                    if data is not None:
+                        # Recover the channel number from the ANTStick Message PDU
+                        channel_number = data.channel_number & 0b11111
+
+                        # Recover the device number from the ANTStick Message PDU
+                        device_number = (
+                            data.device_number if ANTStick_Data_Extension in data 
+                            else self.__channels[channel_number].device_number
+                        )
+                        
+                        # Recover the device type from the ANTStick Message PDU
+                        device_type = (
+                            data.device_type if ANTStick_Data_Extension in data 
+                            else self.__channels[channel_number].device_type
+                        )
+
+                        # Recover the transmission type from the ANTStick Message PDU
+                        transmission_type = (
+                            data.transmission_type if ANTStick_Data_Extension in data 
+                            else self.__channels[cn].transmission_type
+                        )
+
+                        # Recover if the packet is broadcast or ack/burst
+                        broadcast = (0 if ANTStick_Data_Broadcast_Data in data else 1)
+
+                        # Convert it to a scapy packet
                         pkt = bytes(
                                 ANT_Hdr(
                                     preamble = self.__sync, 
-                                    device_number = data.device_number if ANTStick_Data_Extension in data else self.__channels[cn].device_number, 
-                                    device_type = data.device_type if ANTStick_Data_Extension in data else self.__channels[cn].device_type,
-                                    transmission_type=data.transmission_type if ANTStick_Data_Extension in data else self.__channels[cn].transmission_type, 
-                                    broadcast = (0 if ANTStick_Data_Broadcast_Data in data else 1), 
-                                    ack = False, 
+                                    device_number = device_number,  
+                                    device_type = device_type
+                                    transmission_type = transmission_type, 
+                                    broadcast = broadcast, 
+                                    ack = False,
                                     end = False, 
                                     count = 0, 
                                     slot = False, 
@@ -293,15 +395,19 @@ class ANTStick(VirtualDevice):
                             ) / data.pdu
                         )
                         pkt = ANT_Hdr(pkt)
+
+                        # Extract RSSI and timestamp if available
                         rssi = None
                         if ANTStick_RSSI_Data_Extension in data:
                             rssi = data.rssi
                         if ANTStick_Timestamp_Data_Extension in data:
                             timestamp = data.timestamp
                         else:
+                            # If timestamp is not available, build it according to Host clock
                             now = time() * 1000
                             timestamp = now - self.__last_timestamp
-                            
+
+                        # Transmit the PDU as WHAD ANT Message
                         self._send_whad_ant_pdu(
                             pdu=bytes(pkt), 
                             rf_channel=self.__rf_channel, 
@@ -316,6 +422,20 @@ class ANTStick(VirtualDevice):
 
 
     def _send_whad_ant_pdu(self, pdu, channel_number=0, rf_channel=0, timestamp=None, rssi=None):
+        '''Send a WHAD ANT PDU message from virtual device to whad-client core
+
+        :param pdu: PDU to transmit
+        :type pdu: bytes
+        :param channel_number: channel number in use
+        :type channel_number: int
+        :param rf_channel: RF channel (frequency) in use (offset from 2400MHz)
+        :type rf_channel: int 
+        :param timestamp: timestamp in use (in us)
+        :type timestamp: int
+        :param rssi: RSSI in use
+        :type rssi: int 
+        '''
+        # Create the PDUReceived message according to parameters
         msg = self.hub.ant.create_pdu_received(
             pdu=pdu, 
             channel_number=channel_number, 
@@ -326,40 +446,58 @@ class ANTStick(VirtualDevice):
         if timestamp is not None:
             msg.timestamp = timestamp
 
+        # Set RSSI if provided
         if rssi is not None:
             msg.rssi = rssi
+
         # Send message
         self._send_whad_message(msg)
 
 
     def _get_manufacturer(self):
+        '''Returns the manufacturer indicated by the ANT dongle.
+        '''
         return self.__antstick.manufacturer.encode('utf-8').replace(b"\x00", b"")
 
     def _get_firmware_version(self):
+        '''Returns the firmware version (fake value since it can't be recovered from the dongle.)
+        '''
         return (1, 0, 0)
 
     def _get_url(self):
+        '''Returns the URL of the manufacturer website (thisisant website).
+        '''
         return "https://thisisant.com".encode('utf-8')
 
 
 
     def _get_capabilities(self):
+        '''Returns the capabilities of the ANTStick dongle.
+
+        This class transmits a Command Request allowing to recover all the features available on 
+        the dongle. It then builds the WHAD capabilities associated to the ANT domain dynamically.
+        '''
+
+        # Forge and transmit the command request and indicate the expected dissector in the response.
         response = self._antstick_send_command(
             ANTStick_Command_Request_Message(message_id_req=0x54), 
             rsp_filter = lambda response: ANTStick_Requested_Message_Capabilities in response
         )
-        # Provide ant stick capabilities
+
+        # Extract ANTStick capabilities
         if ANTStick_Requested_Message_Capabilities in response:
             self.__antstick_capabilities = response
             self.__number_of_channels = response.max_channels
             self.__number_of_networks = response.max_networks
             
-            capabilities = Capability.NoRawData # no support of raw PDU here
+            # We do not support Raw PDU here since ANTStick only provide a limited control over packets.
+            capabilities = Capability.NoRawData
             commands = [
                 Commands.ListChannels, 
                 Commands.ListNetworks,
             ]
 
+            # Infer the available capabilities and the related commands.
             if (
                 self.__antstick_capabilities.cap_no_receive_messages == 0 and 
                 self.__antstick_capabilities.cap_no_receive_channels == 0 
@@ -442,6 +580,7 @@ class ANTStick(VirtualDevice):
                     Commands.Stop
                 ]
 
+            # Returns the capabilities
             return {
                 Domain.ANT : (
                                 capabilities, 
@@ -449,9 +588,14 @@ class ANTStick(VirtualDevice):
                 )
             }       
 
-        return None        
+        return None
 
     def _get_serial_number(self):
+        '''Transmit a command to get the ANTStick serial number and returns it.
+        
+        :return: serial number of the ANTStick dongle
+        :rtype: int
+        '''
         response = self._antstick_send_command(
             ANTStick_Command_Request_Message(message_id_req=0x61), 
             rsp_filter = lambda response: ANTStick_Requested_Message_Serial_Number in response
@@ -463,6 +607,12 @@ class ANTStick(VirtualDevice):
 
 
     def _get_ant_version(self):
+        '''Transmit a command to get the ANTStick supported ANT version and returns it.
+        
+        :return: supported ANT Version of the ANTStick dongle
+        :rtype: bytes
+        '''
+
         response = self._antstick_send_command(
             ANTStick_Command_Request_Message(message_id_req=0x3E),
             rsp_filter= lambda response:ANTStick_Requested_Message_ANT_Version in response
@@ -473,6 +623,18 @@ class ANTStick(VirtualDevice):
 
 
     def _set_network_key(self, network_key, network_number=0):
+        '''Transmit a command to configure the network key associated with a given network.
+        
+        This function will also generate the syncword associated with the provided network key. 
+        The internal structure of the virtual device will then be updated accordingly.
+
+        :param network_key: network key to use (8-bytes length bytes)
+        :type network_key: bytes
+        :param network_number: network number of the network to configure
+        :type network_number: int
+        :return: boolean indicating if it has been successfully configured.
+        :rtype: bool
+        '''
         if not is_valid_network_key(network_key):
             return False
 
@@ -492,6 +654,15 @@ class ANTStick(VirtualDevice):
         return True
 
     def _unassign_channel(self, channel_number=0):
+        '''Transmit a command to unassign a given channel.
+        
+        This function will also update the channel internal structure of the virtual device.
+
+        :param channel_number: channel number of the channel to unassign
+        :type channel_number: int
+        :return: boolean indicating if it has been successfully unassigned.
+        :rtype: bool
+        '''
 
         if channel_number not in self.__channels:
             return False
@@ -509,7 +680,21 @@ class ANTStick(VirtualDevice):
 
 
     def _assign_channel(self, channel_number=0, channel_type=0, network_number=0, background_scanning = False):
+        '''Transmit a command to assign a given channel.
+        
+        This function will also update the channel internal structure of the virtual device.
 
+        :param channel_number: channel number of the channel to assign
+        :type channel_number: int
+        :param channel_type: channel type to use
+        :param channel_type: int
+        :param network_number: network number of the network to link to the channel
+        :param network_number: int
+        :param background_scanning: indicate if the background scanning must be enabled or not
+        :type background_scanning: bool
+        :return: boolean indicating if it has been successfully assigned.
+        :rtype: bool
+        '''
 
         if channel_number not in self.__channels:
             return False
@@ -527,12 +712,28 @@ class ANTStick(VirtualDevice):
                 extended_assignment = 0x20 # | (0x01 if background_scanning else 0x00)
             ) # for some reason transmission doesn't work without async mode so let's hardcode it
         )
+        #TODO: check if extended assignement can use background scanning or not
         self.__channels[channel_number].status = ChannelStatus.ASSIGNED
         self.__channels[channel_number].assigned_network = network_number 
         self.__channels[channel_number].type = ChannelType(channel_type)
         return True
 
-    def _set_channel_id(self, channel_number=0, device_number=None, device_type=None, transmission_type=None, force=False):
+    def _set_channel_id(self, channel_number=0, device_number=None, device_type=None, transmission_type=None):
+        '''Transmit a command to set the channel ID for a given channel.
+        
+        This function will also update the channel internal structure of the virtual device.
+
+        :param channel_number: channel number of the channel to configure
+        :type channel_number: int
+        :param device_number: device number to use
+        :param device_number: int
+        :param device_type: device type to use
+        :param device_type: int
+        :param transmission_type: transmission type to use
+        :param transmission_type: int
+        :return: boolean indicating if it has been successfully configured.
+        :rtype: bool
+        '''
 
         if channel_number not in self.__channels:
             return False
@@ -746,11 +947,17 @@ class ANTStick(VirtualDevice):
             return ANTStick_Message(msg)
 
     def _antstick_read_message(self, timeout=200):
+        # Read a chunk of data from the IN endpoint
         try:
                 self.__lock.acquire()
-                msg = bytes(self.__antstick.read(self.__in_endpoint,
-                                                64, timeout=timeout))
-                self.__lock.release()            
+                msg = bytes(
+                    self.__antstick.read(
+                        self.__in_endpoint,
+                        64, timeout=timeout
+                    )
+                )
+                self.__lock.release()
+                # Append it to the in buffer          
                 self.__in_buffer += msg
 
         except (USBTimeoutError, USBError) as e:
