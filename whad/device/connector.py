@@ -773,13 +773,13 @@ class Connector:
                     self.process_message(event.message)
 
     # pylint: disable=C0301
-    def sniff(self, messages: List = None, timeout: float = None) -> Generator[HubMessage, None, None]:
-        """Enable sniffing mode and report any received messages, optionally
+    def capture(self, messages: List = None, timeout: float = None) -> Generator[HubMessage, None, None]:
+        """Enable capture mode and report any received messages, optionally
         filtered by their type/classes if `messages` is provided.
 
-        :param messages: If specified, sniff only messages that match the given types.
+        :param messages: If specified, capture only messages that match the given types.
         :param messages: List, optional
-        :param timeout: If specified, set a sniffing timeout in seconds
+        :param timeout: If specified, set a capture timeout in seconds
         :type timeout: float, optional
         """
         # Enable sniffing mode (and disable message processing)

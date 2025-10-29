@@ -385,7 +385,7 @@ class Sniffer(BLE, EventsManager):
         start = time()
         try:
             if self.__configuration.access_addresses_discovery:
-                for message in super().sniff(messages=(AccessAddressDiscovered), timeout=timeout):
+                for message in super().capture(messages=(AccessAddressDiscovered), timeout=timeout):
                     if message is not None:
                         rssi = None
                         timestamp = None
@@ -472,7 +472,7 @@ class Sniffer(BLE, EventsManager):
                 else:
                     message_type = BleAdvPduReceived
 
-                for message in super().sniff(messages=(message_type), timeout=timeout):
+                for message in super().capture(messages=(message_type), timeout=timeout):
                     if message is not None:
                         packet = message.to_packet()
                         if packet is not None:

@@ -157,13 +157,13 @@ class Sniffer(Zigbee, EventsManager):
                 else:
                     message_type = PduReceived
 
-                message = self.wait_for_message(keep=message_filter(message_type), timeout=1.0)
-                if message is not None and issubclass(message, AbstractPacket):
-                    packet = message.to_packet()
-                    if packet is not None:
-                        self.monitor_packet_rx(packet)
-                        packet = self.process_packet(packet)
-                        yield packet
+                for message in super().capture(messages=(message_type), timeout=1.0):
+                    if message is not None and issubclass(message, AbstractPacket):
+                        packet = message.to_packet()
+                        if packet is not None:
+                            self.monitor_packet_rx(packet)
+                            packet = self.process_packet(packet)
+                            yield packet
 
                 # Check if timeout has been reached (if provided)
                 if timeout is not None:
