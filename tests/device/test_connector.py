@@ -231,7 +231,7 @@ def test_sniffing_all(mock_replay):
     mock_replay.open()
     mock_replay.discover()
     messages = []
-    for message in conn.sniff(timeout=.5):
+    for message in conn.capture(timeout=.5):
         messages.append(message)
     assert len(messages) == 1
     assert isinstance(messages[0], BlePduReceived)
@@ -242,7 +242,7 @@ def test_sniffing_filter_nomatch(mock_replay):
     mock_replay.open()
     mock_replay.discover()
     messages = []
-    for message in conn.sniff(messages=(Connector), timeout=1.0):
+    for message in conn.capture(messages=(Connector), timeout=1.0):
         messages.append(message)
     assert len(messages) == 0
 
@@ -252,7 +252,7 @@ def test_sniffing_filter_match(mock_replay):
     mock_replay.open()
     mock_replay.discover()
     messages = []
-    for message in conn.sniff(messages=(BlePduReceived), timeout=1.0):
+    for message in conn.capture(messages=(BlePduReceived), timeout=1.0):
         messages.append(message)
     assert len(messages) == 1
 
