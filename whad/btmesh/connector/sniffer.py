@@ -504,16 +504,13 @@ class Sniffer(BTMesh, EventsManager):
                 message_type = BleAdvPduReceived
 
             while True:
-                message = self.wait_for_message(
-                    keep=message_filter(message_type), timeout=0.1
-                )
-
-                if message is not None:
-                    packet = message.to_packet()
-                    packet = self.process_packet(packet)
-                    if packet is not None:
-                        self.monitor_packet_rx(packet)
-                        yield packet
+                for message in super().capture(messages=(message_type), timeout=0.1):
+                    if message is not None:
+                        packet = message.to_packet()
+                        packet = self.process_packet(packet)
+                        if packet is not None:
+                            self.monitor_packet_rx(packet)
+                            yield packet
 
                 # Check if timeout has been reached
                 if timeout is not None:
