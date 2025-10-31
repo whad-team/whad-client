@@ -1018,7 +1018,7 @@ class ANTStick(VirtualDevice):
             command,
             rsp_filter=lambda p:True,
             force_reset=False,
-            timeout=20,
+            timeout=200,
             no_response=False
     ):
         '''
@@ -1080,7 +1080,7 @@ class ANTStick(VirtualDevice):
 
         return response
 
-    def _antstick_read_response(self, rsp_filter=lambda p : True, timeout=20):
+    def _antstick_read_response(self, rsp_filter=lambda p : True, timeout=200):
         '''
         Read an ANTStick response from the dongle.
 
@@ -1106,7 +1106,7 @@ class ANTStick(VirtualDevice):
             logger.debug("Receiving ANTStick response: " +  repr(ANTStick_Message(msg)))
             return ANTStick_Message(msg)
 
-    def _antstick_read_message(self, timeout=20):
+    def _antstick_read_message(self, timeout=200):
         '''
         Read a chunk of data from the IN endpoint of the dongle, and populate three queues 
         depending on the type of received messages:
