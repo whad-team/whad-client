@@ -36,7 +36,7 @@ from whad.scapy.layers.antstick import ANTStick_Message, ANTStick_Command_Reques
     ANTStick_RSSI_Data_Extension, ANTStick_Timestamp_Data_Extension, \
     ANTStick_Data_Burst_Data, ANTStick_Data_Extension, ANTStick_Advanced_Data_Burst_Data
 
-from .constants import AntStickIds, AntMessageCode
+from .constants import AntStickIds, AntMessageCode, AntMessageIds
 from .channel import ChannelStatus, ChannelType, Channel
 from .network import Network
 
@@ -189,12 +189,14 @@ class ANTStick(VirtualDevice):
             raise WhadDeviceNotReady() from err
 
         # Reset the dongle, then configure endpoints
-        self.__antstick.reset()
         self._configure_endpoints()
 
+        self.__antstick.reset()
+            
         # Get all relevant informations about the dongle: serial number, manufacturer, firmware version ...
         logger.debug("Recovering serial number, manufacturer, firmware version...")
         serial_number = self._get_serial_number()
+
         if serial_number is not None:
             self._dev_id = self._get_ant_version()[:12] + pack("<I", serial_number)
             self._dev_id = b"\x00" * (16 - len(self._dev_id)) + self._dev_id
@@ -287,6 +289,8 @@ class ANTStick(VirtualDevice):
         # Open the channel
         self._open_channel(channel_number)
 
+    def write(self, payload):
+        print("[i] write")
 
     def read(self):
         '''Read incoming data. 
@@ -373,7 +377,7 @@ class ANTStick(VirtualDevice):
                         # Recover the transmission type from the ANTStick Message PDU
                         transmission_type = (
                             data.transmission_type if ANTStick_Data_Extension in data 
-                            else self.__channels[cn].transmission_type
+                            else self.__channels[channel_number].transmission_type
                         )
 
                         # Recover if the packet is broadcast or ack/burst
@@ -384,7 +388,7 @@ class ANTStick(VirtualDevice):
                                 ANT_Hdr(
                                     preamble = self.__sync, 
                                     device_number = device_number,  
-                                    device_type = device_type
+                                    device_type = device_type,
                                     transmission_type = transmission_type, 
                                     broadcast = broadcast, 
                                     ack = False,
@@ -598,7 +602,8 @@ class ANTStick(VirtualDevice):
         '''
         response = self._antstick_send_command(
             ANTStick_Command_Request_Message(message_id_req=0x61), 
-            rsp_filter = lambda response: ANTStick_Requested_Message_Serial_Number in response
+            rsp_filter = lambda response: ANTStick_Requested_Message_Serial_Number in response, 
+            force_reset = True
         )
 
         if ANTStick_Requested_Message_Serial_Number in response:
@@ -702,6 +707,7 @@ class ANTStick(VirtualDevice):
         if self.__channels[channel_number].opened:
             self._close_channel(channel_number)
         
+        # Send ANTStick command to assign ANT channel
         response = self._antstick_send_command(ANTStick_Command_Assign_Channel(
                 channel_number=channel_number, 
                 network_number=network_number, 
@@ -713,6 +719,7 @@ class ANTStick(VirtualDevice):
             ) # for some reason transmission doesn't work without async mode so let's hardcode it
         )
         #TODO: check if extended assignement can use background scanning or not
+        # Update internal structure
         self.__channels[channel_number].status = ChannelStatus.ASSIGNED
         self.__channels[channel_number].assigned_network = network_number 
         self.__channels[channel_number].type = ChannelType(channel_type)
@@ -749,7 +756,7 @@ class ANTStick(VirtualDevice):
         if transmission_type is None:
             transmission_type = self.__channels[channel_number].transmission_type
 
-            
+        # Send ANTStick command to configure ANT Channel ID 
         response = self._antstick_send_command(ANTStick_Command_Set_Channel_ID(
                 channel_number=channel_number, 
                 device_number=device_number, 
@@ -757,6 +764,7 @@ class ANTStick(VirtualDevice):
                 transmission_type=transmission_type
             )
         )
+        # Update internal structure
         self.__channels[channel_number].device_number = device_number
         self.__channels[channel_number].device_type = device_type
         self.__channels[channel_number].transmission_type = transmission_type
@@ -765,6 +773,17 @@ class ANTStick(VirtualDevice):
 
 
     def _set_channel_rf_channel(self, channel_number=0, rf_channel=57):
+        '''Transmit a command to set the RF channel (frequency) for a given channel.
+        
+        This function will also update the channel internal structure of the virtual device.
+
+        :param channel_number: channel number of the channel to configure
+        :type channel_number: int
+        :param rf_channel: rf channel to use (frequency = 2400 + rf_channel MHz)
+        :param rf_channel: int
+        :return: boolean indicating if it has been successfully configured.
+        :rtype: bool
+        '''
 
         if channel_number not in self.__channels:
             return False
@@ -772,11 +791,14 @@ class ANTStick(VirtualDevice):
         if self.__channels[channel_number].opened:
             self._close_channel(channel_number)
 
+        # Send ANTStick command to configure RF channel
         response = self._antstick_send_command(ANTStick_Command_Set_Channel_RF_Frequency(
                 channel_number=channel_number, 
                 channel_rf_frequency=rf_channel
             )
         )
+
+        # Update internal structure
         self.__rf_channel = rf_channel
         self.__channels[channel_number].rf_channel = rf_channel
 
@@ -785,38 +807,73 @@ class ANTStick(VirtualDevice):
 
 
     def _set_channel_period(self, channel_number=0, period = 0):
+        '''Transmit a command to set the channel period for a given channel.
+        
+        This function will also update the channel internal structure of the virtual device.
 
+        :param channel_number: channel number of the channel to configure
+        :type channel_number: int
+        :param period: period to use
+        :param period: int
+        :return: boolean indicating if it has been successfully configured.
+        :rtype: bool
+        '''
         if channel_number not in self.__channels:
             return False
 
         if self.__channels[channel_number].opened:
             self._close_channel(channel_number)
 
+        # Send ANTStick command to configure RF channel
         response = self._antstick_send_command(ANTStick_Command_Set_Channel_Period(
                 channel_number=channel_number, 
                 period=period
             )
         )
+        # Update internal structure
         self.__channels[channel_number].period = period
 
         return True
 
     def _open_rx_scan_mode(self, sync_channel_packets_only=False):
+        '''Open RX Scan mode (uses ANT channel 0).
+        
+        This function will also update the channel internal structure of the virtual device.
+
+        :param sync_channel_packets_only: boolean indicating if the synchronization must be done on channel packets only
+        :type sync_channel_packets_only: bool
+        :return: boolean indicating if it has been successfully configured.
+        :rtype: bool
+        '''
         if 0 not in self.__channels:
             return False
 
         if self.__channels[0].opened:
             self._close_channel(0)
 
+        # Send an ANTStick command to configure Open RX Scan mode
         response = self._antstick_send_command(ANTStick_Command_Open_RX_Scan_Mode(
                 sync_channel_packets_only=(1 if sync_channel_packets_only else 0)
             )
         )
+        # Update the channel 0 as opened in internal structure
         self.__channels[0].opened = True
         return True
 
 
     def _configure_lib(self, rssi=False, channel_id=False, timestamp=False):
+        '''Configure the supported features in the receiving library (this virtual device).
+
+        :param rssi: boolean indicating if virtual device supports RSSI. 
+        :type rssi: bool
+        :param channel_id: boolean indicating if virtual device supports channel ID. 
+        :type channel_id: bool
+        :param timestamp: boolean indicating if virtual device supports RX timestamps. 
+        :type timestamp: bool
+        :return: boolean indicating if it has been successfully configured.
+        :rtype: bool
+        '''
+        # Send ANTStick command to indicate what features are supported on Host side
         response = self._antstick_send_command(ANTStick_Command_Lib_Config(
                 channel_id_output_enabled=(1 if channel_id else 0), 
                 rssi_output_enabled=(1 if rssi else 0), 
@@ -827,6 +884,14 @@ class ANTStick(VirtualDevice):
 
 
     def _configure_extension_mode(self, enable=True):
+        '''Enable or disable the extension mode in dongle.
+
+        :param enable: boolean indicating if extended messages are supported.
+        :type enable: bool
+        :return: boolean indicating if it has been successfully configured.
+        :rtype: bool
+        '''
+
         response = self._antstick_send_command(ANTStick_Command_Enable_Extended_Messages(
                 enable=(1 if enable else 0)
             )
@@ -834,6 +899,15 @@ class ANTStick(VirtualDevice):
         return True
 
     def _open_channel(self, channel_number=0):
+        '''Transmit a command to open a given channel.
+        
+        This function will also update the channel internal structure of the virtual device.
+
+        :param channel_number: channel number of the channel to open
+        :type channel_number: int
+        :return: boolean indicating if it has been successfully configured.
+        :rtype: bool
+        '''
         if channel_number not in self.__channels:
             return False
 
@@ -845,6 +919,7 @@ class ANTStick(VirtualDevice):
             self._configure_search_timeout(channel_number, 0xFF)
             self._configure_low_priority_search_timeout(channel_number, 0)
 
+        # Send the ANTStick command required to open the channel
         response = self._antstick_send_command(ANTStick_Command_Open_Channel(
                 channel_number=channel_number
             )
@@ -852,7 +927,19 @@ class ANTStick(VirtualDevice):
         self.__channels[channel_number].opened = True
         return True
 
+
     def _configure_search_timeout(self, channel_number=0, timeout=0):
+        '''Transmit a command to configure the search timeout for a given channel.
+        
+        This function will also update the channel internal structure of the virtual device.
+
+        :param channel_number: channel number of the channel to configure
+        :type channel_number: int
+        :param timeout: search timeout value to use
+        :type timeout: int
+        :return: boolean indicating if it has been successfully configured.
+        :rtype: bool
+        '''
         if channel_number not in self.__channels:
             return False
 
@@ -867,51 +954,110 @@ class ANTStick(VirtualDevice):
         return True
 
     def _configure_low_priority_search_timeout(self, channel_number=0, timeout=0):
+        '''Transmit a command to configure the low priority search timeout for a given channel.
+        
+        This function will also update the channel internal structure of the virtual device.
+
+        :param channel_number: channel number of the channel to configure
+        :type channel_number: int
+        :param timeout: search timeout value to use
+        :type timeout: int
+        :return: boolean indicating if it has been successfully configured.
+        :rtype: bool
+        '''
         if channel_number not in self.__channels:
             return False
 
         if self.__channels[channel_number].opened:
             self._close_channel(channel_number)
 
+        # Send ANTStick command to configure the low priority search timeout
         response = self._antstick_send_command(ANTStick_Command_Low_Priority_Search_Timeout(
                 channel_number=channel_number, 
                 timeout=timeout
             )
         )
         return True
+
     def _close_channel(self, channel_number=0):
+        '''Transmit a command to close a given channel.
+        
+        This function will also update the channel internal structure of the virtual device.
+
+        :param channel_number: channel number of the channel to close
+        :type channel_number: int
+        :return: boolean indicating if it has been successfully closed.
+        :rtype: bool
+        '''
         if channel_number not in self.__channels:
             return False
 
         if not self.__channels[channel_number].opened:
             return True
 
+        # Send the ANTStick command to close the channel
         response = self._antstick_send_command(ANTStick_Command_Close_Channel(
                 channel_number=channel_number
             )
         )
+        # Update the internal structure to mark the channel as closed
         self.__channels[channel_number].opened = False
         return True
 
     def _antstick_reset(self):
+        '''Transmit a command to force a full reset of the dongle.
+
+        This command will behave differently depending on the dongle version in use, 
+        expect a short slot of time where the dongle will not respond because of the reset process.
+        '''
         self._antstick_send_command(ANTStick_Command_Reset(), force_reset=True)
         
 
-    def _antstick_send_command(self, command, rsp_filter=lambda p:True, force_reset=False, timeout=200, no_response=False):
+    def _antstick_send_command(
+            self,
+            command,
+            rsp_filter=lambda p:True,
+            force_reset=False,
+            timeout=20,
+            no_response=False
+    ):
+        '''
+        Send an ANTStick command to the dongle.
+
+        Depending on the configured mode, it is possible to :
+            - ignore the response (if `no_response` is set to True)
+            - accept any response (if `no_response` is set to False)
+            - accept a specific kind of response (if `no_response` is set 
+            to False and `rsp_filter` has been configured to match a given 
+            type of response).
+
+        :param command: ANTStick command to transmit to the dongle
+        :type command: bytes
+        :param rsp_filter: Filter to apply to filter out a specific response type
+        :type rsp_filter: function
+        :param force_reset: boolean indicating if a reset must be applied after
+        :type force_reset: bool
+        :param timeout: maximal timeout value (in ms) before terminating 
+        :type timeout: int
+        :param no_response: boolean indicating if the response must be ignored or not
+        :type no_response: bool
+        :return: None if no response received before the timeout, received response otherwise
+        :rtype: ANTStick_Message
+        '''
         data = bytes(ANTStick_Message() / command)
-        print(">", bytes(data))
-        print(repr(ANTStick_Message(data)))
+        logger.debug("Transmitting ANTStick command: " +  repr(ANTStick_Message(data)))
+        
 
         while True:
             try:
-                    self.__lock.acquire()
+                    #self.__lock.acquire()
                     self.__antstick.write(self.__out_endpoint,
                                         data, timeout=timeout)
-                    self.__lock.release()
+                    #self.__lock.release()
 
                     break
             except (USBTimeoutError, USBError):
-                self.__lock.release()
+                #self.__lock.release()
 
                 pass
         if no_response:
@@ -921,8 +1067,9 @@ class ANTStick(VirtualDevice):
         while response is None:
             if not self.__opened:
                 self._antstick_read_message()
-                #print(self.__in_buffer)
+
             response = self._antstick_read_response(rsp_filter=rsp_filter)
+            
             if response is None and force_reset:
                 self.__antstick.reset()
                 self.__antstick.write(self.__out_endpoint, data, timeout=timeout)
@@ -933,7 +1080,21 @@ class ANTStick(VirtualDevice):
 
         return response
 
-    def _antstick_read_response(self, rsp_filter=lambda p : True, timeout=200):
+    def _antstick_read_response(self, rsp_filter=lambda p : True, timeout=20):
+        '''
+        Read an ANTStick response from the dongle.
+
+        It can filter out specific response type according to the rsp_filter function. 
+
+        :param rsp_filter: Filter to apply to filter out a specific response type
+        :type rsp_filter: function
+        :param timeout: maximal timeout value (in ms) before terminating 
+        :type timeout: int
+        :return: None if no response received before the timeout, received response otherwise
+        :rtype: ANTStick_Message
+        '''
+        if not self.opened:
+            self._antstick_read_message()
         if self.__response_queue.empty():
             return None
         else:
@@ -942,26 +1103,35 @@ class ANTStick(VirtualDevice):
                 self.__response_queue.put(msg)
                 msg = self.__response_queue.get()
 
-            print("<", msg.hex())
-            print(repr(ANTStick_Message(msg)))
+            logger.debug("Receiving ANTStick response: " +  repr(ANTStick_Message(msg)))
             return ANTStick_Message(msg)
 
-    def _antstick_read_message(self, timeout=200):
+    def _antstick_read_message(self, timeout=20):
+        '''
+        Read a chunk of data from the IN endpoint of the dongle, and populate three queues 
+        depending on the type of received messages:
+        - PDU Queue
+        - Event Queue
+        - Response Queue
+
+        :param timeout: maximal timeout value (in ms) before terminating 
+        :type timeout: int
+        '''
         # Read a chunk of data from the IN endpoint
         try:
-                self.__lock.acquire()
+                #self.__lock.acquire()
                 msg = bytes(
                     self.__antstick.read(
                         self.__in_endpoint,
                         64, timeout=timeout
                     )
                 )
-                self.__lock.release()
+                #self.__lock.release()
                 # Append it to the in buffer          
                 self.__in_buffer += msg
 
         except (USBTimeoutError, USBError) as e:
-            self.__lock.release()
+            pass#self.__lock.release()
 
         while True:
             while len(self.__in_buffer) > 0 and self.__in_buffer[0] != ANTSTICK_SYNC:
@@ -974,20 +1144,42 @@ class ANTStick(VirtualDevice):
                 break
 
             msg = self.__in_buffer[:len(self.__in_buffer) + 3]
+            
             self.__in_buffer = self.__in_buffer[len(msg):]
 
-            if msg[2] in (0x4E, 0x4F, 0x50, 0x72):
+            message_id = msg[2]
+            if message_id in (
+                AntMessageIds.BROADCAST_DATA,
+                AntMessageIds.ACKNOWLEDGED_DATA,
+                AntMessageIds.BURST_TRANSFER_DATA,
+                AntMessageIds.ADVANCED_BURST_TRANSFER_DATA
+            ):
                 self.__pdu_queue.put(msg)
-            elif msg[2] == 0x40 and ANTStick_Message(msg).message_code >= 1 and ANTStick_Message(msg).message_code <= 17: # event range
+            elif (
+                message_id == AntMessageIds.RESPONSE_CHANNEL and
+                ANTStick_Message(msg).message_code >= 1 and ANTStick_Message(msg).message_code <= 17 # event range
+            ):
                 self.__event_queue.put(msg)
             else:
-                #print("Adding response: ", repr(ANTStick_Message(msg))) 
                 self.__response_queue.put(msg)
     
 
 
     # WHAD command handlers
+
     def _on_whad_ant_sniff(self, message):
+        """Callback called when an ANT Sniff message is received.
+
+        Configure the ANTStick dongle according to the configuration provided in the message.
+        In sniffing mode, only channel #0 and network #0 will be used and configured. The behaviour 
+        of a sniffer will be emulated with ANTStick dongle by disabling all filters and using the 
+        Open Rx Scan Mode, allowing to trigger a continuous reception without any sleep between reception slots.
+
+        A Generic WHAD message CommandResult will be transmitted to Host to indicate a successful operation.
+
+        :param message: WHAD ANT-domain SniffMode message
+        :type message: SniffMode
+        """
         self._set_network_key(network_number = 0, network_key = message.network_key)
         self._assign_channel(
             channel_number = 0, 
@@ -1010,18 +1202,52 @@ class ANTStick(VirtualDevice):
         self._send_whad_command_result(CommandResult.SUCCESS)
 
     def _on_whad_ant_start(self, message):
+        """Callback called when an ANT Start message is received.
+
+        Open the stream of reception according to the currently configured mode.
+
+        A Generic WHAD message CommandResult will be transmitted to Host to indicate a successful operation.
+        
+        :param message: WHAD ANT-domain Start message
+        :type message: Start
+        """
+
         self.__opened_stream = True
         self._send_whad_command_result(CommandResult.SUCCESS)
 
     def _on_whad_ant_stop(self, message):
+        """Callback called when an ANT Stop message is received.
+
+        Close the stream of reception on the ANTStick dongle.
+
+        A Generic WHAD message CommandResult will be transmitted to Host to indicate a successful operation.
+        
+        :param message: WHAD ANT-domain Stop message
+        :type message: Stop
+        """
         self.__opened_stream = False
         self._send_whad_command_result(CommandResult.SUCCESS)
 
 
     def _on_whad_ant_list_networks(self, message):
+        """Callback called when an ANT ListNetworks message is received.
+
+        Will trigger the transmission of a WHAD notification AvailableNetworks,
+        indicating the number of networks supported by the ANTStick dongle.
+
+        :param message: WHAD ANT-domain ListNetworks message
+        :type message: ListNetworks
+        """
         self._send_whad_ant_available_networks(self.__number_of_networks)
         
     def _send_whad_ant_available_networks(self, number_of_networks):
+        """Transmit a WHAD notification AvailableNetworks, 
+        indicating the number of networks supported by the ANTStick dongle.
+
+        :param number_of_networks: Number of networks supported by the ANTStick dongle
+        :type number_of_networks: int
+        """
+
         # create available networks notification
         msg = self.hub.ant.create_available_networks(
             number_of_networks=number_of_networks
@@ -1031,9 +1257,24 @@ class ANTStick(VirtualDevice):
 
 
     def _on_whad_ant_list_channels(self, message):
+        """Callback called when an ANT ListChannels message is received.
+
+        Will trigger the transmission of a WHAD notification AvailableChannels,
+        indicating the number of channels supported by the ANTStick dongle.
+
+        :param message: WHAD ANT-domain ListChannels message
+        :type message: ListChannels
+        """
         self._send_whad_ant_available_channels(self.__number_of_channels)
 
     def _send_whad_ant_available_channels(self, number_of_channels):
+        """Transmit a WHAD notification AvailableChannels, 
+        indicating the number of channels supported by the ANTStick dongle.
+
+        :param number_of_channels: Number of channels supported by the ANTStick dongle
+        :type number_of_channels: int
+        """
+
         # create available channels notification
         msg = self.hub.ant.create_available_channels(
             number_of_channels=number_of_channels
@@ -1043,7 +1284,15 @@ class ANTStick(VirtualDevice):
 
 
     def _send_whad_ant_channel_event(self, channel_number, event):
-        # create available channels notification
+        """Transmit a WHAD notification ChannelEvent, indicating a specific channel
+         event for a given channel signaled by the ANTStick dongle.
+
+        :param channel_number: Channel number of the concerned channel
+        :type channel_number: int
+        :param event: channel event code of the signaled event
+        :type event: int 
+        """
+        # create channel event notification
         msg = self.hub.ant.create_channel_event(
             channel_number, 
             event
@@ -1053,6 +1302,16 @@ class ANTStick(VirtualDevice):
 
 
     def _on_whad_ant_open_channel(self, message):
+        """Callback called when an ANT OpenChannel message is received.
+
+        If the channel is configured and available, open the provided channel.
+
+        Will trigger the transmission of a WHAD Generic CommandResult message,
+        indicating the success of the operation.
+
+        :param message: WHAD ANT-domain OpenChannel message
+        :type message: OpenChannel
+        """
         if message.channel_number not in self.__channels:
             self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
         
@@ -1063,6 +1322,16 @@ class ANTStick(VirtualDevice):
 
 
     def _on_whad_ant_close_channel(self, message):
+        """Callback called when an ANT CloseChannel message is received.
+
+        If the channel is opened, close the provided channel.
+
+        Will trigger the transmission of a WHAD Generic CommandResult message,
+        indicating the success of the operation.
+
+        :param message: WHAD ANT-domain CloseChannel message
+        :type message: CloseChannel
+        """
         if message.channel_number not in self.__channels:
             self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
         
@@ -1073,6 +1342,17 @@ class ANTStick(VirtualDevice):
         
 
     def _on_whad_ant_assign_channel(self, message):
+        """Callback called when an ANT AssignChannel message is received.
+
+        If the channel and networks are available, assign the provided channel to the
+        provided network and configure the channel type and background scanning mode.
+
+        Will trigger the transmission of a WHAD Generic CommandResult message,
+        indicating the success of the operation.
+
+        :param message: WHAD ANT-domain AssignChannel message
+        :type message: AssignChannel
+        """
         if message.channel_number not in self.__channels:
             self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
         
@@ -1088,11 +1368,21 @@ class ANTStick(VirtualDevice):
         ):
             self._send_whad_command_result(CommandResult.ERROR)
 
-        print("success")
         self._send_whad_command_result(CommandResult.SUCCESS)
 
 
     def _on_whad_ant_unassign_channel(self, message):
+        """Callback called when an ANT UnassignChannel message is received.
+
+        If the channel and networks are assigned, unassign the provided channel and the
+        provided network.
+
+        Will trigger the transmission of a WHAD Generic CommandResult message,
+        indicating the success of the operation.
+
+        :param message: WHAD ANT-domain AssignChannel message
+        :type message: AssignChannel
+        """
         if message.channel_number not in self.__channels:
             self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
 
@@ -1104,6 +1394,18 @@ class ANTStick(VirtualDevice):
         self._send_whad_command_result(CommandResult.SUCCESS)
 
     def _on_whad_ant_set_network_key(self, message):
+        """Callback called when an ANT SetNetworkKey message is received.
+
+        For the provided network (if available), configure the network key if the provided key 
+        is valid according to ANT check algorithm. 
+
+        Will trigger the transmission of a WHAD Generic CommandResult message,
+        indicating the success of the operation.
+
+        :param message: WHAD ANT-domain SetNetworkKey message
+        :type message: SetNetworkKey
+        """
+
         if message.network_number not in self.__networks:
             self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
 
@@ -1119,6 +1421,19 @@ class ANTStick(VirtualDevice):
         self._send_whad_command_result(CommandResult.SUCCESS)
 
     def _on_whad_ant_set_rf_channel(self, message):
+        """Callback called when an ANT RFChannel message is received.
+
+        If the provided channel is available, configure the RF frequency to use 
+        to the one provided in the message. RF Channels frequency is computed according to:
+
+            rf_channel_frequency = 2400 MHz  + rf_channel
+
+        Will trigger the transmission of a WHAD Generic CommandResult message,
+        indicating the success of the operation.
+
+        :param message: WHAD ANT-domain SetRFChannel message
+        :type message: SetRFChannel
+        """
         if message.channel_number not in self.__channels:
             self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
 
@@ -1135,6 +1450,17 @@ class ANTStick(VirtualDevice):
 
 
     def _on_whad_ant_set_device_number(self, message):
+        """Callback called when an ANT SetDeviceNumber message is received.
+
+        If the provided channel is available, configure the device number to use 
+        to the one provided in the message. 
+
+        Will trigger the transmission of a WHAD Generic CommandResult message,
+        indicating the success of the operation.
+
+        :param message: WHAD ANT-domain SetDeviceNumber message
+        :type message: SetDeviceNumber
+        """        
         if message.channel_number not in self.__channels:
             self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
 
@@ -1151,6 +1477,17 @@ class ANTStick(VirtualDevice):
 
 
     def _on_whad_ant_set_device_type(self, message):
+        """Callback called when an ANT SetDeviceType message is received.
+
+        If the provided channel is available, configure the device type to use 
+        to the one provided in the message. 
+        
+        Will trigger the transmission of a WHAD Generic CommandResult message,
+        indicating the success of the operation.
+
+        :param message: WHAD ANT-domain SetDeviceType message
+        :type message: SetDeviceType
+        """        
         if message.channel_number not in self.__channels:
             self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
 
@@ -1167,6 +1504,17 @@ class ANTStick(VirtualDevice):
 
 
     def _on_whad_ant_set_transmission_type(self, message):
+        """Callback called when an ANT SetTransmissionType message is received.
+
+        If the provided channel is available, configure the transmission type to use 
+        to the one provided in the message. 
+        
+        Will trigger the transmission of a WHAD Generic CommandResult message,
+        indicating the success of the operation.
+
+        :param message: WHAD ANT-domain SetTransmissionType message
+        :type message: SetTransmissionType
+        """        
         if message.channel_number not in self.__channels:
             self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
 
@@ -1184,6 +1532,17 @@ class ANTStick(VirtualDevice):
 
 
     def _on_whad_ant_set_channel_period(self, message):
+        """Callback called when an ANT SetChannelPeriod message is received.
+
+        If the provided channel is available, configure the channel period to use 
+        to the one provided in the message. 
+        
+        Will trigger the transmission of a WHAD Generic CommandResult message,
+        indicating the success of the operation.
+
+        :param message: WHAD ANT-domain SetChannelPeriod message
+        :type message: SetChannelPeriod
+        """        
         if message.channel_number not in self.__channels:
             self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
 
@@ -1199,15 +1558,33 @@ class ANTStick(VirtualDevice):
         self._send_whad_command_result(CommandResult.SUCCESS)
 
     def _on_whad_ant_send(self, message):
+        """Callback called when an ANT SendPdu message is received.
+
+        If the provided channel is available, send a PDU according to the 
+        configuration indicated in its header.
+        
+        Will trigger the transmission of a WHAD Generic CommandResult message,
+        indicating the success of the operation.
+
+        :param message: WHAD ANT-domain SendPdu message
+        :type message: SendPdu
+        """       
         packet = ANT_Hdr(message.pdu)
-        #print("transmitting: ", repr(packet))
+
         if packet.broadcast == 1:
+            logger.debug('Transmitting ANT Ack/Burst PDU: ' + repr(packet))
+            # We have to transmit an ACK/Burst packet
             if packet.end == 0:
+                # If packet is marked as not final (end field = 0), add it to pending PDU queue
                 self.pending_burst_packets.append(message)
                 self._send_whad_command_result(CommandResult.SUCCESS)
 
             else:
+                # If packet is marked as final, it's either an ack or a burst
+
                 if len(self.pending_burst_packets) > 0:
+                    # If we have pending PDU in the queue, build the final Burst command
+                    # We follow the Burst sequencing algorithm according to ANT Specification 
                     data = b""
                     self.pending_burst_packets.append(message)
 
@@ -1227,37 +1604,46 @@ class ANTStick(VirtualDevice):
 
                         channel_seq = burst.channel_number | sequence << 5
                         packet_data = data[i * 8 : i * 8 + 8]
-                        #print(">>>>", packet_data)
+                        
+                        # Send a command for each 8-byte length burst
                         self._antstick_send_command(
                             ANTStick_Data_Burst_Data(
                                 channel_number = channel_seq, 
                                 pdu = packet_data
                             ), no_response = True
                         )
+                    # Clean up the pending PDU queue
                     self.pending_burst_packets = []            
             
-                    
+                    # Wait actively for an ack and return the CommandResult                    
                     while self.__ack_queue.empty():
                         sleep(0.001)
+
                     ack_event = ANTStick_Message(self.__ack_queue.get())
-                    print("ACKEVENT", ack_event)
-                    if ack_event.message_code == 6:
+
+                    logger.debug('Receiving an ANT Ack event.')
+                    
+                    if ack_event.message_code == AntMessageCode.EVENT_TRANSFER_TX_FAILED:
                         self._send_whad_command_result(CommandResult.ERROR)
                         return
                     else:
                         self._send_whad_command_result(CommandResult.SUCCESS)
                         return
-                else:        
+                else:
+                    # We are transmitting an acknowledged PDU, send the corresponding ANTStick command 
                     self._antstick_send_command(
                         ANTStick_Data_Acknowledged_Data(
                             channel_number = message.channel_number, 
-                            pdu = bytes(message.pdu[-8:])
+                            pdu = bytes(message.pdu[-8:]) # crop the message to 8 bytes
                         ), no_response = True
                     )
                     
+                    # Actively expect an ack
                     while self.__ack_queue.empty():
                         sleep(0.001)
+
                     ack_event = ANTStick_Message(self.__ack_queue.get())
+                    
                     if ack_event.message_code == 6:
                         self._send_whad_command_result(CommandResult.ERROR)
                         return
@@ -1265,6 +1651,9 @@ class ANTStick(VirtualDevice):
                         self._send_whad_command_result(CommandResult.SUCCESS)
                         return
         else:
+            # We have to transmit a Broadcast packet
+            # Note: it will be repeated every slot OTA until next transmission
+            logger.debug('Transmitting ANT Broadcast PDU: ' + repr(packet))
             self._antstick_send_command(
                 ANTStick_Data_Broadcast_Data(
                     channel_number = message.channel_number, 
