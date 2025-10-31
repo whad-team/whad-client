@@ -6,6 +6,10 @@ from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
 import sys
 
+import logging
+logger = logging.getLogger('whad.device.antstick')
+#logging.basicConfig(level=logging.DEBUG)
+
 from time import sleep
 
 if __name__ == '__main__':
@@ -19,8 +23,8 @@ if __name__ == '__main__':
 
             # Create the sniffer ANT connector
             sniffer = ANT(dev)
-            #print(sniffer.list_channels())
-            #print(sniffer.list_networks())
+            print("Available channels: ", sniffer.list_channels())
+            print("Available networks: ", sniffer.list_networks())
             '''
             print(sniffer.sniff_ant(
                 device_type = 0, 
