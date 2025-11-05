@@ -25,6 +25,48 @@ class AppLayer(ContextualLayer):
         self.state.profile = profile
         self.state.profile.set_application(self)
 
+    def search_compatible_channel(
+            self,
+            device_number = 0,
+            device_type = None,
+            transmission_type = None,
+            channel_period = None, 
+            rf_channel = None, 
+            network_key = None,
+            unidirectional = False,
+            shared = False,
+            background = False
+        ):
+        if self.state.profile is None:
+            return None
+
+        if device_type is None:
+            device_type = self.state.profile.DEVICE_TYPE
+        
+        if transmission_type is None:
+            transmission_type = self.state.profile.TRANSMISSION_TYPE
+
+        if channel_period is None:
+            channel_period = self.state.profile.CHANNEL_PERIOD
+
+        if rf_channel is None:
+            rf_channel = self.state.profile.DEFAULT_RF_CHANNEL
+
+        if network_key is None:
+            rf_channel = self.state.profile.NETWORK_KEY
+
+        return self.get_layer('ll').search_channel(
+            device_number,
+            device_type,
+            transmission_type,
+            channel_period, 
+            rf_channel, 
+            network_key,
+            unidirectional,
+            shared,
+            background
+        )
+
     def broadcast(self, payload):
         '''Transmit a PDU in broadcast.
         '''
@@ -53,18 +95,17 @@ class AppLayer(ContextualLayer):
     @source('ll')
     def on_pdu(self, pdu):
         """Handles incoming data"""
-        print("[APP]", repr(pdu))
         if ANT_Hdr in pdu and pdu.broadcast == 0:
             self.on_broadcast(pdu[1:])
         else:
             self.on_ack_burst(pdu[1:])
 
     def on_broadcast(self, payload):
-        print("[APP] broadcast payload:", payload)
+        logger.debug("Incoming Broadcast payload:" +  repr(payload))
         if self.state.profile is not None:
             self.state.profile.on_broadcast(payload)
 
     def on_ack_burst(self, payload):
-        print("[APP] ack/burst payload:", payload)
+        logger.debug("Incoming Ack/Burst payload:" +  repr(payload))
         if self.state.profile is not None:
             self.state.profile.on_ack_burst(payload)

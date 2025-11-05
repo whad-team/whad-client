@@ -26,7 +26,7 @@ if __name__ == '__main__':
             profile = HeartRateMonitor()
 
             master = Master(dev)#, profile=hrmprofile)
-            channel = master.create_channel(1234, 120, 1)
+            channel = master.create_channel(1234, 120, 1, channel_period=8070)
             channel.app.set_profile(profile)
 
             print("Chann: ", channel)
@@ -62,13 +62,13 @@ if __name__ == '__main__':
             ))
             '''
             sniffer.set_network_key(0, ANT_PLUS_NETWORK_KEY)
-            sniffer.set_device_number(0,7912)
+            sniffer.set_device_number(0,1234)
             sniffer.set_device_type(0,120)
             sniffer.set_transmission_type(0,1)
             
             sniffer.assign_channel(0, 0, shared=False, direction=ChannelDirection.TX, unidirectional=False)
             sniffer.set_rf_channel(0,57)
-            sniffer.set_channel_period(0,32768//4)
+            sniffer.set_channel_period(0,32768//8)
             sniffer.open_channel(0)
 
 

@@ -213,7 +213,7 @@ class ANTStack(Layer):
 
         This callback handles an incoming channel event.
         '''
-        logger.debug('received a channel event for channel #%d: %d.', channel_number, str(event))
+        logger.debug('Received a channel event for channel #%d: %s.', channel_number, repr(event))
         self.get_layer('ll').on_channel_event(channel_number, event)
 
 

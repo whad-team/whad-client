@@ -20,9 +20,10 @@ class Slave(ANT):
     ANT connector to emulate an ANT Slave node.
     """
 
-    def __init__(self, device):
+    def __init__(self, device, profile=None):
         ANT.__init__(self, device)
 
+        self.__profile = profile
         self.__started = False
         # Check if device can list channels
         if not self.can_list_channels():
@@ -56,16 +57,49 @@ class Slave(ANT):
 
     def search_channel(
         self,
-        device_number,
-        device_type,
-        transmission_type,
-        channel_period = 32768//4,
-        rf_channel = 57,
-        network_key = ANT_PLUS_NETWORK_KEY,
+        device_number=0,
+        device_type=None,
+        transmission_type=None,
+        channel_period = None,
+        rf_channel = None,
+        network_key = None,
         unidirectional = False,
         shared = False,
         background = False
     ):
+
+        if device_type is None:
+            device_type = (
+                self.__profile.DEVICE_TYPE if 
+                self.__profile is not None else
+                0
+            )
+        
+        if transmission_type is None:
+            transmission_type = (
+                self.__profile.TRANSMISSION_TYPE if
+                self.__profile is not None else
+                0
+            )
+
+        if channel_period is None:
+            channel_period = (
+                self.__profile.CHANNEL_PERIOD if
+                self.__profile is not None else
+                32768
+            )
+        if rf_channel is None:
+            rf_channel = (
+                self.__profile.DEFAULT_RF_CHANNEL if
+                self.__profile is not None else
+                57
+            )
+        if network_key is None:
+            network_key = (
+                self.__profile.NETWORK_KEY if
+                self.__profile is not None else
+                ANT_PLUS_NETWORK_KEY
+            )
         channel = self.stack.get_layer('ll').search_channel(
             device_number = device_number, 
             device_type = device_type,
@@ -83,6 +117,8 @@ class Slave(ANT):
             while not channel.is_opened():
                 sleep(0.1)
 
+            if self.__profile is not None:
+                channel.app.set_profile(self.__profile)
         return channel 
                
 

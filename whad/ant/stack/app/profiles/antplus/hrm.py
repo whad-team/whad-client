@@ -135,7 +135,7 @@ class HeartRateMonitor(AntPlusMasterProfile):
             self.heart_beat_count = (self.heart_beat_count + 1) & 0xFF 
             self.heart_beat_event_time = (self.heart_beat_event_time + 1000) & 0xFFFF
             sequence_index = (sequence_index + 1) % len(sequence)
-            sleep(1)
+            sleep(0.8)
 
     def on_ack_burst(self, payload):
         if ANT_Request_Data_Page in payload:
@@ -158,6 +158,9 @@ class HeartRateDisplay(AntPlusSlaveProfile):
         self.heart_beat_count = None
         self.heart_beat_event_time = None
 
+    def on_heart_rate_received(self, computed_heart_rate):
+        pass
+
     def on_heart_rate_update(self, computed_heart_rate):
         pass
 
@@ -165,6 +168,7 @@ class HeartRateDisplay(AntPlusSlaveProfile):
         if ANT_Plus_HR_Header_Hdr in payload:
 
             if ANT_HR_Common_Payload in payload:
+                self.on_heart_rate_received(payload.computed_heart_rate)
                 if self.computed_heart_rate != payload.computed_heart_rate:
                     self.on_heart_rate_update(payload.computed_heart_rate)
                 self.computed_heart_rate = payload.computed_heart_rate
