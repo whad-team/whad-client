@@ -370,7 +370,6 @@ class LinkLayer(Layer):
         # Instantiate a Applicative layer (contextual) to handle the channel
         app_instance = self.instantiate(AppLayer)
         app_instance.set_channel_number(channel_number)
-        print(app_instance)
 
         channel = self.state.register_channel(
             app_instance,
@@ -390,8 +389,7 @@ class LinkLayer(Layer):
         return channel
 
     @instance('app', tag='broadcast')
-    def _send_broadcast(self, l2cap_inst: Layer, channel_number:int, payload : bytes):
-        print(payload, channel_number, l2cap_inst)
+    def _send_broadcast(self, app_inst: Layer, channel_number:int, payload : bytes):
         return self.broadcast(channel_number, payload)
 
     def broadcast(self,channel_number, payload):
@@ -536,7 +534,7 @@ class LinkLayer(Layer):
         This callback dispatches the received events to
         correct callbacks depending on the current mode.
         """
-        print("[event] #%d, %s" % (channel_number, str(event)))
+        #logger.debug("Channel Event on channel # + " + str(channel_number) + " : " +str(event))
         if channel_number in self.state.channels:
             if event in (
                 ChannelEventCode.EVENT_TRANSFER_TX_COMPLETED, 
