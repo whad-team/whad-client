@@ -1485,8 +1485,11 @@ class Hci(VirtualDevice):
     def _on_whad_ble_stop(self, message):
 
         # Stop any connection attempt, terminate established connections
-        for handle in self._active_handles:
-            self.terminate_connection(handle)
+        if self.__conn_state == HCIConnectionState.INITIATING:
+            self.cancel_connection()
+        elif self.__conn_state == HCIConnectionState.ESTABLISHED:
+            for handle in self._active_handles:
+                self.terminate_connection(handle)
 
         # Process with requested mode
         if self.__internal_state == HCIInternalState.SCANNING:
