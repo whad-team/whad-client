@@ -1068,7 +1068,8 @@ class Hci(VirtualDevice):
         """
         # Cancel connection if we were trying to connect to a remote peripheral
         if self.__conn_state in (HCIConnectionState.INITIATING, HCIConnectionState.ESTABLISHED):
-            self.terminate_connection()
+            for handle in self._active_handles:
+                self.terminate_connection(handle)
 
         logger.debug("bd_address: %s (%d)", bd_address, bd_address_type)
         logger.debug("[hci] _connect() called")
