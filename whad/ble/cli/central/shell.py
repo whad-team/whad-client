@@ -121,10 +121,10 @@ class BleCentralShell(InteractiveShell):
         """Update prompt to reflect current state
         """
         if not self.__target_bd:
-            self.set_prompt(HTML("<b>wble-central></b>"), force)
+            self.set_prompt(HTML("<b>wble-central></b> "), force)
         else:
             self.set_prompt(HTML(
-                f"<b>wble-central|<ansicyan>{self.__target_bd}</ansicyan>></b>"
+                f"<b>wble-central|<ansicyan>{self.__target_bd}</ansicyan>></b> "
             ), force)
 
 
