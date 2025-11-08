@@ -483,7 +483,7 @@ class BlePeriphShell(InteractiveShell):
                     force)
         elif self.__current_mode == self.MODE_STARTED:
             self.set_prompt(
-                HTML("<b>wble-periph<ansimagenta>[running]</ansimagenta>></b>"))
+                HTML("<b>wble-periph<ansimagenta>[running]</ansimagenta>></b> "))
 
 
     def switch_role(self, new_role):
