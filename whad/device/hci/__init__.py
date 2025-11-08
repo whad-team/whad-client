@@ -1067,9 +1067,12 @@ class Hci(VirtualDevice):
         Establish a connection using HCI device.
         """
         # Cancel connection if we were trying to connect to a remote peripheral
-        if self.__conn_state in (HCIConnectionState.INITIATING, HCIConnectionState.ESTABLISHED):
+        if self.__conn_state == HCIConnectionState.ESTABLISHED:
             for handle in self._active_handles:
                 self.terminate_connection(handle)
+        elif self.__conn_state == HCIConnectionState.INITIATING:
+            # Cancel current connection request
+            self.cancel_connection()
 
         logger.debug("bd_address: %s (%d)", bd_address, bd_address_type)
         logger.debug("[hci] _connect() called")
@@ -1109,9 +1112,9 @@ class Hci(VirtualDevice):
 
     @req_cmd("le_create_connection_cancel")
     def cancel_connection(self) -> bool:
-        """When iniating mode, cancel connection creationg
+        """When iniating mode, cancel connection creation
         """
-        logger.debug("[%s] sending HCI cancel connection command ...")
+        logger.debug("[%s] sending HCI cancel connection command ...", self.interface)
         response = self._write_command(HCI_Cmd_LE_Create_Connection_Cancel())
         if response is not None and response.status == 0x00:
             self.__conn_state = HCIConnectionState.DISCONNECTED
