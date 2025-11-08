@@ -728,14 +728,17 @@ class BleCentralShell(InteractiveShell):
                 try:
                     value = self.__target.read(handle, offset=offset)
 
-                    # Display result as hexdump
-                    hexdump(value)
+                    if value is not None:
+                        # Display result as hexdump
+                        hexdump(value)
+                    else:
+                        self.error("Characteristic read failed (empty response).")
                 except AttError as att_err:
                     self.show_att_error(att_err)
                 except GattTimeoutException:
                     self.error("GATT timeout while reading.")
                 except ConnectionLostException:
-                    self.error("Characteristic read failed (peripheral disconnected)")
+                    self.error("Characteristic read failed (peripheral disconnected).")
 
             else:
                 # Perform discovery if required
