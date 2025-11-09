@@ -20,6 +20,10 @@ HCI_VERSIONS = LMP_VERSIONS = {
     0x0a:   "5.1",
     0x0b:   "5.2",
     0x0c:   "5.3",
+    0x0d:   "5.4",
+    0x0e:   "6.0",
+    0x0f:   "6.1",
+    0x10:   "6.2",
 }
 
 class HCI_Cmd_Read_Local_Version_Information(Packet):
