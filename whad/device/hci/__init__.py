@@ -183,7 +183,7 @@ class req_feature:
 
             # If all requirements are met, forward
             return method(self, *args, **kwargs)
-        return _wrap   
+        return _wrap 
 
 class le_only(req_feature):
     """Requires a LE-enabled controller
@@ -508,7 +508,7 @@ class Hci(VirtualDevice):
                 logger.debug("[%s][write_command] Received response with opcode %d", self.interface, response.opcode)
                 response = self._wait_response()
             logger.debug("[%s][write_command] Response received.", self.interface)
-            
+
             if response is not None:
                 logger.debug("[%s] HCI write command returned status %d",
                             self.interface, response.status)
@@ -524,7 +524,7 @@ class Hci(VirtualDevice):
                 if event.type == 0x4 and event.code in (0xf, 0x13):
                     self.__hci_responses.put(event)
                 event = self.__socket.recv()
-            
+
             # We got our response: we release our socket lock and set the
             # captured event as the reponse to return to caller.
             self.__lock.release()
@@ -651,10 +651,10 @@ class Hci(VirtualDevice):
                 else:
                     logger.debug("[%s] LE ACL buffer is 0, fallback to default ACL buffer")
                     return self._read_buffer_size()
-        
+
         logger.debug("[%s] Failed reading LE ACL buffer size v1 !", self.interface)
         return False
-    
+
     def read_local_supported_commands(self):
         """Read local adapter supported commands.
         """
@@ -665,9 +665,9 @@ class Hci(VirtualDevice):
                 logger.debug("[%s] Local supported commands cached.", self.interface)
                 self.__local_supp_cmds = response[HCI_Cmd_Complete_Supported_Commands]
                 return True
-            
+
         logger.debug("[%s] Failed reading supported commands !", self.interface)
-        return False   
+        return False
 
     @req_cmd("read_local_supported_features")
     def read_local_supported_features(self):
@@ -679,7 +679,7 @@ class Hci(VirtualDevice):
             logger.debug("[%s] Local supported features cached.", self.interface)
             self.__features = response[HCI_Cmd_Complete_Supported_Features]
             return True
-        
+
         logger.debug("[%s] Failed reading supported features !", self.interface)
         return False
 
@@ -693,7 +693,7 @@ class Hci(VirtualDevice):
             logger.debug("[%s] Local LE supported features cached.", self.interface)
             self.__le_features = response[HCI_Cmd_LE_Complete_Supported_Features]
             return True
-        
+
         logger.debug("[%s] Failed reading LE supported features !", self.interface)
         return False
 
@@ -859,7 +859,7 @@ class Hci(VirtualDevice):
                          self.__fa_size)
             return True
         return False
-    
+
     def get_whitelist_size(self) -> int:
         """Retrieve the LE Device Whitelist size for the current HCI
         interface.
@@ -899,7 +899,7 @@ class Hci(VirtualDevice):
         if response.status == 0x00 and HCI_Cmd_Complete_Read_Local_Name in response:
             self._local_name = response.local_name
             return True
-        
+
         # Cannot read local name.
         logger.debug("[%s] Failed reading local name !", self.interface)
         logger.debug("[%s] Device not supported.")
@@ -913,7 +913,13 @@ class Hci(VirtualDevice):
         logger.debug("[%s] Reading local version info ...", self.interface)
         response = self._write_command(HCI_Cmd_Read_Local_Version_Information())
         if response.status == 0x00 and HCI_Cmd_Complete_Read_Local_Version_Information in response:
-            version = [int(v) for v in HCI_VERSIONS[response.hci_version].split(".")]
+            if response.hci_version <= max(list(HCI_VERSIONS.keys())):
+                version = [int(v) for v in HCI_VERSIONS[response.hci_version].split(".")]
+            else:
+                # Unsupported version, default to bluetooth 4.0
+                logger.debug(f"Unknown Bluetooth version number {response.hci_version}, falling back to {HCI_VERSIONS[0x06]}.")
+                version = [int(v) for v in HCI_VERSIONS[0x06].split(".")]
+
             version += [response.hci_subversion]
             try:
                 manufacturer = BT_MANUFACTURERS[response.company_identifier].encode("utf-8")
@@ -924,7 +930,7 @@ class Hci(VirtualDevice):
             logger.debug("[%s] Version: %s", self.interface, version)
             logger.debug("[%s] Manufacturer: %s", self.interface, manufacturer)
             return version, manufacturer
-        
+
         # Cannot read local version information.
         logger.debug("[%s] Failed reading local version info !", self.interface)
         logger.debug("[%s] Unsupported HCI interface.")
@@ -957,7 +963,7 @@ class Hci(VirtualDevice):
         """
         logger.debug("[%s] Setting HCI adapter random address to %s ...", self.interface, 
                      BDAddress(bd_address))
-        
+
         # Disabled for now
         if False and bd_address_type == AddressType.PUBLIC:
             _, self._manufacturer = self._read_local_version_information()
@@ -1177,7 +1183,7 @@ class Hci(VirtualDevice):
 
         # Return result
         return result
-    
+
     @req_cmd("le_read_advertising_physical_channel_tx_power")
     def _read_advertising_physical_channel_tx_power(self, from_queue: bool = True) -> bool:
         """Read Advertising Physical Channel Tx Power level
@@ -1185,7 +1191,7 @@ class Hci(VirtualDevice):
         logger.debug("Read Advertising Physical Channel Tx Power ...")
         response = self._write_command(HCI_Cmd_LE_Read_Advertising_Physical_Channel_Tx_Power(),
                                        from_queue=from_queue)
-        
+
         if response is not None and response.status == 0x00:
             power_level = response[HCI_Cmd_Complete_LE_Advertising_Tx_Power_Level].tx_power_level
             logger.debug("[%s] Advertising Tx Power level: %d", self.interface, power_level)
@@ -1558,3 +1564,4 @@ class Hci(VirtualDevice):
         else:
             logger.debug("HCI adapter does not support BD address spoofing")
             self._send_whad_command_result(CommandResult.ERROR)
+
