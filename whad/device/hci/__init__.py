@@ -916,9 +916,9 @@ class Hci(VirtualDevice):
             if response.hci_version <= max(list(HCI_VERSIONS.keys())):
                 version = [int(v) for v in HCI_VERSIONS[response.hci_version].split(".")]
             else:
-                # Unsupported version, default to bluetooth 4.0
+                # Unsupported version, default to bluetooth 4.2
                 logger.debug(f"Unknown Bluetooth version number {response.hci_version}, falling back to {HCI_VERSIONS[0x06]}.")
-                version = [int(v) for v in HCI_VERSIONS[0x06].split(".")]
+                version = [int(v) for v in HCI_VERSIONS[0x08].split(".")]
 
             version += [response.hci_subversion]
             try:
