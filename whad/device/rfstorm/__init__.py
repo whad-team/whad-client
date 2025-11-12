@@ -201,6 +201,10 @@ class RfStorm(VirtualDevice):
         """
         Close current device.
         """
+        # Reset device before closing
+        self.__opened_stream = False
+        self.reset()
+
         # Ask parent class to stop I/O thread
         super().close()
 

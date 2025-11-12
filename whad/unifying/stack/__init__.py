@@ -265,43 +265,70 @@ class UnifyingApplicativeLayer(Layer):
             return False
 
 
-    def encrypted_keystroke(self, key, ctrl=False, alt=False, shift=False, gui=False, force_counter=None):
-        if self.__crypto_manager is None:
+    def encrypted_keystroke(self, key, ctrl=False, alt=False, shift=False, gui=False, force_counter=None, forge_keystream=None):
+        if self.__crypto_manager is None and forge_keystream is None:
             return False
 
         counter = self.state.aes_counter if force_counter is None else force_counter
 
         self.lock_channel()
+
         try:
-            answer_press = self.prepare_message(
-                self.__crypto_manager.encrypt(
+            hid_data_keypress = LogitechUnifyingKeystrokeConverter.get_hid_data_from_key(
+                key,
+                ctrl=ctrl,
+                alt=alt,
+                shift=shift,
+                gui=gui,
+                locale=self.state.locale
+            ) + b"\x00"
+            if forge_keystream is not None:
+                forged_hid_data_keypress = bytes(
+                    [hid_data_keypress[i] ^ forge_keystream[i] for i in range(len(forge_keystream))]
+                )
+
+                encrypted_keypress = Logitech_Encrypted_Keystroke_Payload(
+                    hid_data = forged_hid_data_keypress[:7], 
+                    aes_counter = counter, 
+                    unknown = forged_hid_data_keypress[7], 
+                    unused = b""
+                )
+                
+            else:
+                encrypted_keypress = self.__crypto_manager.encrypt(
                     Logitech_Encrypted_Keystroke_Payload(
-                        hid_data=LogitechUnifyingKeystrokeConverter.get_hid_data_from_key(
-                            key,
-                            ctrl=False,
-                            alt=False,
-                            shift=False,
-                            gui=False,
-                            locale=self.state.locale
-                        ),
-                        unknown=201,
+                        hid_data=hid_data_keypress,
+                        unknown=230,
                         aes_counter=counter
                     )
                 )
+            answer_press = self.prepare_message(
+                encrypted_keypress
             )
+            
             keep_alive = self.prepare_message(
                 Logitech_Keepalive_Payload(timeout=1250)
             )
-            answer_release = self.prepare_message(
-                self.__crypto_manager.encrypt(
-
+            if forge_keystream is not None:
+                answer_release = self.prepare_message(
                     Logitech_Encrypted_Keystroke_Payload(
-                        hid_data=b"\x00"*7,
-                        unknown=201,
-                        aes_counter=counter+1
+                        hid_data=forge_keystream[:7],
+                        unknown=forge_keystream[7], 
+                        aes_counter=counter,
+                        unused = b""
                     )
                 )
-            )
+                
+            else:
+                answer_release = self.prepare_message(
+                    self.__crypto_manager.encrypt(
+                        Logitech_Encrypted_Keystroke_Payload(
+                            hid_data=b"\x00"*7,
+                            unknown=230,
+                            aes_counter=counter+1
+                        )
+                    )
+                )
 
             if force_counter is None:
                 self.aes_counter += 2

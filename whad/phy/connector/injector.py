@@ -71,9 +71,9 @@ class Injector(Phy):
         # Set endianness for all modulations but LoRa
         if not self.__configuration.lora:
             self.set_endianness(
-                Endianness.LITTLE if
+                PhyEndianness.LITTLE if
                 self.__configuration.little_endian else
-                Endianness.BIG
+                PhyEndianness.BIG
             )
         if self.__configuration.sync_word is not None:
             self.set_sync_word(self.__configuration.sync_word)
@@ -126,9 +126,9 @@ class Injector(Phy):
 
                 if hasattr(packet, "metadata") and hasattr(packet.metadata, "endianness"):
                     self.set_endianness(
-                        Endianness.LITTLE if
+                        PhyEndianness.LITTLE if
                         packet.metadata.endianness == PhyEndianness.LITTLE else
-                        Endianness.BIG
+                        PhyEndianness.BIG
                     )
 
                 self.start()

@@ -22,7 +22,7 @@ class LogitechUnifyingKeystrokeConverter(HIDConverter):
         (hid_code, modifiers) = super().get_hid_code_from_key(key, ctrl=ctrl, alt=alt, shift=shift, gui=gui, locale=locale)
 
         hid_data = pack("B", modifiers) + pack("B", hid_code) + b"\x00"*5
-
+        
         return hid_data
 
 class LogitechUnifyingMouseMovementConverter:
