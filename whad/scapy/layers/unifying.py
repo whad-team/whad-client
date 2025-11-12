@@ -46,6 +46,7 @@ class Logitech_Unifying_Hdr(Packet):
 
     def post_build(self,p,pay):
         """Re-compute checksum if needed."""
+        pay = pay[:-1] # one byte too long ? 
         #if self.checksum is None:
         cksum = 0xFF
         for i in (p[:2] + pay):
