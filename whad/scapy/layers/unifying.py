@@ -70,7 +70,7 @@ class Logitech_Encrypted_Keystroke_Payload(Packet):
         StrFixedLenField('hid_data', '\0\0\0\0\0\0\0', length=7),
         ByteField("unknown",0x00),
         IntField('aes_counter',None),
-        StrFixedLenField('unused', '\0\0\0\0\0\0\0', length=7)
+        StrFixedLenField('unused', '\0\0\0\0\0\0\0\0', length=6)
     ]
 
 class Logitech_Unencrypted_Keystroke_Payload(Packet):

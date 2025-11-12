@@ -45,12 +45,13 @@ class HIDConverter:
         hid_code, modifiers = matching_codes[0]
 
         # If caller specified some modifiers, apply them
-        modifier_keys = {"ALT": alt, "CTRL": ctrl, "SHIFT": shift, "GUI": gui}
+        modifier_keys = {"LALT": alt, "CTRL": ctrl, "SHIFT": shift, "GUI": gui}
         for keycode, pressed in modifier_keys.items():
             if pressed:
                 mapping = [m for m, k in HID_SPECIALS.items() if k == keycode][0]
                 modifiers += mapping[1]
 
+        print(hid_code, modifiers)
         return (hid_code, modifiers)
 
     @staticmethod

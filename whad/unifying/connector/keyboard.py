@@ -27,6 +27,8 @@ class Keyboard(Unifying):
         self.__channel = 5
         self.__address = "ca:e9:06:ec:a4"
         self.__started = False
+        self.__forge_keystream = None
+
         ESBStack.add(UnifyingApplicativeLayer)
         self.__stack = ESBStack(self)
         # Check if device can choose its own address
@@ -50,6 +52,7 @@ class Keyboard(Unifying):
         self.__stack.app.role = UnifyingRole.KEYBOARD
         if self.__started:
             super().start()
+
 
     @property
     def channel(self) -> int:
@@ -106,6 +109,24 @@ class Keyboard(Unifying):
         """
         self.__stack.app.aes_counter = aes_counter
 
+    @property
+    def forge_keystream(self) -> bytes:
+        """Get encrypted key release HID data (will forge a valid keystream without AES key)
+
+        :return: encrypted HID data of a key release, None if not provided
+        :rtype: int
+        """
+        return self.__forge_keystream
+
+    @forge_keystream.setter
+    def forge_keystream(self,forge_keystream: bytes):
+        """Set encrypted key release HID data (will forge a valid keystream without AES key)
+
+        :param forge_keystream: Encrypted Key release HID data
+        :type forge_keystream: None
+        """
+        self.__forge_keystream = forge_keystream
+
     def start(self):
         """Start keyboard mode
         """
@@ -145,7 +166,7 @@ class Keyboard(Unifying):
         """
         self.__address = address
         self._enable_role()
-
+        
     def on_pdu(self, packet):
         """Unifying packet handler, feeds the underlying stack.
         """
@@ -200,6 +221,10 @@ class Keyboard(Unifying):
         if self.key is not None:
             return self.__stack.app.encrypted_keystroke(key, ctrl=ctrl, alt=alt,
                                                         shift=shift, gui=gui)
+        elif self.__forge_keystream is not None:
+            return self.__stack.app.encrypted_keystroke(key, ctrl=ctrl, alt=alt,
+                shift=shift, gui=gui, force_counter=self.aes_counter, forge_keystream=self.__forge_keystream)
+
         else:
             return self.__stack.app.unencrypted_keystroke(key, ctrl=ctrl, alt=alt,
                                                           shift=shift, gui=gui)
