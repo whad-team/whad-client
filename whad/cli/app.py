@@ -641,22 +641,22 @@ class CommandLineApp(ArgumentParser):
                 break
         return pending_input
 
-    def warning(self, message):
+    def warning(self, message, *args):
         """Display a warning message in orange (if color is enabled)
         """
         try:
-            print_formatted_text(HTML(f"<aaa fg=\"#e97f11\">/!\\ <b>{message}</b></aaa>"))
+            print_formatted_text(HTML("<aaa fg=\"#e97f11\">/!\\ <b>{message}</b></aaa>").format(message=message % args))
         except:
             print_formatted_text(HTML(
                 "<aaa fg=\"#e97f11\">/!\\ <b>an unknown warning occured</b></aaa>"
             ))
 
-    def error(self, message):
+    def error(self, message, *args):
         """Display an error message in red (if color is enabled)
         """
         try:
             print_formatted_text(
-                HTML('<ansired>[!] <b>{message}</b></ansired>').format(message=message)
+                HTML('<ansired>[!] <b>{message}</b></ansired>').format(message=message % args)
             )
         except Exception as err:
             logger.error('[!] an unknown error occured: %s',err)
