@@ -47,7 +47,7 @@ def read_gatt_characteristic(app, command_args, device, profile_loaded=False):
         try:
             handle = int(command_args[0].lower(), 16)
         except ValueError:
-            app.error("Wrong handle: %s", command_args[0])
+            app.error("Wrong handle: '%s'", command_args[0])
             return
     else:
         try:
@@ -56,7 +56,7 @@ def read_gatt_characteristic(app, command_args, device, profile_loaded=False):
             try:
                 handle = UUID(command_args[0].replace('-',''))
             except InvalidUUIDException:
-                app.error("Wrong UUID: %s", command_args[0])
+                app.error("Wrong UUID: '%s'", command_args[0])
                 return
 
     # Check offset and length
