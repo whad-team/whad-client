@@ -397,10 +397,10 @@ class BleConnectApp(CommandLineDevicePipe):
                 }))
 
                 # Create our custom pipe
-                Bridge(central, proxy)
+                bridge = Bridge(central, proxy)
 
-                # Wait for device to disconnect (or user CTL-C)
-                proxy.device.wait()
+                # Wait for our bridge to gracefully terminate...
+                bridge.join()
 
             except PeripheralNotFound:
                 # Could not connect
