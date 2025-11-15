@@ -135,4 +135,7 @@ class Injector(Phy):
                 self._metadata_check = True
 
         # Send packet payload
-        super().send(packet[Phy_Packet])
+        if isinstance(packet, bytes):
+            super().send(packet)
+        else:
+            super().send(packet[Phy_Packet])

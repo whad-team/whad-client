@@ -568,6 +568,9 @@ class UUID:
                                      (r[0:4], r[4:6], r[6:8],r[8:10], r[10:])))
             self.packed = uuid
             self.type = UUID.TYPE_128
+        else:
+            # Other format is not recognized as valid UUID
+            raise InvalidUUIDException()
 
         if self.uuid is None:
             raise InvalidUUIDException(uuid)

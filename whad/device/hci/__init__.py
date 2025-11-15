@@ -714,7 +714,7 @@ class Hci(VirtualDevice):
             logger.debug("[%s] Local LE supported features cached.", self.interface)
             self.__le_features = response[HCI_Cmd_LE_Complete_Supported_Features]
             return True
-        
+
         logger.debug("[%s] Failed reading LE supported features !", self.interface)
         return False
 
@@ -880,7 +880,7 @@ class Hci(VirtualDevice):
                          self.__fa_size)
             return True
         return False
-    
+
     def get_whitelist_size(self) -> int:
         """Retrieve the LE Device Whitelist size for the current HCI
         interface.
@@ -920,7 +920,7 @@ class Hci(VirtualDevice):
         if response.status == 0x00 and HCI_Cmd_Complete_Read_Local_Name in response:
             self._local_name = response.local_name
             return True
-        
+
         # Cannot read local name.
         logger.debug("[%s] Failed reading local name !", self.interface)
         logger.debug("[%s] Device not supported.")
@@ -934,7 +934,13 @@ class Hci(VirtualDevice):
         logger.debug("[%s] Reading local version info ...", self.interface)
         response = self._write_command(HCI_Cmd_Read_Local_Version_Information())
         if response.status == 0x00 and HCI_Cmd_Complete_Read_Local_Version_Information in response:
-            version = [int(v) for v in HCI_VERSIONS[response.hci_version].split(".")]
+            if response.hci_version <= max(list(HCI_VERSIONS.keys())):
+                version = [int(v) for v in HCI_VERSIONS[response.hci_version].split(".")]
+            else:
+                # Unsupported version, default to bluetooth 4.2
+                logger.debug(f"Unknown Bluetooth version number {response.hci_version}, falling back to {HCI_VERSIONS[0x06]}.")
+                version = [int(v) for v in HCI_VERSIONS[0x08].split(".")]
+
             version += [response.hci_subversion]
             try:
                 manufacturer = BT_MANUFACTURERS[response.company_identifier].encode("utf-8")
@@ -945,7 +951,7 @@ class Hci(VirtualDevice):
             logger.debug("[%s] Version: %s", self.interface, version)
             logger.debug("[%s] Manufacturer: %s", self.interface, manufacturer)
             return version, manufacturer
-        
+
         # Cannot read local version information.
         logger.debug("[%s] Failed reading local version info !", self.interface)
         logger.debug("[%s] Unsupported HCI interface.")
@@ -978,7 +984,7 @@ class Hci(VirtualDevice):
         """
         logger.debug("[%s] Setting HCI adapter random address to %s ...", self.interface, 
                      BDAddress(bd_address))
-        
+
         # Disabled for now
         if False and bd_address_type == AddressType.PUBLIC:
             _, self._manufacturer = self._read_local_version_information()
@@ -1094,8 +1100,12 @@ class Hci(VirtualDevice):
         Establish a connection using HCI device.
         """
         # Cancel connection if we were trying to connect to a remote peripheral
-        if self.__conn_state in (HCIConnectionState.INITIATING, HCIConnectionState.ESTABLISHED):
-            self.terminate_connection()
+        if self.__conn_state == HCIConnectionState.ESTABLISHED:
+            for handle in self._active_handles:
+                self.terminate_connection(handle)
+        elif self.__conn_state == HCIConnectionState.INITIATING:
+            # Cancel current connection request
+            self.cancel_connection()
 
         logger.debug("bd_address: %s (%d)", bd_address, bd_address_type)
         logger.debug("[hci] _connect() called")
@@ -1135,9 +1145,9 @@ class Hci(VirtualDevice):
 
     @req_cmd("le_create_connection_cancel")
     def cancel_connection(self) -> bool:
-        """When iniating mode, cancel connection creationg
+        """When iniating mode, cancel connection creation
         """
-        logger.debug("[%s] sending HCI cancel connection command ...")
+        logger.debug("[%s] sending HCI cancel connection command ...", self.interface)
         response = self._write_command(HCI_Cmd_LE_Create_Connection_Cancel())
         if response is not None and response.status == 0x00:
             self.__conn_state = HCIConnectionState.DISCONNECTED
@@ -1550,8 +1560,11 @@ class Hci(VirtualDevice):
     def _on_whad_ble_stop(self, message):
 
         # Stop any connection attempt, terminate established connections
-        for handle in self._active_handles:
-            self.terminate_connection(handle)
+        if self.__conn_state == HCIConnectionState.INITIATING:
+            self.cancel_connection()
+        elif self.__conn_state == HCIConnectionState.ESTABLISHED:
+            for handle in self._active_handles:
+                self.terminate_connection(handle)
 
         # Process with requested mode
         if self.__internal_state == HCIInternalState.SCANNING:
