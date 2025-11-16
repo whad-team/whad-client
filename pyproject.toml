@@ -46,7 +46,7 @@ dependencies = [
     "requests>=2.28.0",
     "distro~=1.9",
     "websockets>=11.0.3",
-    "packaging~=25.0",
+    "packaging~=24.0",
     "strenum~=0.4.15",
 ]
 
