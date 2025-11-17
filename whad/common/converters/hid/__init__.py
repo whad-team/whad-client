@@ -51,7 +51,6 @@ class HIDConverter:
                 mapping = [m for m, k in HID_SPECIALS.items() if k == keycode][0]
                 modifiers += mapping[1]
 
-        print(hid_code, modifiers)
         return (hid_code, modifiers)
 
     @staticmethod
