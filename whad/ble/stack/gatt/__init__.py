@@ -760,9 +760,9 @@ class GattClient(GattLayer):
                     if save_values and (charac_properties & 0x02) > 0:
                         try:
                             charac.value = self.read(charac_value_handle)
-                        except AttError:
+                        except (AttError, GattTimeoutException):
                             charac.value = b""
-                        
+
                     handle = charac.handle+2
                     logger.debug("found characteristic %s with handle %d", charac_uuid, charac_value_handle)
                     yield charac
