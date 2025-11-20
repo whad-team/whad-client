@@ -61,7 +61,7 @@ import traceback
 from typing import Generator
 from urllib.parse import urlparse, parse_qsl
 from signal import signal, SIGPIPE, SIG_DFL
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 
 from prompt_toolkit import print_formatted_text, HTML
 from prompt_toolkit.output import create_output
@@ -313,7 +313,7 @@ class CommandLineApp(ArgumentParser):
         self.__input_iface = None
         self.__input_type = input
         self.__output_type = output
-        self.__args = None
+        self.__args = Namespace()
         self.__has_interface = interface
         self.__is_interface_piped = False
         self.__has_commands = commands
@@ -404,12 +404,12 @@ class CommandLineApp(ArgumentParser):
         return self.__input_iface
 
     @property
-    def args(self):
+    def args(self) -> Namespace:
         """Return the parsed arguments Namespace.
         """
         return self.__args
 
-    def is_piped_interface(self):
+    def is_piped_interface(self) -> bool:
         """Determine if the input interface is piped from a previous app in
         the command line
         """
@@ -566,7 +566,7 @@ class CommandLineApp(ArgumentParser):
             self.__input_iface.close()
 
 
-    def run(self, pre=True, post=True):
+    def run(self, pre: bool = True, post: bool = True):
         """Run the main application
         """
         # Launch pre-run tasks if required
