@@ -19,8 +19,8 @@ class DeviceInfo:
 
     @staticmethod
     def create(proto_ver: int = 2, max_speed: int = 115200, author: str = '', url: str = '',
-               version: str = '0.0', dev_type: int = 0, dev_id: bytes = '',
-               capabilities: List[int] = None) -> 'DeviceInfo':
+               version: str = '0.0', dev_type: int = 0, dev_id: bytes = b'',
+               capabilities: (List[int] | None) = None) -> 'DeviceInfo':
         # Parse version string
         ver = parse(version)
 
@@ -35,7 +35,7 @@ class DeviceInfo:
 
     def __init__(self, info_resp):
         """Populate device information object from WHAD's InfoQueryResp message.
-        
+
         :param info_resp: WHAD InfoQueryResp message
         :type info_resp: whad.hub.discovery.InfoQueryResp
         """
@@ -166,7 +166,7 @@ class DeviceInfo:
         return self.__device_id
 
     @property
-    def domains(self):
+    def domains(self) -> list[int]:
         """Return the list of supported domains.
         """
         return list(self.__domains.keys())
