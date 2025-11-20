@@ -24,7 +24,7 @@ class MockInThread(Thread):
     hardware interface.
     """
 
-    def __init__(self, device: Device):
+    def __init__(self, device: "MockDevice"):
         super().__init__()
         self.daemon = True
         self.__iface = device
@@ -76,7 +76,7 @@ class MockOutThread(Thread):
     to the device object.
     """
 
-    def __init__(self, device = None):
+    def __init__(self, device: "MockDevice"):
         super().__init__()
         self.daemon = True
         self.__iface = device
@@ -142,8 +142,8 @@ class MockDevice(Device):
 
     def __init__(self, author: str = 'whad', url: str = 'https://whad.io', proto_minver: int = 2,
                  version: str = '1.0', dev_type: int = DeviceType.VirtualDevice,
-                 dev_id: bytes = b'', capabilities: dict = None, max_speed: int = 115200,
-                 index: int = None):
+                 dev_id: bytes = b'', capabilities: (dict | None) = None, max_speed: int = 115200,
+                 index: (int | None) = None):
         """Constructor."""
         # Loop over each method and registers those decorated with @route()
         self.__handlers = {}
@@ -164,7 +164,7 @@ class MockDevice(Device):
         self.__dev_type = dev_type
         self.__dev_id = dev_id
         self.__max_speed = max_speed
-        self.__capabilities = capabilities
+        self.__capabilities = capabilities or {}
 
         # Create a basic device
         super().__init__(index)
@@ -173,7 +173,7 @@ class MockDevice(Device):
         self.__info = None
         self.__iface_in = None
         self.__iface_out = None
-        self.__hub = None
+        self.__hub = ProtocolHub()
         self.__discovered = False
         self.__opened = False
 
@@ -181,7 +181,7 @@ class MockDevice(Device):
         self.__blocking_event = Event()
 
     @property
-    def info(self) -> DeviceInfo:
+    def info(self) -> (DeviceInfo | None):
         """Device information object."""
         return self.__info
 
@@ -351,11 +351,12 @@ class MockDevice(Device):
         self.__hub = ProtocolHub(self.__proto_minver)
 
         # Set max transport speed
-        self.change_transport_speed(
-            self.info.max_speed
-        )
+        if self.__info is not None:
+            self.change_transport_speed(
+                self.__info.max_speed
+            )
 
-    def get_domains(self) -> dict:
+    def get_domains(self) -> list[int]:
         """Get device' supported domains.
 
         :returns: list of supported domains
@@ -365,7 +366,7 @@ class MockDevice(Device):
             return self.__info.domains
 
         # No domain discovered yet
-        return {}
+        return []
 
 
     def get_domain_capability(self, domain):
@@ -376,7 +377,7 @@ class MockDevice(Device):
         :rtype: DeviceDomainInfoResp
         """
         if self.__info is not None:
-            return self.__info.get_domain_capabilities(domain)
+            return self.__info.get_domain_capabilities(domain) or 0
 
         # No capability if not discovered
         return 0
@@ -399,3 +400,4 @@ class MockDevice(Device):
         if self.__info is not None:
             return self.__info.has_domain(domain)
         return False
+
