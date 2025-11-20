@@ -600,13 +600,17 @@ class Device:
         return self.__index
 
     @property
-    def device_id(self):
+    def device_id(self) -> (str | None):
         """Return device ID
         """
-        return self.__info.device_id
+        if self.__info is not None:
+            return self.__info.device_id
+
+        # No info yet.
+        return None
 
     @property
-    def info(self) -> DeviceInfo:
+    def info(self) -> (DeviceInfo | None):
         """Get device info object
 
         :return: Device information object
@@ -939,7 +943,7 @@ class Device:
         return False
 
 
-    def get_domains(self) -> dict:
+    def get_domains(self):
         """Get device' supported domains.
 
         :returns: list of supported domains
@@ -949,10 +953,10 @@ class Device:
             return self.__info.domains
 
         # No domain discovered yet
-        return {}
+        return []
 
 
-    def get_domain_capability(self, domain):
+    def get_domain_capability(self, domain) -> int:
         """Get a device domain capabilities.
 
         :param Domain domain: Target domain
@@ -960,7 +964,9 @@ class Device:
         :rtype: DeviceDomainInfoResp
         """
         if self.__info is not None:
-            return self.__info.get_domain_capabilities(domain)
+            cap = self.__info.get_domain_capabilities(domain)
+            if cap is not None:
+                return cap
 
         # No capability if not discovered
         return 0
@@ -1075,7 +1081,7 @@ class VirtualDevice(Device):
     layer between WHAD's core and third-party hardware that does not run a WHAD-enabled
     firmware.
     """
-    def __init__(self, index: int = None):
+    def __init__(self, index: (int | None) = None):
         self._dev_type = None
         self._dev_id = None
         self._fw_author = None
@@ -1158,7 +1164,7 @@ class WhadDevice(Device):
     @classmethod
     def create(cls, interface_string):
         """Create an instance of interface from its name, using Device."""
-        return Device.create(interface_string) 
+        return Device.create(interface_string)
 
     @classmethod
     def check_interface(cls, interface):
@@ -1180,7 +1186,7 @@ class WhadVirtualDevice(VirtualDevice):
     @classmethod
     def create(cls, interface_string):
         """Create an instance of interface from its name, using VirtualDevice."""
-        return VirtualDevice.create(interface_string)        
+        return VirtualDevice.create(interface_string)
 
     @classmethod
     def check_interface(cls, interface):
