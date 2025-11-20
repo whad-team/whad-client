@@ -6,7 +6,6 @@ BLE device, and chain this with another tool.
 """
 import json
 import logging
-from time import sleep
 
 from whad.cli.app import CommandLineDevicePipe, run_app
 from whad.device import Bridge
@@ -14,7 +13,7 @@ from whad.device.connector import LockedConnector
 from whad.device.unix import UnixSocketServer, UnixConnector
 from whad.hub.ble import Connected, Disconnected, BlePduReceived, BleRawPduReceived, \
     BDAddress
-from whad.ble.connector import Peripheral
+from whad.ble.connector import Peripheral, BLE
 from whad.hub.discovery import Capability, Domain
 
 logger = logging.getLogger(__name__)
@@ -337,16 +336,16 @@ class BleSpawnApp(CommandLineDevicePipe):
             help='Use a saved device profile'
         )
 
-        self.__mode = ''
         self.input_conn_handle = None
         self.output_conn_handle = None
 
-    def run(self):
+    def run(self, pre: bool = True, post: bool = True):
         """Override App's run() method to handle scripting feature.
         """
         try:
             # Launch pre-run tasks
-            self.pre_run()
+            if pre:
+                self.pre_run()
 
             # We need to have an interface specified
             if self.interface is not None:
@@ -365,7 +364,6 @@ class BleSpawnApp(CommandLineDevicePipe):
                         # proxify once connected
                         if self.is_stdin_piped() and not self.is_stdout_piped():
                             # We create a peripheral that will send all packets to our input interface
-                            self.__mode = self.MODE_END_CHAIN
                             self.create_input_proxy(adv_data, scan_rsp, int(self.args.conn_handle),
                                                     profile)
 
@@ -373,8 +371,7 @@ class BleSpawnApp(CommandLineDevicePipe):
                         # and proxify when connected
                         elif self.is_stdout_piped() and not self.is_stdin_piped():
                             # We create a peripheral that will proxy all messages
-                            self.__mode = self.MODE_START_CHAIN
-                            self.create_output_proxy(adv_data, scan_rsp, profile_json)
+                            self.create_output_proxy(adv_data, scan_rsp)
                         else:
                             self.error('Tool must be piped to another WHAD tool.')
                     except FileNotFoundError:
@@ -390,7 +387,8 @@ class BleSpawnApp(CommandLineDevicePipe):
             self.warning("ble-spawn stopped (CTL-C)")
 
         # Launch post-run tasks
-        self.post_run()
+        if post:
+            self.post_run()
 
     def create_input_proxy(self, adv_data: bytes, scan_data: bytes, conn_handle, profile):
         """Configure our hardware to advertise a BLE peripheral, and once
@@ -431,14 +429,13 @@ class BleSpawnApp(CommandLineDevicePipe):
 
         # Create our packet bridge
         logger.info("[ble-spawn] Starting our input pipe")
-        input_pipe = BleSpawnInputPipe(LockedConnector(self.input_interface), peripheral)
-        input_pipe.set_in_conn_handle(conn_handle)
+        in_pipe = BleSpawnInputPipe(LockedConnector(self.input_interface), peripheral)
+        in_pipe.set_in_conn_handle(conn_handle)
 
         # Loop until the user hits CTL-C
-        while self.input_interface.opened:
-            sleep(.2)
+        in_pipe.join()
 
-    def create_output_proxy(self, adv_data, scan_data, profile_json):
+    def create_output_proxy(self, adv_data, scan_data):
         """Create an output proxy that will relay packets from our emulated BLE
         peripheral to a chained tool.
         """
@@ -455,11 +452,10 @@ class BleSpawnApp(CommandLineDevicePipe):
 
         # Create our packet bridge
         logger.info("[ble-spawn] Starting our output pipe")
-        _ = BleSpawnOutputPipe(peripheral, unix_server)
+        out_pipe = BleSpawnOutputPipe(peripheral, unix_server)
 
         # Loop until the user hits CTL-C
-        while unix_server.device.opened:
-            sleep(.2)
+        out_pipe.join()
 
         logger.warning("Unix socket client disconnected")
 
