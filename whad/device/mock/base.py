@@ -187,7 +187,7 @@ class MockDevice(Device):
         self.__blocking_event = Event()
 
     @property
-    def info(self) -> (DeviceInfo | None):
+    def info(self) -> Optional[DeviceInfo]:
         """Device information object."""
         return self.__info
 
