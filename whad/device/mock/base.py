@@ -142,8 +142,8 @@ class MockDevice(Device):
 
     def __init__(self, author: str = 'whad', url: str = 'https://whad.io', proto_minver: int = 2,
                  version: str = '1.0', dev_type: int = DeviceType.VirtualDevice,
-                 dev_id: bytes = b'', capabilities: (dict | None) = None, max_speed: int = 115200,
-                 index: (int | None) = None):
+                 dev_id: bytes = b'', capabilities: Optional[dict] = None, max_speed: int = 115200,
+                 index: Optional[int] = None):
         """Constructor."""
         # Loop over each method and registers those decorated with @route()
         self.__handlers = {}
@@ -181,7 +181,7 @@ class MockDevice(Device):
         self.__blocking_event = Event()
 
     @property
-    def info(self) -> (DeviceInfo | None):
+    def info(self) -> Optional[DeviceInfo]:
         """Device information object."""
         return self.__info
 
