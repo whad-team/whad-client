@@ -595,7 +595,7 @@ class Device:
         return self.__index
 
     @property
-    def device_id(self) -> (str | None):
+    def device_id(self) -> Optional[str]:
         """Return device ID
         """
         if self.__info is not None:
@@ -605,7 +605,7 @@ class Device:
         return None
 
     @property
-    def info(self) -> (DeviceInfo | None):
+    def info(self) -> Optional[DeviceInfo]:
         """Get device info object
 
         :return: Device information object
@@ -1076,7 +1076,7 @@ class VirtualDevice(Device):
     layer between WHAD's core and third-party hardware that does not run a WHAD-enabled
     firmware.
     """
-    def __init__(self, index: (int | None) = None):
+    def __init__(self, index: Optional[int] = None):
         self._dev_type = None
         self._dev_id = None
         self._fw_author = None
