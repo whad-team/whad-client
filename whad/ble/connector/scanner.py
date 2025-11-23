@@ -111,9 +111,11 @@ class Scanner(BLE):
                 raise WhadDeviceNotReady()
 
     def discover_devices(self, minimal_rssi = None, filter_address = None,
-                         timeout: Optional[float] = None) -> Iterator[AdvertisingDevice]:
+                         timeout: Optional[float] = None, updates: bool = False) -> Iterator[AdvertisingDevice]:
         """
-        Parse incoming advertisements and yield discovered devices.
+        Parse incoming advertisements and yield discovered devices. If `updates`
+        is set to `True`, all discovered devices will be reported with updated
+        information.
 
         :param  minimal_rssi:       Minimal RSSI level
         :type   minimal_rssi:       float, optional
@@ -121,6 +123,9 @@ class Scanner(BLE):
         :type   filter_address:     :class:`whad.ble.bdaddr.BDAddress`, optional
         :param  timeout:            Timeout in seconds
         :type   timeout:            float, optional
+        :param  updates:            Enable/disable reporting updated information
+                                    about already discovered devices
+        :type   updates:            bool
         """
 
         # Start sniffing
@@ -130,7 +135,8 @@ class Scanner(BLE):
                 devices = self.__db.on_device_found(
                     advertisement.metadata.rssi,
                     advertisement,
-                    filter_addr=filter_address
+                    filter_addr=filter_address,
+                    updates=updates
                 )
 
                 for device in devices:

@@ -270,7 +270,7 @@ class AdvertisingDevicesDB:
             device = self.__db[address]
         return device
 
-    def register_device(self, device):
+    def register_device(self, device) -> bool:
         """Register or update a device.
 
         :param  device: Device to register.
@@ -278,8 +278,14 @@ class AdvertisingDevicesDB:
         """
         if device.address not in self.__db:
             self.__db[device.address] = device
+            return True
         else:
-            self.__db[device.address].seen()
+            dev = self.__db[device.address]
+            dev.seen()
+            if dev.rssi != device.rssi:
+                dev.update(rssi = device.rssi)
+                return True
+        return False
 
 
     def __apply_scan_rsp_timeout(self):
@@ -293,7 +299,7 @@ class AdvertisingDevicesDB:
                 yield device
 
 
-    def on_device_found(self, rssi, adv_packet, filter_addr=None):
+    def on_device_found(self, rssi, adv_packet, filter_addr: str = None, updates: bool = False):
         """Device advertising packet or scan response received.
 
         Parse the incoming packet and handle device appropriately.
@@ -323,9 +329,11 @@ class AdvertisingDevicesDB:
 
                 # Register device if it matches our criterias
                 if filter_addr is not None and filter_addr.lower() == str(bd_address).lower():
-                    self.register_device(device)
+                    if self.register_device(device):
+                        devices.append(device)
                 elif filter_addr is None:
-                    self.register_device(device)
+                    if self.register_device(device):
+                        devices.append(device)
 
             except AdvDataError:
                 pass
@@ -348,9 +356,12 @@ class AdvertisingDevicesDB:
 
                 # Register device if it matches our criterias
                 if filter_addr is not None and filter_addr.lower() == str(bd_address).lower():
-                    self.register_device(device)
+                    if self.register_device(device):
+                        devices.append(device)
                 elif filter_addr is None:
                     self.register_device(device)
+                    if self.register_device(device):
+                        devices.append(device)
 
             except AdvDataError:
                 pass
@@ -374,5 +385,10 @@ class AdvertisingDevicesDB:
         # Check if some devices scan response timeout is reached
         for device in self.__apply_scan_rsp_timeout():
             devices.append(device)
+
+        # If asked for updates, send all updated devices except
+        # those already processed
+        if not updates:
+            filter(lambda x: x.reported == False, devices)
 
         return devices
