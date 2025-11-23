@@ -398,4 +398,9 @@ class AdvertisingDevicesDB:
         if not updates:
             filter(lambda x: x.reported == False, devices)
 
+        # If asked for updates, send all updated devices except
+        # those already processed
+        if not updates:
+            filter(lambda x: x.reported == False, devices)
+
         return devices
