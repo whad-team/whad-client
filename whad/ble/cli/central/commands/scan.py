@@ -18,16 +18,13 @@ def scan_handler(app, _):
         app.error("This command cannot be used chained with another whad tool.")
     elif app.interface is not None:
         # Switch to BLE scan mode
-        scanner = Scanner(app.interface)
-
-        print_formatted_text(HTML(
-            "<ansigreen> RSSI Lvl  Type  BD Address        Extra info</ansigreen>"
-        ))
-        scanner.start()
-        try:
-            for device in scanner.discover_devices():
-                # Show device
-                print(device)
-        except KeyboardInterrupt:
-            print('\rScan terminated by user')
-        scanner.stop()
+        with Scanner(app.interface) as scanner:
+            print_formatted_text(HTML(
+                "<ansigreen> RSSI Lvl  Type  BD Address        Extra info</ansigreen>"
+            ))
+            try:
+                for device in scanner.discover_devices():
+                    # Show device
+                    print(device)
+            except KeyboardInterrupt:
+                print('\rScan terminated by user')
