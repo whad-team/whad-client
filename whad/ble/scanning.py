@@ -276,7 +276,7 @@ class AdvertisingDevicesDB:
             device = self.__db[address]
         return device
 
-    def register_device(self, device) -> bool:
+    def register_device(self, device, update: bool = False) -> bool:
         """Register or update a device.
 
         :param  device: Device to register.
@@ -290,7 +290,7 @@ class AdvertisingDevicesDB:
             dev.seen()
             if dev.rssi != device.rssi:
                 dev.update(rssi = device.rssi)
-                return True
+                return update
         return False
 
 
@@ -335,12 +335,11 @@ class AdvertisingDevicesDB:
 
                 # Register device if it matches our criterias
                 if filter_addr is not None and filter_addr.lower() == str(bd_address).lower():
-                    if self.register_device(device):
+                    if self.register_device(device, update=updates) and updates:
                         devices.append(device)
                 elif filter_addr is None:
-                    if self.register_device(device):
+                    if self.register_device(device, update=updates) and updates:
                         devices.append(device)
-
             except AdvDataError:
                 pass
             except AdvDataFieldListOverflow:
@@ -362,11 +361,10 @@ class AdvertisingDevicesDB:
 
                 # Register device if it matches our criterias
                 if filter_addr is not None and filter_addr.lower() == str(bd_address).lower():
-                    if self.register_device(device):
+                    if self.register_device(device, update=updates) and updates:
                         devices.append(device)
                 elif filter_addr is None:
-                    result = self.register_device(device)
-                    if result and device not in devices:
+                    if self.register_device(device, update=updates) and updates:
                         devices.append(device)
 
             except AdvDataError:
