@@ -7,6 +7,7 @@ This module provides a database that keeps track of discovered devices,
 are handled in :class:`whad.ble.scanning.AdvertisingDevice`.
 """
 from time import time
+from typing import Optional
 
 from scapy.layers.bluetooth4LE import BTLE_ADV_IND, BTLE_ADV_NONCONN_IND, \
     BTLE_SCAN_RSP, BTLE_ADV
@@ -160,6 +161,11 @@ class AdvertisingDevice:
         """
         return self.__connectable
 
+    def __eq__(self, other):
+        """Compare this device to another. Devices are considered unique
+        based on their BD address.
+        """
+        return self.address == other.address
 
     def __repr__(self):
         """Show device information.
@@ -299,7 +305,7 @@ class AdvertisingDevicesDB:
                 yield device
 
 
-    def on_device_found(self, rssi, adv_packet, filter_addr: str = None, updates: bool = False):
+    def on_device_found(self, rssi, adv_packet, filter_addr: Optional[str] = None, updates: bool = False):
         """Device advertising packet or scan response received.
 
         Parse the incoming packet and handle device appropriately.
@@ -359,8 +365,8 @@ class AdvertisingDevicesDB:
                     if self.register_device(device):
                         devices.append(device)
                 elif filter_addr is None:
-                    self.register_device(device)
-                    if self.register_device(device):
+                    result = self.register_device(device)
+                    if result and device not in devices:
                         devices.append(device)
 
             except AdvDataError:
@@ -384,7 +390,8 @@ class AdvertisingDevicesDB:
 
         # Check if some devices scan response timeout is reached
         for device in self.__apply_scan_rsp_timeout():
-            devices.append(device)
+            if device not in devices:
+                devices.append(device)
 
         # If asked for updates, send all updated devices except
         # those already processed
