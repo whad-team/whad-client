@@ -6,6 +6,7 @@ from time import time
 from queue import Queue, Empty
 from struct import unpack, pack
 from threading import Lock
+from typing import List
 
 from scapy.layers.bluetooth import ATT_Handle
 
@@ -62,7 +63,7 @@ def proclock(f):
         except GattTimeoutException as err:
             self.procedure_stop()
             raise err
-        
+
         # Release GATT procedure lock
         self.procedure_stop()
         return result
@@ -80,6 +81,10 @@ class GattLayer(Layer):
         self.__proc_lock = Lock()
         self.__tx_lock = Lock()
         self.state.terminated = False
+        self.state.discovery = {
+            'procstate': None,
+            'handle': None,
+        }
 
         # Dispatch rules
         self.__handlers = {
@@ -457,6 +462,7 @@ class GattClient(GattLayer):
     def __init__(self, parent=None, layer_name=None, options={}):
         super().__init__(parent=parent, layer_name=layer_name, options=options)
         self.__model = None
+        self.__services = []
         self.__notification_callbacks = {}
 
     def configure(self, options):
@@ -644,13 +650,15 @@ class GattClient(GattLayer):
                 raise error_response_to_exc(msg.reason, msg.request, msg.handle)
 
     @proclock
-    def discover_primary_services(self):
+    def discover_primary_services(self, handle: int = 1):
         """Discover remote Primary Services.
 
         This function will yield every discovered primary service.
+
+        :param handle: Start handle value to use for this procedure (default: 1)
+        :type  handle: int
         """
         # List primary services handles
-        handle = 1
         while True:
             # Send a Read By Group Type Request
             self.lock_tx()
@@ -682,11 +690,12 @@ class GattClient(GattLayer):
                     error_response_to_exc(msg.reason, msg.request, msg.handle)
 
     @proclock
-    def discover_secondary_services(self):
+    def discover_secondary_services(self, handle: int = 1):
         """Discover remote Secondary Services.
+
+        :param handle: Start handle value to use for this procedure (default: 1)
         """
         # List primary services handles
-        handle = 1
         while True:
             # Send a Read By Group Type Request
             self.lock_tx()
@@ -804,15 +813,16 @@ class GattClient(GattLayer):
                     else:
                         error_response_to_exc(msg.reason, msg.request, msg.handle)
 
+
                 handle += 1
 
     def get_descriptor(self, characteristic: Characteristic, uuid: UUID, handle: int) -> CharacteristicDescriptor:
         """Read a characteristic descriptor identified by its handle.
 
-        @param handle: Descriptor handle
-        @type handle: int
-        @return Characteristic descriptor
-        @rtype CharacteristicDescriptor
+        :param handle: Descriptor handle
+        :type  handle: int
+        :return:       Characteristic descriptor
+        :rtype:        CharacteristicDescriptor
         """
         # Read descriptor value
         desc_value = self.read(handle)
@@ -821,27 +831,66 @@ class GattClient(GattLayer):
         return CharacteristicDescriptor.from_uuid(characteristic, handle,
                                                       uuid, desc_value)
 
-    def discover(self, save_values: bool = False):
-        # Discover services
-        services = []
-        for service in self.discover_primary_services():
-            services.append(service)
+    def discover(self, start: int = 1, save_values: bool = False):
+        """
+        Discover primary services, characteristics and associated descriptors. This procedure also automatically
+        resumes if it has been stopped in the middle of a discovery process.
 
-        for service in services:
-            for characteristic in self.discover_characteristics(service, save_values=save_values):
-                service.add_characteristic(characteristic)
-            self.__model.add_service(service)
+        :param save_values: If set to `True`, we will read all readable characteristics' values
+                            and save them in the current profile.
+        :type  save_values: bool
+        """
+        # Are we resuming from an interrupted discovery procedure ?
+        previous_state = self.state.discovery['procstate']
+        if previous_state is not None:
+            # Determine at which step we were interrupted
+            if previous_state == 'services':
+                # Resume services discovery
+                last_handle = self.state.discovery['handle']
+                for service in self.discover_primary_services(last_handle + 1):
+                    self.__services.append(service)
 
-        # Searching for descriptors
-        for service in self.__model.services():
-            for characteristic in service.characteristics():
-                for descriptor in self.discover_characteristic_descriptors(characteristic):
-                    try:
-                        desc = self.get_descriptor(characteristic, descriptor.uuid, descriptor.handle)
-                        if desc is not None:
-                            characteristic.add_descriptor(desc)
-                    except (InsufficientAuthenticationError, InsufficientAuthorizationError, InsufficientEncryptionError):
-                        pass
+            if previous_state in ('services', 'chars'):
+                # If we were enumerating a series of characteristics, find out which service
+                # was being populated
+                # TODO
+
+            if previous_state in ('services', 'chars', 'desc'):
+                # If we were enumerating a series of descriptors, find out which characteristic
+                # and service we stopped at.
+                # TODO
+
+        else:
+            # Discover services from starting handle
+            self.state.discovery['procstate'] = 'services'
+            self.__services = []
+            for service in self.discover_primary_services(start):
+                self.__services.append(service)
+                self.state.discovery['handle'] = service.handle
+
+            self.state.discovery['procstate'] = 'chars'
+            for service in self.__services:
+                for characteristic in self.discover_characteristics(service, save_values=save_values):
+                    service.add_characteristic(characteristic)
+                    self.state.discovery['handle'] = characteristic.handle
+                self.__model.add_service(service)
+
+            # Searching for descriptors
+            self.state.discovery['procstate'] = 'desc'
+            for service in self.__model.services():
+                for characteristic in service.characteristics():
+                    for descriptor in self.discover_characteristic_descriptors(characteristic):
+                        try:
+                            desc = self.get_descriptor(characteristic, descriptor.uuid, descriptor.handle)
+                            if desc is not None:
+                                characteristic.add_descriptor(desc)
+                                self.state.discovery['handle'] = desc.handle
+                        except (InsufficientAuthenticationError, InsufficientAuthorizationError, InsufficientEncryptionError):
+                            pass
+
+        # We are done, clean state.
+        self.state.discovery['procstate'] = None
+        self.state.discovery['handle'] = None
 
     @proclock
     def read(self, handle):
