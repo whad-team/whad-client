@@ -2,6 +2,7 @@
 RFStorm adaptation layer for WHAD.
 """
 import logging
+from re import I
 from threading import  Lock
 from time import sleep, time
 from typing import Type, Optional
@@ -10,11 +11,13 @@ from usb.core import find, USBError, USBTimeoutError
 
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
 from whad.hub.generic.cmdresult import ParameterError, Success, Error
+from whad.hub.message import HubMessage
 from whad.hub.esb import (
     Commands as EsbCommands,
     SendPdu as EsbSend, SetNodeAddress as EsbSetNodeAddress,
     EsbStart, EsbStop, SniffMode as EsbSniffMode,
     PtxMode as EsbPtxMode, PrxMode as EsbPrxMode,
+    PduReceived as EsbPduReceived,
 )
 from whad.hub.phy import (
     Commands as PhyCommands,
@@ -22,6 +25,7 @@ from whad.hub.phy import (
     GetSupportedFreqs, SetFreq, SetDatarate, SetSyncWord,
     SetEndianness, SetPacketSize, SetGfskMod,
     SendPacket, SniffMode as PhySniffMode,
+    PacketReceived as PhyPacketReceived
 )
 from whad.esb.esbaddr import ESBAddress
 from whad.hub.unifying import(
@@ -30,6 +34,7 @@ from whad.hub.unifying import(
     UnifyingStart, UnifyingStop, SniffMode as UnifyingSniffMode,
     MouseMode as UnifyingMouse, KeyboardMode as UnifyingKeyboard,
     DongleMode as UnifyingDongle,
+    PduReceived as UnifyingPduReceived
 )
 from whad.hub.discovery import Capability, Domain
 from whad.phy import Endianness
@@ -128,6 +133,7 @@ class RfStorm(VirtualDevice):
 
     def open(self):
         try:
+            logger.debug("[rfstorm] setting up hardware interface ...")
             self.__rfstorm.set_configuration()
         except USBError as err:
             if err.errno == 13:
@@ -256,11 +262,13 @@ class RfStorm(VirtualDevice):
 
     def _rfstorm_promiscuous_mode(self, prefix=b""):
         data = bytes([len(prefix)]) + prefix
+        logger.debug("[rfstorm] enabling generic promisucuous mode")
         return self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_PROMISCUOUS,
                                           data, no_response=True)
 
     def _rfstorm_generic_promiscuous_mode(self, prefix=b"", rate=RFStormDataRate.RF_2MBPS,
                                           payload_length=32):
+        logger.debug("[rfstorm] enabling generic promisucuous mode")
         data = bytes([len(prefix), rate, payload_length]) + prefix
         return self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_PROMISCUOUS_GENERIC,
                                           data, no_response=True)
@@ -289,17 +297,21 @@ class RfStorm(VirtualDevice):
         return self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_TRANSMIT_ACK,
                                           data, no_response=True)
 
-    def _rfstorm_set_channel(self, channel):
+    def _rfstorm_set_channel(self, channel: int):
         if channel < 0 or channel > 125:
+            logging.debug("[rfstorm] Cannot configure channel, invalid value (%d)", channel)
             return False
 
+        logger.debug("[rfstorm] Configuring channel (%d)", channel)
         data = bytes([channel])
         return self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_SET_CHANNEL, data)
 
     def _rfstorm_get_channel(self, channel):
+        """Query hardware and retrieve configured channel."""
         return self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_GET_CHANNEL)[0]
 
     def _rfstorm_enable_lna(self):
+        """Enable hardware low-noise amplifier, if available."""
         return self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_ENABLE_LNA)
 
     def write(self, data):
@@ -315,6 +327,7 @@ class RfStorm(VirtualDevice):
             if self.__domain == RFStormDomains.RFSTORM_PHY:
                 try:
                     data = self._rfstorm_read_packet()
+                    logger.debug("[rfstorm:phy] Received packet: %s", data.hex())
                 except USBTimeoutError:
                     data = b""
                 if data is not None and isinstance(data, bytes) and \
@@ -330,12 +343,15 @@ class RfStorm(VirtualDevice):
                     if time() - self.__last_packet_timestamp > 1:
                         if self.__internal_state == RFStormInternalStates.PROMISCUOUS_SNIFFING:
                             self.__channel = (self.__channel + 1) % 100
+                            logger.debug("[rfstorm:esb|uni] hopping on channel %d", self.__channel)
                             self._rfstorm_set_channel(self.__channel)
                             sleep(0.05)
                         elif self.__internal_state == RFStormInternalStates.SNIFFING:
                             for i in range(0,100):
+                                logger.debug("[rfstorm] hopping on channel %d", self.__channel)
                                 self._rfstorm_set_channel(i)
                                 if self._rfstorm_transmit_payload(b"\x0f\x0f\x0f\x0f",1,1):
+                                    logger.debug("[rfstorm] got a ping response")
                                     self.__last_packet_timestamp = time()
                                     self.__channel = i
                                     self._send_whad_pdu(b"", address=self.__address)
@@ -344,6 +360,7 @@ class RfStorm(VirtualDevice):
                 if not self.__ptx:
                     try:
                         data = self._rfstorm_read_packet()
+                        logger.debug("[rfstorm|rx] Received packet: %s", data.hex())
                     except USBTimeoutError:
                         data = b""
 
@@ -686,7 +703,7 @@ class RfStorm(VirtualDevice):
         return self.__start()
 
     @VirtualDevice.route(PhyStart)
-    def _on_whad_phy_start(self, messagei: PhyStart):
+    def _on_whad_phy_start(self, message: PhyStart):
         self.__domain = RFStormDomains.RFSTORM_PHY
         return self.__start()
 
