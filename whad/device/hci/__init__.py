@@ -370,9 +370,9 @@ class Hci(VirtualDevice):
         :param bytes data: Data to write
         :return: number of bytes written to the device
         """
-        if not self.__opened:
+        if not self.__opened or self.__socket is None:
             raise WhadDeviceNotReady()
-        self.__socket.send(payload)
+        return self.__socket.send(payload)
 
     def read(self):
         """
@@ -519,7 +519,7 @@ class Hci(VirtualDevice):
                 logger.debug("[%s][write_command] Received response with opcode %d", self.interface, response.opcode)
                 response = self._wait_response()
             logger.debug("[%s][write_command] Response received.", self.interface)
-            
+
             if response is not None:
                 logger.debug("[%s] HCI write command returned status %d",
                             self.interface, response.status)
@@ -606,7 +606,7 @@ class Hci(VirtualDevice):
         if feature in self.__features.lmp_features.names:
             return getattr(self.__features.lmp_features, feature)
         return False
-    
+
     def is_le_feature_supported(self, feature: str) -> bool:
         """Determine if a specific feature is supported by the HCI interface.
 
@@ -665,7 +665,7 @@ class Hci(VirtualDevice):
         
         logger.debug("[%s] Failed reading LE ACL buffer size v1 !", self.interface)
         return False
-    
+
     def read_local_supported_commands(self):
         """Read local adapter supported commands.
         """
@@ -676,9 +676,9 @@ class Hci(VirtualDevice):
                 logger.debug("[%s] Local supported commands cached.", self.interface)
                 self.__local_supp_cmds = response[HCI_Cmd_Complete_Supported_Commands]
                 return True
-            
+
         logger.debug("[%s] Failed reading supported commands !", self.interface)
-        return False   
+        return False
 
     @req_cmd("read_local_supported_features")
     def read_local_supported_features(self):
@@ -690,7 +690,7 @@ class Hci(VirtualDevice):
             logger.debug("[%s] Local supported features cached.", self.interface)
             self.__features = response[HCI_Cmd_Complete_Supported_Features]
             return True
-        
+
         logger.debug("[%s] Failed reading supported features !", self.interface)
         return False
 
@@ -704,7 +704,7 @@ class Hci(VirtualDevice):
             logger.debug("[%s] Local LE supported features cached.", self.interface)
             self.__le_features = response[HCI_Cmd_LE_Complete_Supported_Features]
             return True
-        
+
         logger.debug("[%s] Failed reading LE supported features !", self.interface)
         return False
 
@@ -870,7 +870,7 @@ class Hci(VirtualDevice):
                          self.__fa_size)
             return True
         return False
-    
+
     def get_whitelist_size(self) -> int:
         """Retrieve the LE Device Whitelist size for the current HCI
         interface.
@@ -969,7 +969,7 @@ class Hci(VirtualDevice):
         """
         logger.debug("[%s] Setting HCI adapter random address to %s ...", self.interface, 
                      BDAddress(bd_address))
-        
+
         # Disabled for now
         if False and bd_address_type == AddressType.PUBLIC:
             _, self.__manufacturer = self._read_local_version_information()
@@ -1185,7 +1185,7 @@ class Hci(VirtualDevice):
 
         # Return result
         return result
-    
+
     @req_cmd("le_read_advertising_physical_channel_tx_power")
     def _read_advertising_physical_channel_tx_power(self, from_queue: bool = True) -> bool:
         """Read Advertising Physical Channel Tx Power level
@@ -1193,7 +1193,7 @@ class Hci(VirtualDevice):
         logger.debug("Read Advertising Physical Channel Tx Power ...")
         response = self._write_command(HCI_Cmd_LE_Read_Advertising_Physical_Channel_Tx_Power(),
                                        from_queue=from_queue)
-        
+
         if response is not None and response.status == 0x00:
             power_level = response[HCI_Cmd_Complete_LE_Advertising_Tx_Power_Level].tx_power_level
             logger.debug("[%s] Advertising Tx Power level: %d", self.interface, power_level)

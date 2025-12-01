@@ -165,6 +165,7 @@ class Pcap(VirtualDevice):
     def write(self, payload):
         if not self.__opened:
             raise WhadDeviceNotReady()
+        return len(payload)
 
     def read(self):
         """Read packets from PCAP file and replay them
