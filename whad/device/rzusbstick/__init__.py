@@ -3,15 +3,17 @@ RZUSBStick adaptation layer.
 """
 import logging
 from struct import unpack, pack
-
+from typing import Optional
 from usb.core import find, USBError, USBTimeoutError
 
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
 from whad.device import VirtualDevice
-from whad.hub.discovery import Domain, Capability
 
-from whad.hub.generic.cmdresult import CommandResult
-from whad.hub.dot15d4 import Commands
+from whad.hub.message import HubMessage
+from whad.hub.discovery import Domain, Capability
+from whad.hub.dot15d4.pdu import SendRawPdu
+from whad.hub.generic.cmdresult import CommandResult, Success, Error
+from whad.hub.dot15d4 import Commands, Start, Stop, SniffMode, SendRawPdu
 
 from .constants import RZUSBStickInternalStates, \
     RZUSBStickId, RZUSBStickModes, RZUSBStickEndPoints, RZUSBStickCommands, \
@@ -115,11 +117,11 @@ class RzUsbStick(VirtualDevice):
         # Ask parent class to run a background I/O thread
         super().open()
 
-    def write(self, data):
+    def write(self, payload: bytes):
         if not self.__opened:
             raise WhadDeviceNotReady()
 
-    def read(self):
+    def read(self) -> Optional[HubMessage]:
         """Read data from device.
         """
         if not self.__opened:
@@ -146,13 +148,13 @@ class RzUsbStick(VirtualDevice):
                     valid_fcs = self.__input_header[7] == 0x01
                     packet = self.__input_buffer[:-1]
                     #link_quality_indicator = self.__input_buffer[-1]
-                    self._send_whad_zigbee_raw_pdu(packet, rssi=rssi, is_fcs_valid=valid_fcs)
+                    return self.create_raw_pdu(packet, rssi=rssi, is_fcs_valid=valid_fcs)
 
     def reset(self):
         self.__rzusbstick.reset()
 
     # Virtual device whad message builder
-    def _send_whad_zigbee_raw_pdu(self, packet, rssi=None, is_fcs_valid=None, timestamp=None):
+    def create_raw_pdu(self, packet, rssi=None, is_fcs_valid=None, timestamp=None):
         pdu = packet[:-2]
         fcs = unpack("H",packet[-2:])[0]
 
@@ -170,19 +172,23 @@ class RzUsbStick(VirtualDevice):
         if timestamp is not None:
             msg.timestamp = timestamp
 
-        # Send message
-
-        self._send_whad_message(msg)
+        # Return message
+        return msg
 
 
     # Virtual device whad message callbacks
-    def _on_whad_dot15d4_stop(self, message):
-        if self._stop():
-            self._send_whad_command_result(CommandResult.SUCCESS)
-        else:
-            self._send_whad_command_result(CommandResult.ERROR)
 
-    def _on_whad_dot15d4_send_raw(self, message):
+    @VirtualDevice.route(Stop)
+    def on_dot15d4_stop(self, _: Stop) -> CommandResult:
+        if self._stop():
+            return Success()
+
+        # Error, could not stop hardware
+        return Error()
+
+    @VirtualDevice.route(SendRawPdu)
+    def on_dot15d4_send_raw(self, message: SendRawPdu) -> CommandResult:
+        """Handle raw PDU transmit request."""
         channel = message.channel
 
         if self._set_channel(channel):
@@ -190,24 +196,30 @@ class RzUsbStick(VirtualDevice):
             success = self._send_packet(packet)
         else:
             success = False
-        self._send_whad_command_result(CommandResult.SUCCESS if success else CommandResult.ERROR)
 
-    def _on_whad_dot15d4_sniff(self, message):
+        # Return success/error message
+        return Success() if success else Error()
+
+    @VirtualDevice.route(SniffMode)
+    def _on_whad_dot15d4_sniff(self, message: SniffMode) -> CommandResult:
         channel = message.channel
         self.__future_channel = channel
         self.__internal_state = RZUSBStickInternalStates.SNIFFING
-        self._send_whad_command_result(CommandResult.SUCCESS)
+        return Success()
 
-    def _on_whad_dot15d4_start(self, message):
+    @VirtualDevice.route(Start)
+    def on_dot15d4_start(self, _: Start) -> CommandResult:
+        """Handle current mode start request."""
         self.__input_buffer = b""
         self.__input_buffer_length = 0
         self.__input_header = b""
         if self._start():
             if self.__future_channel != self.__channel:
                 self._set_channel(self.__future_channel)
-            self._send_whad_command_result(CommandResult.SUCCESS)
-        else:
-            self._send_whad_command_result(CommandResult.ERROR)
+            return Success()
+
+        # Failed
+        return Error()
 
     # RZUSBStick low level communication primitives
 
