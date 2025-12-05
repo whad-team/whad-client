@@ -4,17 +4,28 @@ Adaptation layer for the Yard Stick One.
 import logging
 from struct import unpack, pack
 from time import time
+from typing import Optional
 
 from usb.core import find, USBError, USBTimeoutError
 from usb.util import get_string
 
+from scapy.packet import Packet
+
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
 from whad.device import VirtualDevice
+
+from whad.hub.message import HubMessage
 from whad.hub.discovery import Domain, Capability
-from whad.hub.generic.cmdresult import CommandResult
-from whad.hub.phy import Commands, TxPower, Endianness as PhyEndianness, Modulation as PhyModulation
-from whad.phy import Endianness
+from whad.hub.generic.cmdresult import CommandResult, Success, Error, ParameterError
+from whad.hub.phy import (
+    Commands, TxPower, Endianness as PhyEndianness, Modulation as PhyModulation,
+    GetSupportedFreqs, SendPacket, SetFreq, SetDatarate, SetPacketSize,
+    SetEndianness, SetTxPower, SetAskMod, Set4FskMod, SetFskMod, SetGfskMod,
+    SetSyncWord, Start, Stop, SniffMode,
+)
+
 from whad.helpers import swap_bits
+from whad.phy import Endianness
 
 from .constants import YardStickOneId, YardStickOneEndPoints, \
     YardApplications, YardSystemCommands, YardRadioStructure, YardRFStates, \
@@ -114,10 +125,12 @@ class YardStickOne(VirtualDevice):
         return self.__frequency
 
     def _enter_configuration_mode(self):
+        """Set hardware in configuration mode."""
         self._set_idle_mode()
         self._strobe_idle_mode()
 
     def _restore_previous_mode(self):
+        """Restore yard's previous mode."""
         if self.__internal_state == YardInternalStates.YARD_MODE_RX:
             self._set_rx_mode()
             self._strobe_rx_mode()
@@ -126,21 +139,28 @@ class YardStickOne(VirtualDevice):
             self._set_tx_mode()
             self._strobe_tx_mode()
 
-    def _on_whad_phy_get_supported_freq(self, message):
+    ##############################
+    # WHAD message handling
+    ##############################
+
+    @VirtualDevice.route(GetSupportedFreqs)
+    def on_supported_freqs(self, _: GetSupportedFreqs) -> CommandResult:
+        """Process GetSupportedFreqs requests."""
         # Create a SupportedFreqRanges
-        msg = self.hub.phy.create_supported_freq_ranges(
+        return self.hub.phy.create_supported_freq_ranges(
             self.__supported_frequency_range
         )
 
-        # Send message
-        self._send_whad_message(msg)
-
-    def _on_whad_phy_send(self, message):
+    @VirtualDevice.route(SendPacket)
+    def on_send_packet(self, message: SendPacket) -> CommandResult:
+        """Process SendPacket messages."""
         self._send_packet(message.packet)
-        self._send_whad_command_result(CommandResult.SUCCESS)
+        return Success()
 
-
-    def _on_whad_phy_set_freq(self, message):
+    @VirtualDevice.route(SetFreq)
+    def on_set_freq(self, message: SetFreq) -> CommandResult:
+        """Process SetFreq message, check supplied frequency
+        and configure if supported."""
         found = False
         for supported_range in self.__supported_frequency_range:
             range_start, range_end = supported_range[0], supported_range[1]
@@ -148,38 +168,50 @@ class YardStickOne(VirtualDevice):
                 found = True
                 break
 
+        # Frequency is supported, configure hardware.
         if found:
             self._enter_configuration_mode()
             self._set_frequency(message.frequency)
             self.__frequency = message.frequency
             self._restore_previous_mode()
-            self._send_whad_command_result(CommandResult.SUCCESS)
-        else:
-            self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
+            return Success()
 
-    def _on_whad_phy_datarate(self, message):
+        # Bad parameter passed
+        return ParameterError()
+
+    @VirtualDevice.route(SetDatarate)
+    def on_datarate(self, message: SetDatarate) -> CommandResult:
+        """Process datarate configuration request."""
         self._enter_configuration_mode()
         self._set_data_rate(message.rate)
         self._restore_previous_mode()
-        self._send_whad_command_result(CommandResult.SUCCESS)
+        return Success()
 
-    def _on_whad_phy_packet_size(self, message):
+    @VirtualDevice.route(SetPacketSize)
+    def _on_whad_phy_packet_size(self, message: SetPacketSize) -> CommandResult:
+        """Process packet size request."""
         if message.packet_size < 255:
             self._enter_configuration_mode()
             self._set_packet_length(message.packet_size)
             self._restore_previous_mode()
-            self._send_whad_command_result(CommandResult.SUCCESS)
-        else:
-            self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
+            return Success()
 
-    def _on_whad_phy_endianness(self, message):
+        # Bad parameter
+        return ParameterError()
+
+    @VirtualDevice.route(SetEndianness)
+    def on_set_endianness(self, message: SetEndianness) -> CommandResult:
+        """Process endianness configuration request."""
         if message.endianness in (Endianness.BIG, Endianness.LITTLE):
             self.__endianness = message.endianness
-            self._send_whad_command_result(CommandResult.SUCCESS)
-        else:
-            self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
+            return Success()
 
-    def _on_whad_phy_tx_power(self, message):
+        # Invalid parameter
+        return ParameterError()
+
+    @VirtualDevice.route(SetTxPower)
+    def on_set_tx_power(self, message) -> CommandResult:
+        """Process Tx power configuration."""
         tx_powers = {
             TxPower.LOW : 0x20,
             TxPower.MEDIUM : 0x80,
@@ -192,44 +224,54 @@ class YardStickOne(VirtualDevice):
                 tx_powers[message.power]
             )
             self._restore_previous_mode()
-            self._send_whad_command_result(CommandResult.SUCCESS)
-        else:
-            self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
+            return Success()
 
-    def _on_whad_phy_mod_ask(self, message):
+        # Invalid parameter
+        return ParameterError()
+
+    @VirtualDevice.route(SetAskMod)
+    def on_set_mod_ask(self, _: SetAskMod) -> CommandResult:
+        """Process ASK modulation request."""
         self._enter_configuration_mode()
         self._set_modulation(YardModulations.MODULATION_ASK)
         self._set_encoding(YardEncodings.NON_RETURN_TO_ZERO)
         self._restore_previous_mode()
-        self._send_whad_command_result(CommandResult.SUCCESS)
+        return Success()
 
-    def _on_whad_phy_mod_4fsk(self, message):
+    @VirtualDevice.route(Set4FskMod)
+    def on_set_mod_4fsk(self, message: Set4FskMod) -> CommandResult:
+        """Process 4FSK modulation request."""
         self._enter_configuration_mode()
         self._set_modulation(YardModulations.MODULATION_4FSK)
         self._set_encoding(YardEncodings.NON_RETURN_TO_ZERO)
         self._set_deviation(message.deviation)
         self._restore_previous_mode()
-        self._send_whad_command_result(CommandResult.SUCCESS)
+        return Success()
 
-
-    def _on_whad_phy_mod_fsk(self, message):
+    @VirtualDevice.route(SetFskMod)
+    def on_set_mod_fsk(self, message: SetFskMod) -> CommandResult:
+        """Process FSK modulation request."""
         self._enter_configuration_mode()
         self._set_modulation(YardModulations.MODULATION_2FSK)
         self._set_encoding(YardEncodings.NON_RETURN_TO_ZERO)
         self._set_deviation(message.deviation)
         self._restore_previous_mode()
-        self._send_whad_command_result(CommandResult.SUCCESS)
+        return Success()
 
-    def _on_whad_phy_mod_gfsk(self, message):
+    @VirtualDevice.route(SetGfskMod)
+    def on_set_mod_gfsk(self, message: SetGfskMod) -> CommandResult:
+        """Process GFSK modulation request."""
         self._enter_configuration_mode()
         self._set_modulation(YardModulations.MODULATION_GFSK)
         self._set_encoding(YardEncodings.NON_RETURN_TO_ZERO)
         self._set_deviation(message.deviation)
         # message.gaussian_filter can't be processed
         self._restore_previous_mode()
-        self._send_whad_command_result(CommandResult.SUCCESS)
+        return Success()
 
-    def _on_whad_phy_sync_word(self, message):
+    @VirtualDevice.route(SetSyncWord)
+    def on_set_sync_word(self, message: SetSyncWord) -> CommandResult:
+        """Process SetSyncWord message."""
         if len(message.sync_word) == 0:
             self._enter_configuration_mode()
             self._set_crc(enable=False)
@@ -240,7 +282,7 @@ class YardStickOne(VirtualDevice):
             self._set_sync_word(b"")
             self._set_preamble_quality_threshold(0)
             self._restore_previous_mode()
-            self._send_whad_command_result(CommandResult.SUCCESS)
+            return Success()
         elif len(message.sync_word) <= 2:
             self._enter_configuration_mode()
             self._set_crc(enable=False)
@@ -255,7 +297,7 @@ class YardStickOne(VirtualDevice):
             self._set_sync_word(sync)
             self._set_preamble_quality_threshold(0)
             self._restore_previous_mode()
-            self._send_whad_command_result(CommandResult.SUCCESS)
+            return Success()
         elif len(message.sync_word) == 4 and message.sync_word[:2] == message.sync_word[2:]:
             self._enter_configuration_mode()
             self._set_crc(enable=False)
@@ -270,31 +312,43 @@ class YardStickOne(VirtualDevice):
             self._set_sync_word(sync)
             self._set_preamble_quality_threshold(0)
             self._restore_previous_mode()
-            self._send_whad_command_result(CommandResult.SUCCESS)
+            return Success()
 
-        else:
-            self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
+        # Invalid parameter
+        return ParameterError()
 
-
-    def _on_whad_phy_sniff(self, message):
+    @VirtualDevice.route(SniffMode)
+    def on_sniff_mode(self, _: SniffMode) -> CommandResult:
+        """Enable sniffing mode."""
         self.__internal_state = YardInternalStates.YARD_MODE_RX
-        self._send_whad_command_result(CommandResult.SUCCESS)
+        return Success()
 
-    def _on_whad_phy_start(self, message):
+    @VirtualDevice.route(Start)
+    def on_start(self, _: Start):
+        """Start current mode."""
         if self.__internal_state == YardInternalStates.YARD_MODE_RX:
             self._set_rx_mode()
             self._strobe_rx_mode()
             self.__opened_stream = True
-        self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_phy_stop(self, message):
+        return Success()
+
+    @VirtualDevice.route(Stop)
+    def _on_whad_phy_stop(self, _: Stop) -> CommandResult:
+        """Stop current mode."""
         #self._set_idle_mode()
         #self._strobe_idle_mode()
         self.__opened_stream = False
-        self._send_whad_command_result(CommandResult.SUCCESS)
+        return Success()
 
+    def __create_recv_pdu(self, packet: Packet, timestamp: int = None) -> HubMessage:
+        """Build a PHY Packetreceived message.
 
-    def _send_whad_phy_pdu(self, packet, timestamp=None):
+        :param packet:    Received packet
+        :type  packet:    Packet
+        :param timestamp: Reception timestamp
+        :type  timestamp: int
+        """
         # Create a PacketReceived message
         msg = self.hub.phy.create_packet_received(
             self._get_frequency(),
@@ -310,7 +364,7 @@ class YardStickOne(VirtualDevice):
         if timestamp is not None:
             msg.timestamp = timestamp
 
-        self._send_whad_message(msg)
+        return msg
 
 
     def open(self):
@@ -363,7 +417,7 @@ class YardStickOne(VirtualDevice):
         if not self.__opened:
             raise WhadDeviceNotReady()
 
-    def read(self):
+    def read(self) -> Optional[HubMessage]:
         """Read data from Yard Stick One
         """
         if not self.__opened:
@@ -385,7 +439,7 @@ class YardStickOne(VirtualDevice):
                         else:
                             formatted_data = data[2]
 
-                        self._send_whad_phy_pdu(formatted_data, int(
+                        return self.__create_recv_pdu(formatted_data, int(
                             time()*1000000 - self.__start_time
                             ))
 
