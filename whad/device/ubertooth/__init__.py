@@ -22,18 +22,20 @@ from whad.hub.generic.cmdresult import CommandResult, Success, Error, ParameterE
 from whad.hub.ble import (
     Commands, BleStart, BleStop, SniffActiveConn, SniffAccessAddress, SniffAdv, SniffConnReq,
 )
-from whad.scapy.layers.ubertooth import Ubertooth_Hdr,UBERTOOTH_PACKET_TYPES, \
-    BTLE_Promiscuous_Access_Address, BTLE_Promiscuous_CRCInit, BTLE_Promiscuous_Hop_Interval, \
-    BTLE_Promiscuous_Hop_Increment
+from whad.scapy.layers.ubertooth import (
+    Ubertooth_Hdr,UBERTOOTH_PACKET_TYPES, BTLE_Promiscuous_Access_Address,
+    BTLE_Promiscuous_CRCInit, BTLE_Promiscuous_Hop_Interval,
+)
 
-from .constants import UbertoothId, \
-    UbertoothTransfers, UbertoothModulations, UbertoothCommands, \
-    UbertoothInternalState, UbertoothModes, UbertoothJammingModes
+from .constants import (
+    UbertoothId, UbertoothTransfers, UbertoothModulations, UbertoothCommands,
+    UbertoothInternalState, UbertoothJammingModes,
+)
 
 logger = logging.getLogger(__name__)
 
 # Helpers functions
-def get_ubertooth(index: int = 0, serial: str = None):
+def get_ubertooth(index: int = 0, serial: Optional[str] = None):
     """
     Returns an ubertooth USB object based on index or serial number.
     """
@@ -116,11 +118,11 @@ class Ubertooth(VirtualDevice):
             # Device not ready
             raise WhadDeviceNotReady() from err
 
-        self._dev_id = self._get_serial_number()
-        self._fw_author = self._get_manufacturer()
-        self._fw_url = self._get_url()
-        self._fw_version = self._get_firmware_version()
-        self._dev_capabilities = self._get_capabilities()
+        self.author = self._get_manufacturer()
+        self.version = self._get_firmware_version()
+        self.dev_id = self._get_serial_number()
+        self.url = self._get_url()
+        self.capabilities = self._get_capabilities()
 
         self.__opened = True
         # Ask parent class to run a background I/O thread
@@ -399,11 +401,10 @@ class Ubertooth(VirtualDevice):
         return serial_number
 
     def _get_url(self):
-        url = "https://github.com/greatscottgadgets/ubertooth"
-        return url.encode("utf-8")
+        return "https://github.com/greatscottgadgets/ubertooth"
 
     def _get_manufacturer(self):
-        return get_string(self.__ubertooth, self.__ubertooth.iManufacturer).encode("utf-8")
+        return get_string(self.__ubertooth, self.__ubertooth.iManufacturer)
 
     def _get_firmware_version(self):
         firmware_version = self._ubertooth_ctrl_transfer_in(
