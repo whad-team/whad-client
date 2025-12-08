@@ -336,7 +336,7 @@ class RfStorm(VirtualDevice):
                     if len(data[:5]) >= 3:
                         if self.__phy_endianness == Endianness.LITTLE:
                             data = bytes([swap_bits(i) for i in data])
-                        self._send_whad_pdu(data[5:], data[:5], int(self.__last_packet_timestamp))
+                        return self.__build_whad_pdu(data[5:], data[:5], int(self.__last_packet_timestamp))
 
             else:
                 if self.__scanning:
@@ -354,8 +354,7 @@ class RfStorm(VirtualDevice):
                                     logger.debug("[rfstorm] got a ping response")
                                     self.__last_packet_timestamp = time()
                                     self.__channel = i
-                                    self._send_whad_pdu(b"", address=self.__address)
-                                    break
+                                    return self.__build_whad_pdu(b"", address=self.__address)
 
                 if not self.__ptx:
                     try:
@@ -375,9 +374,9 @@ class RfStorm(VirtualDevice):
                         self.__last_packet_timestamp = time()
                         if self.__internal_state == RFStormInternalStates.PROMISCUOUS_SNIFFING:
                             if len(data[:5]) >= 3:
-                                self._send_whad_pdu(data[5:], data[:5])
+                                return self.__build_whad_pdu(data[5:], data[:5])
                         elif self.__internal_state == RFStormInternalStates.SNIFFING:
-                            self._send_whad_pdu(data[1:], self.__address)
+                            return self.__build_whad_pdu(data[1:], self.__address)
                 else:
                     sleep(0.1)
 
