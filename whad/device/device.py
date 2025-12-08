@@ -554,8 +554,9 @@ class Device:
 
         # Interface lock
         self.__lock = Lock()
+
         # Connector lock
-        self.__msg_filter: Callable[..., bool] = None
+        self.__msg_filter: Optional[Callable[..., bool]] = None
 
         # Protocol hub
         self.__hub = ProtocolHub()
@@ -564,7 +565,7 @@ class Device:
         self.__timeout = 5.0
 
     @contextlib.contextmanager
-    def get_pending_message(self, timeout: float = None) -> Generator[HubMessage, None, None]:
+    def get_pending_message(self, timeout: Optional[float] = None) -> Generator[HubMessage, None, None]:
         """Get message waiting to be sent to the interface.
         """
         try:
@@ -600,10 +601,12 @@ class Device:
     def device_id(self):
         """Return device ID
         """
-        return self.__info.device_id
+        if self.__info is not None:
+            return self.__info.device_id
+        return None
 
     @property
-    def info(self) -> DeviceInfo:
+    def info(self) -> Optional[DeviceInfo]:
         """Get device info object
 
         :return: Device information object
@@ -1209,10 +1212,10 @@ class VirtualDevice(Device):
                 pass
 
         # Initialize our properties
-        self.__dev_type = None
-        self.__dev_id = None
+        self.__dev_type = -1
+        self.__dev_id = b''
         self.__fw_author = b''
-        self.__fw_url = None
+        self.__fw_url = b''
         self.__fw_version = (0, 0, 0)
         self.__capabilities = {}
         self.__lock = Lock()
