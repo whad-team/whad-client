@@ -160,11 +160,12 @@ class Apimote(VirtualDevice):
         """
         # If device is a true serial device, ask for a reset through DTR/RTS
         # Reset device through DTR
-        self.__uart.dtr = False             # Non reset state
-        self.__uart.rts = True             # Non reset state
-        sleep(0.2)
-        self.__uart.dtr = False             # Non reset state
-        self.__uart.rts = False             # Non reset state
+        if self.__uart is not None:
+            self.__uart.dtr = False             # Non reset state
+            self.__uart.rts = True             # Non reset state
+            sleep(0.2)
+            self.__uart.dtr = False             # Non reset state
+            self.__uart.rts = False             # Non reset state
 
         while not self.__synced:
             sleep(0.1)
