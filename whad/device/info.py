@@ -4,7 +4,7 @@ WHAD device information module.
 This module provides the `WhadDeviceInfo` class that stores all the information
 about a compatible WHAD device.
 """
-from typing import List
+from typing import List, Optional
 from packaging.version import parse
 
 from whad.helpers import asciiz
@@ -19,8 +19,8 @@ class DeviceInfo:
 
     @staticmethod
     def create(proto_ver: int = 2, max_speed: int = 115200, author: str = '', url: str = '',
-               version: str = '0.0', dev_type: int = 0, dev_id: bytes = '',
-               capabilities: List[int] = None) -> 'DeviceInfo':
+               version: str = '0.0', dev_type: int = 0, dev_id: bytes = b'',
+               capabilities: Optional[List[int]] = None) -> 'DeviceInfo':
         # Parse version string
         ver = parse(version)
 
@@ -35,7 +35,7 @@ class DeviceInfo:
 
     def __init__(self, info_resp):
         """Populate device information object from WHAD's InfoQueryResp message.
-        
+
         :param info_resp: WHAD InfoQueryResp message
         :type info_resp: whad.hub.discovery.InfoQueryResp
         """

@@ -58,7 +58,7 @@ import re
 import logging
 import contextlib
 from time import time
-from typing import Generator, Callable, Union, Type, Optional
+from typing import Generator, Callable, Union, Type, Optional, List
 from threading import Thread, Lock
 from queue import Queue, Empty
 
@@ -128,7 +128,7 @@ class DevInThread(Thread):
     hardware interface.
     """
 
-    def __init__(self, device = None):
+    def __init__(self, device: 'Device'):
         super().__init__(daemon=True)
         self.__iface = device
         self.__canceled = False
@@ -159,6 +159,7 @@ class DevInThread(Thread):
         """
         while not self.__canceled:
             # Read data from device (may block)
+            message = None
             try:
                 # Wait for a message to send to interface (blocking)
                 logger.debug("[%s][in_thread] waiting for message to send", self.__iface.interface)
@@ -188,11 +189,11 @@ class DevInThread(Thread):
             except Empty:
                 pass
             except WhadDeviceNotReady:
-                if message.has_callback():
+                if message is not None and message.has_callback():
                     Thread(target=message.error, args=[1]).start()
                 break
             except WhadDeviceDisconnected:
-                if message.has_callback():
+                if message is not None and message.has_callback():
                     Thread(target=message.error, args=[2]).start()
                 break
 
@@ -200,7 +201,7 @@ class DevOutThread(Thread):
     """Internal thread processing data sent by the hardware interface
     to the device object.
     """
-    def __init__(self, device = None):
+    def __init__(self, device: 'Device'):
         super().__init__(daemon=True)
         self.__iface = device
         self.__canceled = False
@@ -323,7 +324,7 @@ class Device:
         return device_classes
 
     @classmethod
-    def create_inst(cls, interface_string) -> Type['Device']:
+    def create_inst(cls, interface_string) -> 'Device':
         """
         Helper allowing to get a device according to the interface string provided.
 
@@ -332,7 +333,7 @@ class Device:
             - a class method list, returning the available devices
             - a property identifier, allowing to identify the device in a unique way
 
-        This method should NOT be used outside of this class. Use Device.create instead.
+        This method should NOT be used outside of this class. Use `Device.create()` instead.
         """
         if cls.INTERFACE_NAME is None:
             raise WhadDeviceNotFound()
@@ -420,7 +421,7 @@ class Device:
         raise WhadDeviceNotFound
 
     @staticmethod
-    def find(interface: str) -> Type['Device']:
+    def find(interface: str) -> Optional['Device']:
         """Find a device based on its interface string with lazy loading of
         available interface implementations.
 
@@ -731,7 +732,7 @@ class Device:
         """
         return not (self.__out_messages.empty() and self.__in_messages.empty())
 
-    def set_queue_filter(self, keep: Callable[..., bool] = None):
+    def set_queue_filter(self, keep: Optional[Callable[..., bool]] = None):
         """Set message queue filter.
         """
         self.__msg_filter = keep
@@ -743,7 +744,7 @@ class Device:
         # message queue. Same if the message is an interface event (this type of
         # messages MUST be handled by the interface itself).
         logger.debug("[%s] putting message %s", self.interface, message)
-        if self.__connector is None:
+        if self.connector is None:
             logger.debug("[%s] connector is None, sending to pending messages", self.interface)
             self.__out_messages.put(message)
 
@@ -753,7 +754,8 @@ class Device:
         # receive critical events from interface.
         elif isinstance(message, DeviceEvt):
             logger.debug("Sending event %s to connector %s", message, self.connector)
-            self.connector.send_event(message)
+            if self.connector is not None:
+                self.connector.send_event(message)
         elif isinstance(message, HubMessage):
             # If a filter is set and message does not match, save it in our
             # pending messages queue.
@@ -765,13 +767,17 @@ class Device:
 
                 # Otherwise, wrap hub message into a `MessageReceived` event
                 self.connector.send_event(MessageReceived(self, message))
-        else:
-            # Unknown message type, log it.
-            logger.debug("[%s] put_message() called with an invalid parameter of type %s",
-                         self.interface, type(message))
+        ###
+        # The following is not supposed to happen.
+        ###
 
-    def wait_for_single_message(self, timeout: float = None ,
-                                keep: Callable[..., bool] = None):
+        #else:
+        #    # Unknown message type, log it.
+        #    logger.debug("[%s] put_message() called with an invalid parameter of type %s",
+        #                 self.interface, type(message))
+
+    def wait_for_single_message(self, timeout: Optional[float] = None ,
+                                keep: Optional[Callable[..., bool]] = None):
         """Configures the device message queue filter to automatically move messages
         that matches the filter into the queue, and then waits for the first message
         that matches this filter and returns it.
@@ -797,7 +803,7 @@ class Device:
         return msg
 
 
-    def wait_for_message(self, timeout: float = None, keep: Callable[..., bool] = None,
+    def wait_for_message(self, timeout: Optional[float] = None, keep: Optional[Callable[..., bool]] = None,
                          command: bool = False):
         """
         Configures the device message queue filter to automatically move messages
@@ -835,7 +841,7 @@ class Device:
                     raise WhadDeviceDisconnected()
 
                 # If message does not match, re-enqueue for late processing
-                if not self.__msg_filter(msg):
+                if self.__msg_filter is not None and not self.__msg_filter(msg):
                     self.put_message(msg)
                 else:
                     # If it does match, return it
@@ -849,7 +855,7 @@ class Device:
                     logger.debug("exiting wait_for_message (timeout: %s)...", timeout)
                     return None
 
-    def send_message(self, message: HubMessage, keep: Callable[..., bool] = None):
+    def send_message(self, message: HubMessage, keep: Optional[Callable[..., bool]] = None):
         """
         Serializes a message and sends it to the interface, without waiting
         for an answer. Optionally, you can update the message queue filter
@@ -870,7 +876,7 @@ class Device:
         self.__in_messages.put(message)
 
 
-    def send_command(self, command: HubMessage, keep: Callable[..., bool] = None):
+    def send_command(self, command: HubMessage, keep: Optional[Callable[..., bool]] = None):
         """
         Sends a command and awaits a specific response from the device.
         WHAD commands usualy expect a CmdResult message, if `keep` is not
@@ -939,7 +945,7 @@ class Device:
         return False
 
 
-    def get_domains(self) -> dict:
+    def get_domains(self) -> List[int]:
         """Get device' supported domains.
 
         :returns: list of supported domains
@@ -949,7 +955,7 @@ class Device:
             return self.__info.domains
 
         # No domain discovered yet
-        return {}
+        return []
 
 
     def get_domain_capability(self, domain):
@@ -1309,6 +1315,11 @@ class VirtualDevice(Device):
             self.__iface_in.cancel()
         if self.__iface_out is not None:
             self.__iface_out.cancel()
+
+    def read(self) -> Optional[Union[HubMessage, List[HubMessage]]]:
+        """Read bytes from interface (blocking).
+        """
+        return None
 
     ##
     # Message hooks
