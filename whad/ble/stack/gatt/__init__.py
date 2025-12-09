@@ -62,7 +62,7 @@ def proclock(f):
         except GattTimeoutException as err:
             self.procedure_stop()
             raise err
-        
+
         # Release GATT procedure lock
         self.procedure_stop()
         return result
@@ -833,13 +833,17 @@ class GattClient(GattLayer):
             self.__model.add_service(service)
 
         # Searching for descriptors
-        for service in self.__model.services():
+        for service in services:
             for characteristic in service.characteristics():
                 for descriptor in self.discover_characteristic_descriptors(characteristic):
                     try:
                         desc = self.get_descriptor(characteristic, descriptor.uuid, descriptor.handle)
                         if desc is not None:
+                            # Add descriptor to characteristic
                             characteristic.add_descriptor(desc)
+
+                            # Update model: register descriptor into the model's attribute database
+                            self.__model.register_attribute(desc)
                     except (InsufficientAuthenticationError, InsufficientAuthorizationError, InsufficientEncryptionError):
                         pass
 
