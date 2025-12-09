@@ -15,7 +15,7 @@ from typing import Iterator
 
 from whad.ble.profile.service import Service
 from whad.ble.profile.characteristic import CharacteristicProperties, Characteristic, \
-    CharacteristicValue, CharacteristicDescriptor
+    CharacteristicValue, CharacteristicDescriptor, SecurityAccess
 from whad.ble.profile import GenericProfile
 from whad.ble.profile.attribute import UUID
 
@@ -49,6 +49,11 @@ class PeripheralCharacteristicDescriptor:
         :return UUID: Attribute type UUID
         """
         return self.__descriptor.type_uuid
+
+    @property
+    def value(self) -> bytes:
+        """Read descriptor value."""
+        return self.__descriptor.value
 
     def read(self):
         """Read descriptor value.
@@ -200,6 +205,11 @@ class PeripheralCharacteristic:
         """Handle for this characteristic value attribute
         """
         return self.__characteristic.value_handle
+
+    @property
+    def security(self) -> SecurityAccess:
+        """Return the associated security access."""
+        return self.__characteristic.security
 
     def can_notify(self) -> bool:
         """Check if characteristic accepts notifications
@@ -443,6 +453,14 @@ class PeripheralService:
         :return UUID: Service type UUID
         """
         return self.__service.type_uuid
+
+    def included_services(self) -> Iterator['PeripheralService']:
+        """Iterate over included services."""
+        for inc_service in self.__service.included_services():
+            yield PeripheralService(
+                inc_service,
+                self.__gatt
+            )
 
     def read_characteristic_by_uuid(self, uuid):
         """Read a characteristic belonging to this service identified by its UUID.
