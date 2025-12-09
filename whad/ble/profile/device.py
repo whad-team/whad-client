@@ -55,6 +55,11 @@ class PeripheralCharacteristicDescriptor:
         """Read descriptor value."""
         return self.__descriptor.value
 
+    @property
+    def name(self) -> str:
+        """Descriptor's name."""
+        return self.__descriptor.name
+
     def read(self):
         """Read descriptor value.
 
