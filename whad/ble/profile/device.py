@@ -14,7 +14,7 @@ from time import sleep
 
 from whad.ble.profile.service import Service
 from whad.ble.profile.characteristic import CharacteristicProperties, Characteristic, \
-    CharacteristicValue
+    CharacteristicValue, CharacteristicDescriptor
 from whad.ble.profile import GenericProfile
 from whad.ble.profile.attribute import UUID
 
@@ -653,6 +653,12 @@ class PeripheralDevice(GenericProfile):
 
         if isinstance(obj, CharacteristicValue):
             return PeripheralCharacteristicValue(
+                obj,
+                self.__gatt
+            )
+
+        if isinstance(obj, CharacteristicDescriptor):
+            return PeripheralCharacteristicDescriptor(
                 obj,
                 self.__gatt
             )
