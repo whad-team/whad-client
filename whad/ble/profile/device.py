@@ -11,6 +11,7 @@ for a given connected device:
 import logging
 from struct import unpack
 from time import sleep
+from typing import Iterator
 
 from whad.ble.profile.service import Service
 from whad.ble.profile.characteristic import CharacteristicProperties, Characteristic, \
@@ -295,9 +296,6 @@ class PeripheralCharacteristic:
                     self.__gatt
                 )
         # Not found
-        return None
-
-        # No descriptor
         return None
 
     def readable(self):
@@ -773,6 +771,13 @@ class PeripheralDevice(GenericProfile):
         # Read long
         return self.__gatt.read_long(handle)
 
+    def services(self) -> Iterator[PeripheralService]:
+        """Iterate over the device's GATT services."""
+        for service in super().services():
+            yield PeripheralService(
+                service,
+                self.__gatt
+            )
 
     def on_disconnect(self, conn_handle):
         """Disconnection callback
@@ -788,6 +793,7 @@ class PeripheralDevice(GenericProfile):
         """MTU change callback
 
         :param  mtu: New MTU value
+        
         :type   mtu: int
         """
         logger.debug("PeripheralDevice: MTU has been changed to %d", mtu)
