@@ -803,6 +803,12 @@ class PeripheralDevice(GenericProfile):
                 )
             return obj
 
+        if isinstance(obj, CharacteristicDescriptor):
+            return PeripheralCharacteristicDescriptor(
+                obj,
+                self.__gatt
+            )
+
         # Not found
         return None
 
