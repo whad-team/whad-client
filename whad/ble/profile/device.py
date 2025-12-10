@@ -290,7 +290,7 @@ class PeripheralService(Service):
     def __init__(self, service, gatt):
         """Initialize a peripheral service from discovered GATT service."""
         self.__gatt = gatt
-        super().__init__(service.uuid, service.handle, service.end_handle)
+        super().__init__(service.uuid, service.type_uuid, service.handle, service.end_handle)
 
         # Copy characteristics
         for charac in service.characteristics():
