@@ -644,9 +644,6 @@ class PeripheralDevice(GenericProfile):
         # Not found
         return None
 
-        # Not found
-        return False
-
 
     def find_object_by_handle(self, handle):
         """Find an existing object (service, attribute, descriptor) based on its handle,

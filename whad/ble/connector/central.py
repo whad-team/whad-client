@@ -476,7 +476,7 @@ class Central(BLE):
         """
         return self.connection.gatt.model.export_json()
 
-    def on_mtu_changed(self, conn_handle, mtu: int):
+    def on_mtu_changed(self, conn_handle: int, mtu: int):
         """Notify MTU change to peripheral.
         """
         logger.info("on_mtu_changed")
@@ -491,7 +491,7 @@ class Central(BLE):
             # Start a MTU exchange procedure
             self.__gatt_client.set_mtu(mtu)
 
-    def get_mtu(self) -> int:
+    def get_mtu(self) -> Optional[int]:
         """Retrieve the connection MTU.
         """
         if self.connection is not None:
