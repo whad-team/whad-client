@@ -150,8 +150,7 @@ def test_notification(central_mock):
     assert target.conn_handle != 0
 
     target.discover()
-    # Read DeviceName characteristic value starting at offset 24 (invalid),
-    # InvalidOffsetValueError is expected to be raised
+    # Retrieve a specific characteristic
     char = target.get_characteristic(
         UUID("6d02b600-1b51-4ef9-b753-1399e05debfd"),
         UUID("6d02b602-1b51-4ef9-b753-1399e05debfd")
