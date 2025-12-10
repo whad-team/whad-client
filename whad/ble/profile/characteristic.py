@@ -3,6 +3,7 @@ BLE GATT Characteristic Model
 =============================
 """
 from struct import pack, unpack
+from typing import Union, Type, Optional
 
 from whad.ble.stack.att.constants import BleAttProperties, SecurityAccess
 from whad.ble.profile.attribute import Attribute, UUID, get_uuid_alias
@@ -457,6 +458,20 @@ class Characteristic(Attribute):
         if isinstance(descriptor, CharacteristicDescriptor):
             self.__descriptors.append(descriptor)
             self.__end_handle = max(descriptor.handle, self.__end_handle)
+
+    def get_descriptor(self, desc_type: Union[UUID, Type[CharacteristicDescriptor]]) -> Optional[CharacteristicDescriptor]:
+        """Retrieve a decriptor based on its type UUID or class."""
+        if isinstance(desc_type, UUID):
+            for desc in self.__descriptors:
+                if desc.type_uuid == desc_type:
+                    return desc
+        elif issubclass(desc_type, CharacteristicDescriptor):
+            for desc in self.__descriptors:
+                if isinstance(desc, desc_type):
+                    return desc
+
+        # Not found
+        return None
 
     def descriptors(self):
         """Iterate over the registered descriptors (generator)
