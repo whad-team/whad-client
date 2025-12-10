@@ -56,13 +56,13 @@ class Dot15d4(Connector):
         self.device.open()
         self.device.discover()
 
-        # Display a warning message if ButteRFly version is less than 1.1.0 as
-        # a critical bug has been found and fixed in version 1.1.0. FCS values
-        # will be wrong if using a version prior to 1.1.0.
+        # Display a warning message if ButteRFly version is less than 1.0.2 as
+        # a critical bug has been found and fixed in version 1.0.2. FCS values
+        # will be wrong if using a version prior to 1.0.2.
         if device.info.fw_url == "https://github.com/whad-team/butterfly":
             if Version(device.info.version_str) < Version("1.0.2"):
                 message = ((
-                    "You are using a ButteRFly version prior to 1.1.0 that does not correctly compute FCS values, "
+                    "You are using a ButteRFly version prior to 1.0.2 that does not correctly compute FCS values, "
                     "this will result in invalid FCS values in packets and PCAP files that may cause errors when "
                     "used with other WHAD tools. Please consider upgrading firmware to the latest version "
                     "(see https://github.com/whad-team/butterfly). "
