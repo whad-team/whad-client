@@ -604,7 +604,8 @@ class UUID:
 class Attribute:
     """GATT Attribute model
     """
-    def __init__(self, uuid, handle=None, value=0):
+
+    def __init__(self, uuid: UUID, handle: Optional[int] = None, value: bytes = b''):
         """Instantiate a GATT Attribute
         """
         self.__uuid = uuid
@@ -622,25 +623,25 @@ class Attribute:
         return self.__value
 
     @property
-    def value(self):
+    def value(self) -> bytes:
         """Attribute value
         """
         return self.__value
 
     @value.setter
-    def value(self, value):
+    def value(self, value: bytes):
         """Set attribute value
         """
         self.__value = value
 
     @property
-    def handle(self):
+    def handle(self) -> Optional[int]:
         """Attribute handle
         """
         return self.__handle
 
     @handle.setter
-    def handle(self, new_handle):
+    def handle(self, new_handle: int):
         """Set attribute handle
         """
         if isinstance(new_handle, int):
@@ -649,7 +650,7 @@ class Attribute:
             raise InvalidHandleValueException
 
     @property
-    def type_uuid(self):
+    def type_uuid(self) -> UUID:
         """Attribute type UUID
         """
         return self.__uuid
@@ -687,3 +688,4 @@ def get_uuid_alias(uuid: UUID):
 
     # Alias not found
     return None
+
