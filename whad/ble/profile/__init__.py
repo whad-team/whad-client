@@ -908,7 +908,7 @@ class GenericProfile:
         except IndexError:
             return False
 
-    def find_object_by_handle(self, handle) -> Attribute:
+    def find_object_by_handle(self, handle) -> Optional[Attribute]:
         """Find an object by its handle value
 
         :param  handle: Object handle
