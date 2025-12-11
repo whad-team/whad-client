@@ -99,6 +99,21 @@ class Descriptor(Attribute):
         return None
 
     @staticmethod
+    def get_type_uuid(desc_cls) -> Optional[UUID]:
+        """Find the type UUID corresponding to a given registered descriptor's
+        class.
+
+        :return: Descriptor's type UUID if found, `None` otherwise.
+        :rtype: UUID
+        """
+        for desc_type,desc_cls in CharacteristicDescriptor.desc_types.items():
+            if desc_cls == desc_cls:
+                return UUID(desc_type)
+
+        # Not found
+        return None
+
+    @staticmethod
     def from_uuid(characteristic, handle: int, uuid: UUID, value: bytes):
         """Create an instance of a descriptor based on the provided UUID and
         descriptor value.
