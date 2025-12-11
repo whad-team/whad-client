@@ -75,6 +75,21 @@ class CharacteristicDescriptor(Attribute):
                 CharacteristicDescriptor.desc_types[uuid_value] = cls
 
     @staticmethod
+    def get_type_uuid(desc_cls) -> Optional[UUID]:
+        """Find the type UUID corresponding to a given registered descriptor's
+        class.
+
+        :return: Descriptor's type UUID if found, `None` otherwise.
+        :rtype: UUID
+        """
+        for desc_type,desc_cls in CharacteristicDescriptor.desc_types.items():
+            if desc_cls == desc_cls:
+                return UUID(desc_type)
+
+        # Not found
+        return None
+
+    @staticmethod
     def from_uuid(characteristic, handle: int, uuid: UUID, value: bytes):
         """Create an instance of a descriptor based on the provided UUID and
         descriptor value.
@@ -222,7 +237,6 @@ class CharacteristicValue(Attribute):
         """
         return self.type_uuid
 
-
 class Characteristic(Attribute):
     """BLE Characteristic
     """
@@ -309,6 +323,20 @@ class Characteristic(Attribute):
     def value(self):
         return self.__value.value
 
+    @value.setter
+    def value(self, value):
+        """Set characteristic value
+
+        :param bytes new_value: Value
+        """
+        self.__value.value = value
+
+        # Notify or indicate if required
+        if self.must_notify() and self.__notification_callback is not None:
+            self.__notification_callback(self)
+        elif self.must_indicate() and self.__indication_callback is not None:
+            self.__indication_callback(self)
+
     @property
     def value_attr(self):
         """Associated value attribute
@@ -327,20 +355,6 @@ class Characteristic(Attribute):
         """
         self.__value_handle = value
         self.__value.handle = value
-
-    @value.setter
-    def value(self, new_value):
-        """Set characteristic value
-
-        :param bytes new_value: Value
-        """
-        self.__value.value = new_value
-
-        # Notify or indicate if required
-        if self.must_notify() and self.__notification_callback is not None:
-            self.__notification_callback(self)
-        elif self.must_indicate() and self.__indication_callback is not None:
-            self.__indication_callback(self)
 
     @property
     def properties(self):
@@ -461,14 +475,23 @@ class Characteristic(Attribute):
 
     def get_descriptor(self, desc_type: Union[UUID, Type[CharacteristicDescriptor]]) -> Optional[CharacteristicDescriptor]:
         """Retrieve a decriptor based on its type UUID or class."""
+        # Validate descriptor type (UUID or class)
         if isinstance(desc_type, UUID):
-            for desc in self.__descriptors:
-                if desc.type_uuid == desc_type:
-                    return desc
+            # Descriptor's type UUID is provided, use it as-is
+            type_uuid = desc_type
         elif issubclass(desc_type, CharacteristicDescriptor):
-            for desc in self.__descriptors:
-                if isinstance(desc, desc_type):
-                    return desc
+            # Descriptor class provided, search for corresponding type UUID
+            type_uuid = CharacteristicDescriptor.get_type_uuid(desc_type)
+            if type_uuid is None:
+                return None
+        else:
+            # Invalid descriptor type, could not find descriptor.
+            return None
+
+        # If we found a valid type UUID, look for a matching descriptor
+        for desc in self.__descriptors:
+            if desc.type_uuid == type_uuid:
+                return desc
 
         # Not found
         return None

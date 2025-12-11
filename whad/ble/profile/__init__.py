@@ -546,7 +546,7 @@ class GenericProfile:
                             charac_data = b''
                             if 'data' in charac['value']:
                                 charac_data = bytes.fromhex(charac['value']['data'])
-                            
+
                             # Create characteristic model
                             charac_obj = BleCharacteristic(
                                 uuid=UUID(charac['value']['uuid']),
@@ -1101,7 +1101,7 @@ class GenericProfile:
                     'value': {
                         'handle': charac.value_handle,
                         'uuid': str(charac.uuid),
-                        'data': charac.value.hex()
+                        'data': Attribute.value.fget(charac.value_attr).hex()
                     }
                 }
                 charac_dict['descriptors'] = []
@@ -1109,7 +1109,7 @@ class GenericProfile:
                     desc_dict = {
                         'handle': desc.handle,
                         'uuid': str(desc.type_uuid),
-                        'value': desc.value.hex()
+                        'value': Attribute.value.fget(desc).hex()
                     }
                     charac_dict['descriptors'].append(desc_dict)
                 service_dict['characteristics'].append(charac_dict)

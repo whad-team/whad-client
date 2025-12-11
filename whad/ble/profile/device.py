@@ -102,6 +102,36 @@ class PeripheralCharacteristicDescriptor(CharacteristicDescriptor, RemoteAttribu
         CharacteristicDescriptor.__init__(self,descriptor.characteristic, descriptor.uuid, descriptor.handle, descriptor.value)
         RemoteAttribute.__init__(self, descriptor.handle, gatt)
 
+    @property
+    def value(self) -> bytes:
+        """Transparent characteristic read.
+
+        :return bytes: Characteristic value
+        """
+        value = self.read()
+
+        # Update the underlying attribute value
+        if Attribute.value.fset:
+            Attribute.value.fset(self, value)
+        return value
+
+    @value.setter
+    def value(self, value: bytes):
+        """Transparent characteristic write.
+
+        :param bytes val: Value to write into this characteristic
+        """
+        super().write(value)
+        # Update the underlying attribute value
+        if Attribute.value.fset:
+            Attribute.value.fset(self, value)
+
+    @property
+    def cached_value(self) -> bytes:
+        if Attribute.value.fget:
+            return Attribute.value.fget(self)
+        return b''
+
 class PeripheralCharacteristicValue(CharacteristicValue, RemoteAttribute):
     """CharacteristicValue wrapper for peripheral devices
 
@@ -126,7 +156,13 @@ class PeripheralCharacteristicValue(CharacteristicValue, RemoteAttribute):
 
         :return bytes: Characteristic value
         """
-        return self.read()
+        value = super().read()
+
+        # Update model's cached value
+        if Attribute.value.fset:
+            Attribute.value.fset(self, value)
+
+        return value
 
     @value.setter
     def value(self, value: bytes):
@@ -134,7 +170,12 @@ class PeripheralCharacteristicValue(CharacteristicValue, RemoteAttribute):
 
         :param bytes val: Value to write into this characteristic
         """
-        super().write(value)
+        # Write value
+        self.write(value)
+
+        # Update model's cached value
+        if Attribute.value.fset:
+            Attribute.value.fset(self, value)
 
 
 class PeripheralCharacteristic(Characteristic, RemoteAttribute):
@@ -166,6 +207,32 @@ class PeripheralCharacteristic(Characteristic, RemoteAttribute):
         if not isinstance(result, PeripheralCharacteristicDescriptor):
             return PeripheralCharacteristicDescriptor(result, self.gatt)
         return result
+
+    @property
+    def value(self) -> bytes:
+        """Characteristic's value"""
+        # Read value from characteristic
+        value = super().read_long()
+
+        # Update the underlying attribute value
+        if Attribute.value.fset:
+            Attribute.value.fset(self.value_attr, value)
+        return value
+
+    @value.setter
+    def value(self, value: bytes):
+        # Write new value into characteristic
+        self.write(value)
+
+        # Update model's cached value
+        if Attribute.value.fset:
+            Attribute.value.fset(self.value_attr, value)
+
+    @property
+    def cached_value(self) -> bytes:
+        if Attribute.value.fget:
+            return Attribute.value.fget(self.value_attr)
+        return b''
 
     def read(self, offset: int = 0) -> bytes:
         """Read characteristic value.
@@ -363,7 +430,6 @@ class PeripheralDevice(GenericProfile):
         """Current connection handle.
         """
         return self.__conn_handle
-
 
     def start_encryption(self):
         """Start encryption procedure for BLE peripheral
