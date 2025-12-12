@@ -923,7 +923,7 @@ class PeripheralDevice(GenericProfile):
                 return service
         return None
 
-    def get_service(self, uuid):
+    def service(self, uuid):
         """Retrieve a PeripheralService object given its UUID.
 
         :param  uuid:       Service UUID
