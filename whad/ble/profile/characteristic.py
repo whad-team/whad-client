@@ -241,7 +241,7 @@ class Characteristic(Attribute):
     """BLE Characteristic
     """
 
-    def __init__(self, uuid, handle=0, end_handle=0, value=b'', properties=BleAttProperties.DEFAULT,
+    def __init__(self, uuid: UUID, handle: int = 0, end_handle: int = 0, value: bytes = b'', properties=BleAttProperties.DEFAULT,
                  security=None):
         """Instantiate a BLE characteristic object
 
@@ -369,7 +369,7 @@ class Characteristic(Attribute):
         self.__properties = new_properties
 
     @property
-    def uuid(self):
+    def uuid(self) -> UUID:
         """Characteristic UUID
         """
         return self.__charac_uuid
