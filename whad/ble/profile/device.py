@@ -440,14 +440,20 @@ class PeripheralService(Service):
             self.end_handle
         )
 
-    def char(self, uuid: UUID) -> Optional[PeripheralCharacteristic]:
+    def char(self, uuid: Union[str, UUID]) -> Optional[PeripheralCharacteristic]:
         """Look for a specific characteristic belonging to this service, identified by its UUID.
 
         :param uuid: Characteristic UUID
         :type  uuid: UUID
         :return: Found characteristic if any, `None` otherwise.
         :rtype: PeripheralCharacteristic
+        :raise: InvalidUUIDException
         """
+        # Convert to UUID if str is provided
+        if isinstance(uuid, str):
+            uuid = UUID(uuid)
+
+        # Search for matching characteristic
         for charac in self.characteristics():
             if charac.uuid == uuid:
                 return charac
@@ -650,6 +656,31 @@ class PeripheralDevice(GenericProfile):
         # Not found
         return None
 
+    def char(self, uuid: Union[str, UUID]) -> Optional[PeripheralCharacteristic]:
+        """Retrieve a characteristic by its UUID. If more than one characteristic is found,
+        returns the first match.
+
+        :param uuid: Characteristic's UUID
+        :type  uuid: UUID
+        :type  uuid: str
+        :return:     First matching characteristic, `None` if not found
+        :rtype:      PeripheralCharacteristic
+        :raise:      InvalidUUIDException
+        """
+        # If UUID is a string, convert to the corresponding UUID object
+        if isinstance(uuid, str):
+            uuid = UUID(uuid)
+
+        # Search for characteristic
+        for service in self.services():
+            for charac in service.characteristics():
+                if charac.uuid == uuid:
+                    return charac
+
+        # Not found
+        return None
+
+
     def find_characteristic_by_uuid(self, uuid: UUID) -> Optional[Characteristic]:
         """Find characteristic by its UUID
 
@@ -659,13 +690,7 @@ class PeripheralDevice(GenericProfile):
                         if characteristic has been found, None otherwise.
         :rtype: :class:`whad.ble.profile.device.PeripheralCharacteristic`
         """
-        for service in self.services():
-            for charac in service.characteristics():
-                if charac.uuid == uuid:
-                    return charac
-
-        # Not found
-        return None
+        return self.char(uuid)
 
 
     def find_object_by_handle(self, handle) -> Optional[Attribute]:
@@ -736,15 +761,22 @@ class PeripheralDevice(GenericProfile):
         return None
 
 
-    def service(self, uuid):
+    def service(self, uuid: Union[str, UUID]):
         """Retrieve a PeripheralService object given its UUID.
 
         :param  uuid:       Service UUID
         :type   uuid:       :class:`whad.ble.profile.attribute.UUID`
+        :type   uuid:       str
         :return:            Corresponding PeripheralService object if found, None otherwise.
         :rtype: :class:`whad.ble.profile.device.PeripheralService`
+        :raise: InvalidUUIDException
         """
+        # If a string is provided as UUID, convert it to the corresponding
+        # UUID object. This could raise an InvalidUUIDException.
+        if isinstance(uuid, str):
+            uuid = UUID(uuid)
 
+        # Search for a service matching the given UUID
         for service in self.services():
             if service.uuid == uuid:
                 if not isinstance(service, PeripheralService):
@@ -761,8 +793,9 @@ class PeripheralDevice(GenericProfile):
         :rtype: :class:`whad.ble.profile.device.PeripheralService`
 
         .. deprecated:: 1.3.0
-            Since version 1.3.0, you can use the :meth:`~whad.ble.profule.device.PeripheralDevice.service` method
-            to get a :class:`~whad.ble.profile.device.PeripheralService` object representing a service from its UUID.
+            The new :meth:`~whad.ble.profule.device.PeripheralDevice.service` method shall be used to
+            retrieve a :class:`~whad.ble.profile.device.PeripheralService` object representing a service
+            identified by a given UUID.
         """
         return self.service(uuid)
 

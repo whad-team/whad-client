@@ -52,11 +52,11 @@ below:
 
 .. code-block:: python
 
-    from whad.device import WhadDevice
+    from whad.device import Device
     from whad.ble import Central
 
     # We assign a BLE central role to our HCI adapter
-    central = Central(WhadDevice.create("hci0"))
+    central = Central(Device.create("hci0"))
 
     # And we initiate a connection to our public BLE device
     target = central.connect("00:11:22:33:44:55")
@@ -71,11 +71,11 @@ method:
 
 .. code-block:: python
 
-    from whad.device import WhadDevice
+    from whad.device import Device
     from whad.ble import Central
 
     # We assign a BLE central role to our HCI adapter
-    central = Central(WhadDevice.create("hci0"))
+    central = Central(Device.create("hci0"))
 
     # And we initiate a connection to our public BLE device
     # with a timeout of 5 seconds
@@ -91,11 +91,11 @@ a random address:
 
 .. code-block:: python
 
-    from whad.device import WhadDevice
+    from whad.device import Device
     from whad.ble import Central
 
     # We assign a BLE central role to our HCI adapter
-    central = Central(WhadDevice.create("hci0"))
+    central = Central(Device.create("hci0"))
 
     # And we initiate a connection to our device that uses a random
     # address
@@ -112,11 +112,11 @@ value when initiating the connection:
 
 .. code-block:: python
 
-    from whad.device import WhadDevice
+    from whad.device import Device
     from whad.ble import Central
 
     # We assign a BLE central role to our HCI adapter
-    central = Central(WhadDevice.create("hci0"))
+    central = Central(Device.create("hci0"))
 
     # And we initiate a connection to our device that uses a random
     # address
@@ -227,13 +227,13 @@ standard `Generic Access` service identified with the `0x1800` 16-bit UUID:
 
 .. code-block:: python
 
-    from whad.device import WhadDevice
+    from whad.device import Device
     from whad.ble import Central
     from whad.ble.exceptions import PeripheralNotFound
     from whad.ble.profile import UUID
 
     # We assign a BLE central role to our HCI adapter
-    central = Central(WhadDevice.create("hci0"))
+    central = Central(Device.create("hci0"))
 
     try:
         # Connect to remote device and discover services and characteristics
@@ -241,8 +241,15 @@ standard `Generic Access` service identified with the `0x1800` 16-bit UUID:
         target.discover()
 
         # Retrieve the DeviceName characteristic object
-        device_name = target.get_characteristic(UUID(0x1800), UUID(0x2A00))
-        print(device_name.name)
+        service = target.service('1800')
+        if service is not None:
+            device_name = target.service('1800').char('2A00')
+            if device_name is not None:
+                print(f"Device name: {device_name.value.decode('utf-8')}")
+            else:
+                print("Cannot read device name (characteristic not found).")
+        else:
+            print("Cannot find Generic Access service (0x1800).")
 
     # Device not found ?
     except PeripheralNotFound:
@@ -477,14 +484,14 @@ code shows how to handle GATT write errors:
 
 .. code-block:: python
 
-    from whad.device import WhadDevice
+    from whad.device import Device
     from whad.ble import Central
     from whad.ble.exceptions import PeripheralNotFound
     from whad.ble.profile import UUID
     from whad.ble.stack.att.exceptions import WriteNotPermittedError
 
     # We assign a BLE central role to our HCI adapter
-    central = Central(WhadDevice.create("hci0"))
+    central = Central(Device.create("hci0"))
 
     # Target not connected
     target = None

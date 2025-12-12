@@ -192,7 +192,7 @@ def test_get_service_error(central_mock):
     service = target.get_service(UUID('3300'))
     assert service is None
 
-def test_service(central_mock):
+def test_service_uuid(central_mock):
     """Retrieve a specific service from its UUID with the new `service()` method."""
     # Connect to emulate device
     central = Central(central_mock)
@@ -202,6 +202,19 @@ def test_service(central_mock):
 
     target.discover()
     service = target.get_service(UUID('1800'))
+    assert service is not None
+    assert isinstance(service, PeripheralService)
+
+def test_service_str(central_mock):
+    """Retrieve a specific service from its UUID as a string with the new `service()` method."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    target.discover()
+    service = target.get_service('1800')
     assert service is not None
     assert isinstance(service, PeripheralService)
 
@@ -309,7 +322,7 @@ def test_service_get_char_error(central_mock):
     char = service.get_characteristic(UUID('3300'))
     assert char is None
 
-def test_service_char(central_mock):
+def test_service_char_from_uuid(central_mock):
     """Retrieve a specific characteristic from its UUID with the new `char()` method."""
     # Connect to emulate device
     central = Central(central_mock)
@@ -322,6 +335,22 @@ def test_service_char(central_mock):
     assert service is not None
     assert isinstance(service, PeripheralService)
     char = service.char(UUID('2a00'))
+    assert char is not None
+    assert isinstance(char, PeripheralCharacteristic)
+
+def test_service_char_from_str(central_mock):
+    """Retrieve a specific characteristic from its UUID as string with the new `char()` method."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    target.discover()
+    service = target.get_service(UUID('1800'))
+    assert service is not None
+    assert isinstance(service, PeripheralService)
+    char = service.char('2a00')
     assert char is not None
     assert isinstance(char, PeripheralCharacteristic)
 
