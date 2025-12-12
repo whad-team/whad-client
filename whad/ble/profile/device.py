@@ -923,11 +923,12 @@ class PeripheralDevice(GenericProfile):
                 return service
         return None
 
-    def service(self, uuid):
+    def service(self, uuid: Union[str, UUID]):
         """Retrieve a PeripheralService object given its UUID.
 
         :param  uuid:       Service UUID
         :type   uuid:       :class:`whad.ble.profile.attribute.UUID`
+        :type   uuid:       str
         :return:            Corresponding PeripheralService object if found, None otherwise.
         :rtype: :class:`whad.ble.profile.device.PeripheralService`
 
