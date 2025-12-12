@@ -19,7 +19,7 @@ from whad.ble.profile.characteristic import (
     CharacteristicDescriptor,
 )
 from whad.ble.profile import GenericProfile
-from whad.ble.profile.attribute import UUID, Attribute
+from whad.ble.profile.attribute import UUID, Attribute, InvalidUUIDException
 
 logger = logging.getLogger(__name__)
 
@@ -359,7 +359,7 @@ class PeripheralService(Service):
         self.__gatt = gatt
         super().__init__(service.uuid, service.type_uuid, service.handle, service.end_handle)
 
-        # Copy characteristics
+        # Copy characteristics and wrap each of them into a `PeripheralCharacteristic` object.
         for charac in service.characteristics():
             self.add_characteristic(PeripheralCharacteristic(charac, self.__gatt))
 
@@ -367,10 +367,71 @@ class PeripheralService(Service):
         for inc_service in service.included_services():
             self.add_include_service(inc_service)
 
-    def read_characteristic_by_uuid(self, uuid):
-        """Read a characteristic belonging to this service identified by its UUID.
+    def __iter__(self) -> Iterator[UUID]:
+        """Iterator over the discovered characteristics."""
+        for charac in self.characteristics():
+            yield charac.uuid
 
-        :param UUID uuid: Characteristic UUID
+    def __getitem__(self, key) -> PeripheralCharacteristic:
+        """
+        Retrieve a :class:`whad.ble.profile.device.PeripheralCharacteristic` object from
+        its corresponding UUID.
+
+        This special method simplifies operations based on this :class:`whad.ble.profile.device.PeripheralService`
+        class, like checking the presence of a characteristing in the discovered service or simply getting an object
+        representing this characteristic.
+
+        To check if a specific characteristic with UUID `2A00` exists, one may simply use Python's `in` operator:
+
+        ```python
+        # From the 16-bit integer value corresponding to the characteristic UUID:
+        if 0x2A00 in service:
+            print("Characteristic with UUID 2A00 does exist.")
+
+        # Or a string containing the UUID value
+        if '2A00' in service:
+            print("Characteristic with UUID 2A00 does exist.")
+
+        # Or simply with an instance of UUID
+        if UUID('2A00') in service:
+            print("Characteristic with UUID 2A00 does exist.")
+
+        ```
+
+        To access a specific characteristic and retrieve the corresponding
+        :class:`whad.ble.profile.device.PeripheralCharacteristic` object:
+
+        ```python
+        char = service[UUID('1800')]
+        ```
+        """
+        # Key must be a valid UUID
+        try:
+            # Check service UUID
+            if not isinstance(key, UUID):
+                char_uuid = UUID(key)
+            else:
+                char_uuid = key
+
+            # Retrieve object, if it does exist.
+            char = self.char(char_uuid)
+            if char is None:
+                raise IndexError()
+
+            # Found
+            return char
+        except InvalidUUIDException as uuid_err:
+            raise IndexError() from uuid_err
+
+    def read_characteristic_by_uuid(self, uuid):
+        """Read a characteristic belonging to this service identified by its UUID, using a GATT ReadByType
+        procedure as defined in the specification (Vol 3, Part G, Section 4.8.2).
+
+        This method can be called at any time, even if the target device's attributes have not been discovered
+        yet by calling the :py:meth:`~.discover` method.
+
+        :param uuid: Characteristic UUID
+        :type  uuid: UUID
         :return bytes: Characteristic value
         """
         return self.__gatt.read_characteristic_by_uuid(
@@ -379,20 +440,35 @@ class PeripheralService(Service):
             self.end_handle
         )
 
-    def get_characteristic(self, uuid):
+    def char(self, uuid: UUID) -> Optional[PeripheralCharacteristic]:
         """Look for a specific characteristic belonging to this service, identified by its UUID.
 
-        :param UUID uuid: Characteristic UUID
-        :return PeripheralCharacteristic: Found characteristic if any, `None` otherwise.
+        :param uuid: Characteristic UUID
+        :type  uuid: UUID
+        :return: Found characteristic if any, `None` otherwise.
+        :rtype: PeripheralCharacteristic
         """
         for charac in self.characteristics():
             if charac.uuid == uuid:
-                #return PeripheralCharacteristic(
-                #    charac,
-                #    self.__gatt
-                #)
                 return charac
+
+        # Not found
         return None
+
+
+    def get_characteristic(self, uuid: UUID) -> Optional[PeripheralCharacteristic]:
+        """Look for a specific characteristic belonging to this service, identified by its UUID.
+
+        :param uuid: Characteristic UUID
+        :type  uuid: UUID
+        :return: Found characteristic if any, `None` otherwise.
+        :rtype: PeripheralCharacteristic
+
+        .. deprecated:: 1.3.0
+            This method has been superseeded by :py:meth:`~.char` starting from version 1.3.0,
+            in a effort to make WHAD's API simpler and easier to use.
+        """
+        return self.char(uuid)
 
 
 class PeripheralDevice(GenericProfile):
@@ -430,6 +506,63 @@ class PeripheralDevice(GenericProfile):
         """Current connection handle.
         """
         return self.__conn_handle
+
+    def __iter__(self) -> Iterator[UUID]:
+        """Iterator for services's UUIDs."""
+        for service in self.services():
+            yield service.uuid
+
+    def __getitem__(self, key):
+        """
+        Retrieve a :class:`whad.ble.profile.device.PeripheralService` object from
+        its corresponding UUID.
+
+        This special method simplifies operations based on this :class:`whad.ble.profile.device.PeripheralDevice`
+        class, like checking the presence of a service in the discovered atrributes or simply getting an object
+        representing this service.
+
+        To check if a specific service with UUID `1800` exists, one may simply use Python's `in` operator:
+
+        ```python
+        # From the 16-bit integer value corresponding to the service UUID:
+        if 0x1800 in device:
+            print("Service with UUID 1800 does exist.")
+
+        # Or a string containing the UUID value
+        if '1800' in device:
+            print("Service with UUID 1800 does exist.")
+
+        # Or simply with an instance of UUID
+        if UUID('1800') in device:
+            print("Service with UUID 1800 does exist.")
+
+        ```
+
+        To access a specific service and retrieve the corresponding :class:`whad.ble.profile.device.PeripheralService`
+        object:
+
+        ```python
+        service = device[UUID('1800')]
+        ```
+        """
+        # Key must be a valid UUID
+        try:
+            # Check service UUID
+            if not isinstance(key, UUID):
+                service_uuid = UUID(key)
+            else:
+                service_uuid = key
+
+            # Retrieve object, if it does exist.
+            service = self.service(service_uuid)
+            if service is None:
+                raise IndexError()
+
+            # Found
+            return service
+        except InvalidUUIDException as uuid_err:
+            raise IndexError() from uuid_err
+
 
     def start_encryption(self):
         """Start encryption procedure for BLE peripheral
@@ -529,11 +662,8 @@ class PeripheralDevice(GenericProfile):
         for service in self.services():
             for charac in service.characteristics():
                 if charac.uuid == uuid:
-                    #return PeripheralCharacteristic(
-                    #    charac,
-                    #    self.__gatt
-                    #)
                     return charac
+
         # Not found
         return None
 
@@ -606,7 +736,7 @@ class PeripheralDevice(GenericProfile):
         return None
 
 
-    def get_service(self, uuid):
+    def service(self, uuid):
         """Retrieve a PeripheralService object given its UUID.
 
         :param  uuid:       Service UUID
@@ -622,6 +752,19 @@ class PeripheralDevice(GenericProfile):
                 return service
         return None
 
+    def get_service(self, uuid):
+        """Retrieve a PeripheralService object given its UUID.
+
+        :param  uuid:       Service UUID
+        :type   uuid:       :class:`whad.ble.profile.attribute.UUID`
+        :return:            Corresponding PeripheralService object if found, None otherwise.
+        :rtype: :class:`whad.ble.profile.device.PeripheralService`
+
+        .. deprecated:: 1.3.0
+            Since version 1.3.0, you can use the :meth:`~whad.ble.profule.device.PeripheralDevice.service` method
+            to get a :class:`~whad.ble.profile.device.PeripheralService` object representing a service from its UUID.
+        """
+        return self.service(uuid)
 
     def write(self, handle, value):
         """Perform a write operation on an attribute based on its handle.
@@ -699,7 +842,11 @@ class PeripheralDevice(GenericProfile):
         return self.__gatt.read_long(handle)
 
     def services(self) -> Iterator[PeripheralService]:
-        """Iterate over the device's GATT services."""
+        """Iterate over the device's GATT services.
+
+        :return: An iterator that can be used to iterate over services.
+        :rtype: Iterator
+        """
         for service in super().services():
             if not isinstance(service, PeripheralService):
                 yield PeripheralService(
@@ -715,15 +862,14 @@ class PeripheralDevice(GenericProfile):
         :param  conn_handle:    Connection handle
         :type   conn_handle:    int
         """
-        logger.debug('PeripheralDevice has disconnected')
+        logger.debug("PeripheralDevice has disconnected (conn. handle: %d)", conn_handle)
         if self.__disconnect_cb is not None:
             self.__disconnect_cb()
 
     def on_mtu_changed(self, mtu: int):
         """MTU change callback
 
-        :param  mtu: New MTU value
-
-        :type   mtu: int
+        :param mtu: New MTU value
+        :type  mtu: int
         """
         logger.debug("PeripheralDevice: MTU has been changed to %d", mtu)

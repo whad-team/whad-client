@@ -175,6 +175,40 @@ method:
             for desc in char.descriptors():
                 print(f"   desc: f{desc.name}")
 
+Getting a service object from its UUID
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Once services and characteristics discovered, we can easily retrieve a service from
+its UUID, if it does exist in the discovered services:
+
+.. code-block:: python
+
+    # Retrieve an object representing the remote service
+    service = target.service(UUID('1800'))
+
+.. attention::
+
+    :py:meth:`~.PeripheralDevice.service` method has been introduced in version 1.3.0
+    to provide a simple and easy way to access a device's service, as a replacement of
+    the :py:meth:`~.PeripheralDevice.get_service` method that is now deprecated.
+
+Starting from version 1.3.0, it is also possible to check if a service is present
+in the discovered attributes with Python's `in` operator:
+
+.. code-block:: python
+
+    # Check our device does expose a primary service with UUID 0x1800
+    if UUID('1800') in target:
+        print("Primary service 0x1800 is available.")
+
+Following the same notation, it is possible to retrieve a service object from its
+UUID without calling any specific method:
+
+.. code-block:: python
+
+    # Retrieve service by its UUID
+    service = target['1800']
+
 
 Getting a characteristic object from its UUID
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -466,10 +500,10 @@ code shows how to handle GATT write errors:
             device_name.value = b"p0wn3d"
         except WriteNotPermittedError:
             print("Device name characteristic cannot be written.")
-        
+
         # Closing connection
         target.disconnect()
-    
+
     # Handle connection error
     except PeripheralNotFound:
         print("Target device not found.")

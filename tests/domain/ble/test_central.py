@@ -8,7 +8,7 @@ from whad.ble.mock import CentralMock, EmulatedDevice
 from whad.ble import BDAddress, Central
 from whad.ble.profile import Characteristic
 from whad.ble.profile.attribute import UUID, Attribute
-from whad.ble.profile.device import PeripheralCharacteristic, PeripheralDevice
+from whad.ble.profile.device import PeripheralCharacteristic, PeripheralDevice, PeripheralService
 from whad.ble.stack.att.exceptions import AttributeNotFoundError, InvalidOffsetError, WriteNotPermittedError
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
 
@@ -166,6 +166,253 @@ def test_get_characteristic_error(central_mock):
     target.discover()
     charac = target.get_characteristic(UUID("1800"), UUID("3300"))
     assert charac is None
+
+def test_get_service(central_mock):
+    """Retrieve a specific service from its UUID with `get_service()`."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    target.discover()
+    service = target.get_service(UUID('1800'))
+    assert service is not None
+    assert isinstance(service, PeripheralService)
+
+def test_get_service_error(central_mock):
+    """Retrieve a service from an invalid UUID with `get_service`"""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    target.discover()
+    service = target.get_service(UUID('3300'))
+    assert service is None
+
+def test_service(central_mock):
+    """Retrieve a specific service from its UUID with the new `service()` method."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    target.discover()
+    service = target.get_service(UUID('1800'))
+    assert service is not None
+    assert isinstance(service, PeripheralService)
+
+def test_service_error(central_mock):
+    """Retrieve a specific service from an invalid UUID with the new `service()` method."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    target.discover()
+    service = target.service(UUID('3300'))
+    assert service is None
+
+def test_device_get_item_uuid(central_mock):
+    """Retrieve a specific service from its UUID using the `PeripheralDevice` dict-like behavior."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    target.discover()
+    service = target[UUID('1800')]
+    assert service is not None
+    assert isinstance(service, PeripheralService)
+
+def test_device_get_item_int(central_mock):
+    """Retrieve a specific service from its UUID using the `PeripheralDevice` dict-like behavior."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    target.discover()
+    service = target[0x1800]
+    assert service is not None
+    assert isinstance(service, PeripheralService)
+
+def test_device_get_item_str(central_mock):
+    """Retrieve a specific service from its UUID using the `PeripheralDevice` dict-like behavior."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    target.discover()
+    service = target['1800']
+    assert service is not None
+    assert isinstance(service, PeripheralService)
+
+def test_device_get_item_error(central_mock):
+    """Retrieve a specific service from an invalid UUID using the `PeripheralDevice` dict-like behavior."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    target.discover()
+    with pytest.raises(IndexError):
+        _ = target[UUID('3300')]
+
+def test_device_service_in_uuid(central_mock):
+    """Check a specific service is present in the attribute database based on its UUID, using the `in` operator."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    target.discover()
+    assert UUID('1800') in target
+
+def test_service_get_char(central_mock):
+    """Retrieve a specific characteristic from its UUID with `get_characteristic()`."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    target.discover()
+    service = target.get_service(UUID('1800'))
+    assert service is not None
+    assert isinstance(service, PeripheralService)
+    char = service.get_characteristic(UUID('2a00'))
+    assert char is not None
+    assert isinstance(char, PeripheralCharacteristic)
+
+def test_service_get_char_error(central_mock):
+    """Retrieve a characteristic from an invalid UUID with `get_characteristic()`"""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    target.discover()
+    service = target.get_service(UUID('1800'))
+    assert service is not None
+    char = service.get_characteristic(UUID('3300'))
+    assert char is None
+
+def test_service_char(central_mock):
+    """Retrieve a specific characteristic from its UUID with the new `char()` method."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    target.discover()
+    service = target.get_service(UUID('1800'))
+    assert service is not None
+    assert isinstance(service, PeripheralService)
+    char = service.char(UUID('2a00'))
+    assert char is not None
+    assert isinstance(char, PeripheralCharacteristic)
+
+def test_service_char_error(central_mock):
+    """Retrieve a specific characteristic from an invalid UUID with the new `char()` method."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    target.discover()
+    service = target.service(UUID('1800'))
+    assert service is not None
+    char = service.char(UUID('3300'))
+    assert char is None
+
+def test_service_get_item_uuid(central_mock):
+    """Retrieve a specific characteristic from its UUID using the `PeripheralService` dict-like behavior."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    target.discover()
+    service = target.service(UUID('1800'))
+    assert service is not None
+    char = service[UUID('2a00')]
+    assert char is not None
+    assert isinstance(char, PeripheralCharacteristic)
+    assert char.uuid == UUID('2a00')
+
+def test_service_get_item_int(central_mock):
+    """Retrieve a specific characteristic from its UUID using the `PeripheralService` dict-like behavior."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    target.discover()
+    service = target.service(UUID('1800'))
+    assert service is not None
+    char = service[0x2a00]
+    assert char is not None
+    assert isinstance(char, PeripheralCharacteristic)
+    assert char.uuid == UUID('2a00')
+
+def test_service_get_item_str(central_mock):
+    """Retrieve a specific characteristic from its UUID using the `PeripheralService` dict-like behavior."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    target.discover()
+    service = target.service(UUID('1800'))
+    assert service is not None
+    char = service['2a00']
+    assert char is not None
+    assert isinstance(char, PeripheralCharacteristic)
+    assert char.uuid == UUID('2a00')
+
+def test_service_get_item_error(central_mock):
+    """Retrieve a specific characteristic from an invalid UUID using the `PeripheralService` dict-like behavior."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    target.discover()
+    service = target.service(UUID('1800'))
+    assert service is not None
+    with pytest.raises(IndexError):
+        _ = service[UUID('3300')]
+
+def test_service_char_in_uuid(central_mock):
+    """Check a specific characteristic is present in the attribute database based on its UUID, using the `in` operator."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    target.discover()
+    service = target.service(UUID('1800'))
+    assert service is not None
+    assert UUID('2a00') in service
 
 def test_find_attribute(central_mock):
     """Search for an attribute given its handle."""
