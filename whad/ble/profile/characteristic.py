@@ -2,12 +2,13 @@
 BLE GATT Characteristic Model
 =============================
 """
+from re import I
 from struct import pack, unpack
-from typing import Union, Type, Optional
+from typing import Union, Type, Optional, List
 
 from whad.ble.stack.att.constants import BleAttProperties, SecurityAccess
 from whad.ble.profile.attribute import Attribute, UUID, get_uuid_alias
-from whad.ble.exceptions import InvalidHandleValueException, InvalidUUIDException
+from whad.ble.exceptions import InvalidHandleValueException
 from whad.ble.utils.clues import CluesDb
 
 class desc_type:
@@ -19,7 +20,7 @@ class desc_type:
         CharacteristicDescriptor.register_type(self.__uuid, cls)
         return cls
 
-class CharacteristicProperties:
+class Properties:
     """Generic characteristic properties.
     """
     BROADCAST = 0x01
@@ -31,20 +32,28 @@ class CharacteristicProperties:
     AUTH_SIGNED_WRITES = 0x40
     EXTENDED_PROPERTIES = 0x80
 
+class CharacteristicProperties(Properties):
+    """Old name, defined for compatibility"""
+
 class CharacteristicDescriptor(Attribute):
     """BLE Characteristic descriptor
     """
     desc_types = {}
 
-    def __init__(self, characteristic, uuid, handle=0, value=b''):
+    def __init__(self, uuid: UUID, handle: int = 0, value: bytes = b'', characteristic: Optional['Characteristic'] = None):
         super().__init__(uuid=uuid,handle=handle,value=value)
         self.__characteristic = characteristic
 
     @property
-    def characteristic(self):
+    def characteristic(self) -> Optional['Characteristic']:
         """Parent characteristic
         """
         return self.__characteristic
+
+    @characteristic.setter
+    def characteristic(self, charac: 'Characteristic'):
+        """Set characteristic."""
+        self.__characteristic = charac
 
     @property
     def uuid(self):
@@ -108,14 +117,28 @@ class CharacteristicDescriptor(Attribute):
 
         # Cannot find any class matching the provided UUID, return a generic
         # descriptor.
-        return CharacteristicDescriptor(characteristic, uuid, handle, value)
+        return CharacteristicDescriptor(uuid, handle, value, characteristic)
+
+    @classmethod
+    def _build(cls, instance: Type['CharacteristicDescriptor']):
+        """Build a new descriptor based on current template."""
+        return cls(
+            instance.uuid,
+            0,
+            instance.value,
+            characteristic=instance.characteristic
+        )
+
+    def build(self):
+        return self.__class__._build(self)
 
 @desc_type(UUID(0x2902))
 class ClientCharacteristicConfig(CharacteristicDescriptor):
     """Client Characteristic Configuration Descriptor
     """
 
-    def __init__(self, characteristic, handle=0, notify=False, indicate=False):
+    def __init__(self, handle: int = 0, notify: bool = False, indicate: bool = False,
+                 characteristic: Optional['Characteristic'] = None):
         """Instantiate a Client Characteristic Configuration Descriptor
 
         :param bool notify: Set to True to get the corresponding characteristic notified on change
@@ -127,7 +150,7 @@ class ClientCharacteristicConfig(CharacteristicDescriptor):
             value |= 0x0001
         if indicate:
             value |= 0x0002
-        super().__init__(characteristic, uuid=UUID(0x2902), handle=handle, value=pack('<H', value))
+        super().__init__(UUID(0x2902), handle=handle, value=pack('<H', value), characteristic=characteristic)
 
     @property
     def config(self):
@@ -147,17 +170,28 @@ class ClientCharacteristicConfig(CharacteristicDescriptor):
         handle and value, and tie it to a specific characteristic.
         """
         # Create our CCCD object
-        cccd = ClientCharacteristicConfig(characteristic, handle)
+        v = value[0]
+        cccd = ClientCharacteristicConfig(handle,(v & 0x0001) != 0, (v & 0x0002) != 0, characteristic)
         # Set its value
         cccd.value = value
 
         return cccd
 
+    @classmethod
+    def _build(cls, instance: 'ClientCharacteristicConfig'):
+        """Build a new descriptor based on current template."""
+        return cls(
+            0,
+            (instance.config & 0x0001) != 0,
+            (instance.config & 0x0002) != 0,
+            characteristic=instance.characteristic
+        )
+
 class ReportReferenceDescriptor(CharacteristicDescriptor):
     """Report Reference Descriptor, used in HID profile
     """
 
-    def __init__(self, characteristic, handle=None):
+    def __init__(self, handle: int = 0, characteristic: Optional['Characteristic'] = None):
         """Instantiate a Report Reference Descriptor
 
         :param bool notify: Set to True to get the corresponding characteristic notified on change
@@ -165,10 +199,18 @@ class ReportReferenceDescriptor(CharacteristicDescriptor):
                               indicated on change
         """
         super().__init__(
-            characteristic,
             uuid=UUID(0x2908),
             handle=handle,
-            value=b'\x01\x01'
+            value=b'\x01\x01',
+            characteristic=characteristic
+        )
+
+    @classmethod
+    def _build(cls, instance: 'ReportReferenceDescriptor'):
+        """Build a new descriptor based on current template."""
+        return cls(
+            0,
+            characteristic=instance.characteristic
         )
 
 @desc_type(UUID(0x2901))
@@ -176,17 +218,17 @@ class CharacteristicUserDescriptionDescriptor(CharacteristicDescriptor):
     """Characteristic description defined by user, contains
     a textual description of the related characteristic.
     """
-    def __init__(self, characteristic, handle=None, description=''):
+    def __init__(self, handle: int = 0, description: str = '', characteristic: Optional['Characteristic'] = None):
         """Instantiate a Characteristic User Description descriptor
 
         :param description: Set characteristic text description
         """
         self.__description = description
         super().__init__(
-            characteristic,
             uuid=UUID(0x2901),
             handle=handle,
-            value=description.encode('utf-8')
+            value=description.encode('utf-8'),
+            characteristic=characteristic
         )
 
     @property
@@ -214,14 +256,23 @@ class CharacteristicUserDescriptionDescriptor(CharacteristicDescriptor):
         """Create CUD descriptor from value
         """
         return CharacteristicUserDescriptionDescriptor(
-            characteristic, handle, description=value.decode('utf-8')
+             handle, description=value.decode('utf-8'), characteristic=characteristic
+        )
+
+    @classmethod
+    def _build(cls, instance: 'CharacteristicUserDescriptionDescriptor'):
+        """Build a new descriptor based on current template."""
+        return cls(
+            0,
+            instance.value.decode('utf-8'),
+            characteristic=instance.characteristic
         )
 
 class CharacteristicValue(Attribute):
     """Characteristic value attribute.
     """
 
-    def __init__(self, uuid, handle=None, value=b'', characteristic=None):
+    def __init__(self, uuid, handle: int = 0, value: bytes = b'', characteristic: Optional['Characteristic'] = None):
         super().__init__(uuid=uuid, handle=handle, value=value)
         self.__characteristic = characteristic
 
@@ -241,8 +292,20 @@ class Characteristic(Attribute):
     """BLE Characteristic
     """
 
-    def __init__(self, uuid: UUID, handle: int = 0, end_handle: int = 0, value: bytes = b'', properties=BleAttProperties.DEFAULT,
-                 security=None):
+    # Properties
+    BROADCAST = 0x01
+    READ = 0x02
+    WRITE_WITHOUT_RESPONSE = 0x04
+    WRITE = 0x08
+    NOTIFY = 0x10
+    INDICATE = 0x20
+    AUTH_SIGNED_WRITES = 0x40
+    EXTENDED_PROPERTIES = 0x80
+
+    def __init__(self, uuid: UUID, handle: int = 0, end_handle: int = 0, value: bytes = b'',
+                 properties: int = 0, permissions: Optional[List[str]] = None, notify: bool = False,
+                 indicate: bool = False, required: bool = True, description: Optional[str] = None, security:
+                 Optional[SecurityAccess] = None, **descriptors):
         """Instantiate a BLE characteristic object
 
         :param uuid: 16-bit or 128-bit UUID
@@ -250,39 +313,120 @@ class Characteristic(Attribute):
         :param bytes value: Characteristic value
         :param int perms: Permissions
         """
+        # Create our parent attribute (type UUID of 0x2803, and value containing our properties, value handle and UUID)
         super().__init__(uuid=UUID(0x2803), handle=handle,
                          value=pack('<BH', properties & 0xff, handle+1)+uuid.to_bytes())
+
+        # Set end handle: if 0, then it is considered as not set by the caller and set by
+        # default to the characteristic's handle value.
         if end_handle == 0:
             self.__end_handle = handle
         else:
             self.__end_handle = end_handle
+
+        # Set characteristic UUID
         self.__charac_uuid = uuid
 
-        # notification and indication callbacks
+        # Set characteristic alias
+        self.__alias = None
+
+        # Notification and indication callbacks
         self.__notification_callback = None
         self.__indication_callback = None
 
-        if isinstance(handle, int):
-            self.__value_handle = handle + 1
-            self.__value = CharacteristicValue(uuid, self.__value_handle, value, self)
-            self.__end_handle = self.__value_handle
-        else:
-            self.__value_handle = None
-            self.__value = CharacteristicValue(uuid, self.__value_handle, value, self)
+        # Add a characteristic value attribute
+        self.__value_handle = handle + 1
+        self.__value = CharacteristicValue(uuid, self.__value_handle, value, self)
+        self.__end_handle = self.__value_handle
 
-        # Permissions
+        # Set characteristic properties
         self.__properties = properties
+
+        # Update properties according to defined permissions, if any (only used when object is considered a template)
+        if permissions is not None:
+            perms = list(map(lambda x: x.lower(), permissions))
+            if 'read' in perms:
+                self.__properties |= Properties.READ
+            if 'write' in perms:
+                self.__properties |= Properties.WRITE
+            if 'write_without_response' in perms:
+                self.__properties |= Properties.WRITE_WITHOUT_RESPONSE
+
+        # If characteristic is set as supporting notifications, define the correct property.
+        if notify:
+            self.__properties |= Properties.NOTIFY
+
+        # Same for indications.
+        if indicate:
+            self.__properties |= Properties.INDICATE
+
+        # By default, this characteristic object is instantiated as a standalone characteristic,
+        # this means all the handles depending on this characteristic (value and descriptors) will
+        # be computed from the characteristic's definition handle.
+        self.__service = None
+
+        # When `required` is set, the characteristic is set as *mandatory*. This flag is only used by a
+        # service to determine if this characteristic must be present in its parent service.
+        self.required = required
 
         # Security properties
         self.__security = security if security is not None else []
 
-        # Descriptors
+        # List of descriptors.
         self.__descriptors = []
+
+        # Add descriptors if handle is 0 (object used as a template)
+        if handle == 0:
+            # If this characteristic's handle is not set, we automatically add a ClientCharacteristicConfig
+            # descriptor if its properties say it supports indication and/or notification.
+            if self.can_indicate() or self.can_notify():
+                self.add_descriptor(ClientCharacteristicConfig(
+                    characteristic=self
+                ))
+
+            # Add a CharacteristicUserDescriptionDescriptor if description is set and handle is 0
+            if description is not None and handle == 0:
+                self.add_descriptor(CharacteristicUserDescriptionDescriptor(
+                    description=description,
+                    characteristic=self
+                ))
+
+            # Add additional descriptors
+            for desc in descriptors.values():
+                if isinstance(desc, CharacteristicDescriptor):
+                    # Bind descriptor to this characteristic
+                    desc.characteristic = self
+
+                    # Add descriptor to our list of descriptors
+                    self.add_descriptor(desc)
+
+    @classmethod
+    def _build(cls, instance):
+        """Build a new characteristic object based on this model."""
+        # Create a new list of descriptors
+        descriptors = []
+        for desc in instance.descriptors():
+            descriptors.append(desc.build())
+        # Create a new object based on current template.
+        charac = cls(
+            instance.uuid,
+            handle=0,
+            end_handle=0,
+            value=instance.value,
+            properties=instance.properties,
+            security=instance.security,
+        )
+        if instance.alias is not None:
+            charac.alias = instance.alias
+        return charac
+
+    def build(self):
+        """Build a new characteristic from current object."""
+        return self.__class__._build(self)
 
     def payload(self):
         """Return characteristic payload
         """
-        #return bytes([self.__properties, self.__value_handle]) + self.__value.uuid.to_bytes()
         return pack('<BH', self.__properties, self.__value_handle) + self.__value.uuid.packed
 
     def set_notification_callback(self, callback):
@@ -298,14 +442,17 @@ class Characteristic(Attribute):
     @Attribute.handle.setter
     def handle(self, new_handle):
         """Set new handle value
+
+        Update the characteristic's value handle as well as handles
+        of all descriptors attached to this characteristic.
         """
         if isinstance(new_handle, int):
 
             # Set attribute handle
             Attribute.handle.fset(self, new_handle)
 
-            self.__value.handle = self.handle + 1
-            self.__value_handle = self.handle + 1
+            self.__value.handle = new_handle + 1
+            self.__value_handle = new_handle + 1
 
             handle = self.__value_handle
 
@@ -406,21 +553,53 @@ class Characteristic(Attribute):
 
         return str(self.__charac_uuid)
 
+    @property
+    def service(self):
+        """Service this characteristic belongs to."""
+        return self.__service
+
+    @service.setter
+    def service(self, service):
+        """Set characteristic service."""
+        self.__service = service
+
+    @property
+    def alias(self) -> Optional[str]:
+        """Characteristic alias."""
+        return self.__alias
+
+    @alias.setter
+    def alias(self, alias: str):
+        self.__alias = alias
+
     ##########################
     # Methods
     ##########################
 
+    def attach(self, service):
+        """Attach this characteristic to a service.
+
+        :param service: Service referenced
+        :type  service: Service
+        """
+        self.__service = service
+
+    def get_required_handles(self) -> int:
+        if self.handle is not None and self.__end_handle is not None:
+            return (self.__end_handle - self.handle) + 1
+        return 0
+
     def readable(self):
         """Determine if characteristic can be read
         """
-        return (self.properties & CharacteristicProperties.READ) != 0
+        return (self.properties & Properties.READ) != 0
 
     def writeable(self):
         """Determine if characteristic can be written to
         """
         return (
-            ((self.properties & CharacteristicProperties.WRITE) != 0) or
-            ((self.properties & CharacteristicProperties.WRITE_WITHOUT_RESPONSE) != 0)
+            ((self.properties & Properties.WRITE) != 0) or
+            ((self.properties & Properties.WRITE_WITHOUT_RESPONSE) != 0)
         )
 
     def can_notify(self) -> bool:
@@ -429,7 +608,7 @@ class Characteristic(Attribute):
         :return: ``True`` if characteristic sends notification, ``False`` otherwise.
         :rtype: bool
         """
-        return (self.properties & CharacteristicProperties.NOTIFY) != 0
+        return (self.properties & Properties.NOTIFY) != 0
 
     def must_notify(self):
         """Determine if a notification must be sent for this characteristic.
@@ -437,7 +616,7 @@ class Characteristic(Attribute):
         Notification must be sent when a characteristic has the notification property and
         its ClientCharacteristicConfiguration descriptor has notifications enabled.
         """
-        if (self.properties & CharacteristicProperties.NOTIFY) != 0:
+        if (self.properties & Properties.NOTIFY) != 0:
             cccd = self.get_client_config()
             if cccd is not None:
                 return cccd.config == 0x0001
@@ -449,7 +628,7 @@ class Characteristic(Attribute):
         :return: ``True`` if characteristic sends indication, ``False`` otherwise.
         :rtype: bool
         """
-        return (self.properties & CharacteristicProperties.INDICATE) != 0
+        return (self.properties & Properties.INDICATE) != 0
 
     def must_indicate(self):
         """Determine if an indication must be sent for this characteristic.
@@ -457,21 +636,27 @@ class Characteristic(Attribute):
         Indication must be sent when a characteristic has the indication property and
         its ClientCharacteristicConfiguration descriptor has indications enabled.
         """
-        if (self.properties & CharacteristicProperties.INDICATE) != 0:
+        if (self.properties & Properties.INDICATE) != 0:
             cccd = self.get_client_config()
             if cccd is not None:
                 return cccd.config == 0x0002
         return False
 
-    def add_descriptor(self, descriptor):
+    def add_descriptor(self, descriptor: CharacteristicDescriptor):
         """Add a descriptor
 
         :param CharacteristicDescriptor descriptor: Descriptor instance to add
                                                     to this characteristic.
         """
-        if isinstance(descriptor, CharacteristicDescriptor):
-            self.__descriptors.append(descriptor)
-            self.__end_handle = max(descriptor.handle, self.__end_handle)
+        # Set descriptor's handle and update end handle
+        if descriptor.handle == 0:
+            descriptor.handle = self.__end_handle + 1
+
+        # Add this descriptor to our list of descriptors
+        self.__descriptors.append(descriptor)
+
+        # Update our end handle
+        self.__end_handle = max(descriptor.handle, self.__end_handle)
 
     def get_descriptor(self, desc_type: Union[UUID, Type[CharacteristicDescriptor]]) -> Optional[CharacteristicDescriptor]:
         """Retrieve a decriptor based on its type UUID or class."""
@@ -481,11 +666,9 @@ class Characteristic(Attribute):
             type_uuid = desc_type
         elif issubclass(desc_type, CharacteristicDescriptor):
             # Descriptor class provided, search for corresponding type UUID
-            type_uuid = CharacteristicDescriptor.get_type_uuid(desc_type)
-            if type_uuid is None:
-                return None
-        else:
-            # Invalid descriptor type, could not find descriptor.
+            for desc in self.__descriptors:
+                if isinstance(desc, desc_type):
+                    return desc
             return None
 
         # If we found a valid type UUID, look for a matching descriptor

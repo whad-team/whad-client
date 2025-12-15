@@ -665,7 +665,7 @@ class GattClient(GattLayer):
             if isinstance(msg, GattReadByGroupTypeResponse):
                 for item in msg:
                     yield PrimaryService(
-                        uuid=UUID(item.value),
+                        UUID(item.value),
                         handle=item.handle,
                         end_handle=item.end
                     )
@@ -750,11 +750,12 @@ class GattClient(GattLayer):
                     charac_value_handle = unpack('<H', item.value[1:3])[0]
                     charac_uuid = UUID(item.value[3:])
                     charac = Characteristic(
+                        handle=charac_handle,
                         uuid=charac_uuid,
                         properties=charac_properties
                     )
-                    charac.handle = charac_handle
                     charac.value_handle = charac_value_handle
+                    charac.service = service
 
                     # Read value if requested and characteristic is readable
                     if save_values and (charac_properties & 0x02) > 0:
