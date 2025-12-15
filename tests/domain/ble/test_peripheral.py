@@ -11,11 +11,14 @@ from scapy.layers.bluetooth import (
 from whad.ble.mock.peripheral import PeripheralMock
 from whad.ble import BDAddress, Peripheral
 
-from whad.ble.profile import PrimaryService, Characteristic, GenericProfile
+from whad.ble.profile import GenericProfile
+from whad.ble.profile.service import PrimaryService
+from whad.ble.profile.characteristic import Characteristic
 from whad.ble.profile.advdata import AdvDataFieldList, AdvFlagsField, AdvShortenedLocalName
 from whad.ble.profile.attribute import UUID
 from whad.ble.stack.att.constants import BleAttErrorCode, BleAttOpcode
 from whad.ble.stack.gatt.attrlist import GattAttributeDataList, GattAttributeValueItem
+from whad.hub.ble import connect
 
 @pytest.fixture
 def profile() -> Type[GenericProfile]:
@@ -58,7 +61,6 @@ def profile() -> Type[GenericProfile]:
                 value=b"\x00\x00\x00\x00",
             )
         )
-
     return EmulatedProfile
 
 @pytest.fixture
