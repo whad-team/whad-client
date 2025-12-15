@@ -27,7 +27,7 @@ def test_charac_desc_new():
                             security=None, descriptors=[dummy_desc])
     desc_list = list(charac.descriptors())
     assert(dummy_desc in desc_list)
-    assert(desc_list[0] == dummy_desc) 
+    assert(desc_list[0] == dummy_desc)
 
 def test_charac_required_handles():
     """Test if characteristic correctly computes the required handles.
