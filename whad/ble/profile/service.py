@@ -268,6 +268,26 @@ class PrimaryService(Service):
         # Return our cloned service
         return service
 
+class StandardService(PrimaryService):
+    """Standard service class.
+
+    Service UUID shall be set as a property in every class inheriting from this
+    service.
+    """
+
+    _uuid = None
+
+    def __init__(self, handle: int = 0, end_handle: int = 0, **characteristics):
+        super().__init__(self._uuid, handle, end_handle, **characteristics)
+
+    @classmethod
+    def _build(cls, instance):
+        """Clone service."""
+        # Create a basic service with same properties.
+        service = cls(0, 0)
+
+        # Return our cloned service
+        return service
 
 class SecondaryService(Service):
     """Secondary service attribute.
