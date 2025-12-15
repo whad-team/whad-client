@@ -7,26 +7,27 @@ by 10%.
 """
 
 from whad.device import WhadDevice
-from whad.ble import Peripheral
-from whad.ble.profile.advdata import AdvCompleteLocalName, \
-                                     AdvDataFieldList, AdvFlagsField
-from whad.ble.profile.services import BatteryService
-from whad.ble.profile import read, GenericProfile
+from whad.ble import (
+    Peripheral, AdvCompleteLocalName, AdvDataFieldList, AdvFlagsField, Profile, read,
+    BatteryService,
+)
 
-class BatteryDevice(GenericProfile, BatteryService):
+class BatteryDevice(Profile):
     """Device exposing a battery service
     """
 
-    @read(BatteryService.battery.level)
+    battery = BatteryService()
+
+    @read(battery.level)
     def on_battery_level_read(self, offset, length):
-        level = self.get_battery_level() - 10
+        level = self.battery.percentage - 10
         if level <= 0:
             level = 100
-        self.set_battery_level(level)
+        self.battery.percentage = level
         return self.battery.level.value
 
 # Start advertising on hci0
-periph = Peripheral(WhadDevice.create('hci0'), profile=BatteryDevice())
+periph = Peripheral(WhadDevice.create('hci1'), profile=BatteryDevice())
 periph.enable_peripheral_mode(adv_data=AdvDataFieldList(
     AdvCompleteLocalName(b'BatteryDevice'),
     AdvFlagsField()
