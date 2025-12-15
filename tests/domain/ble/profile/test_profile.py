@@ -130,13 +130,13 @@ def test_profile_find_charac_end_handle(basic_profile: GenericProfile, complex_p
     assert(end_handle == 3)
 
     # Test for complex profile
-    end_handle = complex_profile.find_characteristic_end_handle(9)
-    assert(end_handle == 10)
+    end_handle = complex_profile.find_characteristic_end_handle(10)
+    assert(end_handle == 11)
 
 def test_profile_find_service_by_charac_handle(complex_profile:GenericProfile):
     """Test finding service from one of its characteristic handle.
     """
-    service = complex_profile.find_service_by_characteristic_handle(9)
+    service = complex_profile.find_service_by_characteristic_handle(10)
     assert(service.uuid == UUID("fc0d6e0a-bfa8-4cf7-bd37-215d1f96efab"))
 
 def test_profile_hooks(complex_profile:GenericProfile):
