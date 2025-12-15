@@ -8,7 +8,7 @@ def service():
 
 @pytest.fixture
 def characteristic(service):
-    charac = Characteristic(uuid=UUID(0x2A00), name="TestCharac")
+    charac = Characteristic(uuid=UUID(0x2A00))
     charac.attach(service)
     return charac
 
