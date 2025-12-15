@@ -433,7 +433,6 @@ class Characteristic(Attribute):
         for desc in instance.descriptors():
             descriptors.append(desc.build())
 
-        print(f"charac:build(): add descriptors {descriptors} for {instance.uuid}")
         # Create a new object based on current template.
         charac = cls(
             instance.uuid,
