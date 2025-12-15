@@ -150,9 +150,22 @@ and read its value:
 
 .. code-block:: python
 
-    charac = device.get_characteristic(UUID('1800'), UUID('2A00'))
-    if charac is not None:
-        print('Value: %s' % charac.value)
+        # Search for the DeviceName characteristic (0x2A00)
+        # in the Generic Access Service (0x1800)
+        charac = device.char('2a00', '1800')
+        if charac is not None:
+            # If found, read its value.
+            print('Value: %s' % charac.value)
+
+We use the :py:meth:`~whad.ble.profile.device.PeripheralDevice.char` method to retrieve
+a :class:`~whad.ble.profile.device.PeripheralCharacteristic` object corresponding to the
+characteristic we want to access. This method accepts a first parameter specifying the
+searched characteristic's UUID and an optional one specifying the service's UUID this
+characteristic is expected to belong to. UUIDs can be passed as string (using their
+textual representation) or as instances of :class:`~whad.ble.profile.attribute.UUID`.
+
+If no service's UUID is specified, it will return the first characteristic with the
+specified UUID, or `None` if not found.
 
 Write to characteristic
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -161,7 +174,7 @@ To write a value into a characteristic, this is as simple as reading one:
 
 .. code-block:: python
 
-    charac = device.get_characteristic(UUID('1800'), UUID('2A00'))
+    charac = device.char('2a00', '1800')
     if charac is not None:
         charac.value = b'Something'
 
@@ -179,7 +192,7 @@ characteristic. This is done through the `subscribe()` method of :class:`whad.bl
         else:
             print('[notification] characteristic updated with value: %s' % value)
 
-    charac = device.get_characteristic(UUID('1800'), UUID('2A00'))
+    charac = device.char('2a00', '1800')
     if charac is not None:
         charac.subscribe(
             notification=True,
@@ -205,7 +218,7 @@ the device services and characteristics:
 .. code-block:: python
 
     from whad.device import Device
-    from whad.ble import Peripheral
+    from whad.ble import Peripheral, PrimaryService, Characteristic
     from whad.ble.profile import GattProfile
     from whad.ble.profile.advdata import AdvCompleteLocalName, AdvDataFieldList, AdvFlagsField
 
@@ -216,15 +229,13 @@ the device services and characteristics:
 
             device_name = Characteristic(
                 uuid=UUID(0x2A00),
-                permissions = ['read', 'write'],
-                notify=True,
+                permissions = ['read', 'write', 'notify'],
                 value=b'TestDevice'
             ),
 
             null_char = Characteristic(
                 uuid=UUID(0x2A01),
-                permissions = ['read', 'write'],
-                notify=True,
+                permissions = ['read', 'write', 'notify'],
                 value=b''
             ),
         )
@@ -252,7 +263,7 @@ using this profile:
     periph.start()
 
 It is also possible to trigger specific actions when a characteristic is read or written,
-through the dedicated callbacks provided by :class:`whad.ble.profile.GenericProfile`.
+through the dedicated callbacks provided by :class:`whad.ble.profile.Profile`.
 
 Advanced features
 ~~~~~~~~~~~~~~~~~
@@ -272,7 +283,7 @@ and :py:class:`~whad.ble.connector.Central` connector provides a nifty way to do
 
     # Connect to target
     print('Connecting to remote device ...')
-    central = Central(Device.create("uart0"))
+    central = Central(Device.create('uart0'))
     device = central.connect('00:11:22:33:44:55', random=False)
 
     # Make sure connection has succeeded
@@ -301,12 +312,12 @@ and :py:class:`~whad.ble.connector.Central` connector provides a nifty way to do
 The above example connects to a target device, sends an `LL_VERSION_IND`
 PDU and waits for an `LL_VERSION_IND` PDU from the remote device.
 
-Normally, when a :class:`~whad.device.connector.WhadDeviceConnector`
+Normally, when a :class:`whad.device.connector.Connector`
 (or any of its inherited classes) is used it may rely on a protocol stack to process
 outgoing and ingoing PDUs. By doing so, there is no way to get access to the received
 PDUs and avoid them to be forwarded to the connector's protocol stack.
 
-However, all connectors expose a method called :meth:`~whad.device.connector.WhadDeviceConnector.enable_synchronous`
+However, all connectors expose a method called :meth:`whad.device.connector.Connector.enable_synchronous`
 that can enable or disable this automatic processing of PDUs. By default,
 PDUs are passed to the underlying protocol stack but we can force the connector
 to keep them in a queue and to wait for us to retrieve them:
@@ -319,7 +330,7 @@ to keep them in a queue and to wait for us to retrieve them:
 
 With the connector set in synchronous mode, every received PDU is then stored by
 the connector in a dedicated queue and can be retrieved using 
-:py:meth:`whad.device.connector.WhadDeviceConnector.wait_packet`.
+:py:meth:`whad.device.connector.Connector.wait_packet`.
 This method requires the connector to be in synchronous mode and will return
 a PDU from the connector's queue, or `None` if the queue is empty once the
 specified timeout period expired.
