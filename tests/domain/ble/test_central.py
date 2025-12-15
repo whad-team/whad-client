@@ -431,6 +431,27 @@ def test_service_get_item_error(central_mock):
     with pytest.raises(IndexError):
         _ = service[UUID('3300')]
 
+@pytest.mark.parametrize("uuid, service", [
+    ('2a00', None),
+    (UUID('2a00'), None),
+    ('2a00', '1800'),
+    (UUID('2a00'), '1800'),
+    ('2a00', UUID('1800')),
+    (UUID('2a00'), UUID('1800')),
+])
+def test_char(central_mock, uuid, service):
+    """Retrieve a specific characteristic from only its UUID as string."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    target.discover()
+    charac = target.char(uuid, service=service)
+    assert charac is not None
+    assert charac.uuid == UUID(0x2a00)
+
 def test_service_char_in_uuid(central_mock):
     """Check a specific characteristic is present in the attribute database based on its UUID, using the `in` operator."""
     # Connect to emulate device
