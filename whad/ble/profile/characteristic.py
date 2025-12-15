@@ -106,7 +106,7 @@ class Descriptor(Attribute):
         :return: Descriptor's type UUID if found, `None` otherwise.
         :rtype: UUID
         """
-        for desc_type,desc_cls in CharacteristicDescriptor.desc_types.items():
+        for desc_type,desc_cls in Descriptor.desc_types.items():
             if desc_cls == desc_cls:
                 return UUID(desc_type)
 
