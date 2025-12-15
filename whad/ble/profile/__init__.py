@@ -11,7 +11,7 @@ allows to interact with it:
 """
 import json
 import logging
-from typing import List, Iterator, Optional, Callable, Any
+from typing import List, Iterator, Optional, Callable, Any, Union
 
 from whad.ble.profile.attribute import Attribute, UUID
 from whad.ble.profile.characteristic import (
@@ -590,38 +590,80 @@ class Profile:
             if isinstance(obj, IncludeService):
                 yield obj
 
-    def get_service_by_uuid(self, service_uuid: UUID):
-        """Get a service by its UUID.
+    def service(self, uuid: Union[str, UUID]) -> Optional[Service]:
+        """Retrieve a Service object given its UUID.
 
-        :param      service_uuid:   Service UUID to look for
-        :type       service_uuid:   :class:`whad.ble.profile.attribute.UUID`
-        :return:    Service if found, ``None`` otherwise
-        :rtype:     :class:`whad.ble.profile.service.Service`
+        :param uuid:    Service UUID
+        :type  uuid:    :class:`whad.ble.profile.attribute.UUID`
+        :type  uuid:    str
+        :return:        Corresponding Service object if found, `None` otherwise.
+        :rtype:         :class:`whad.ble.profile.service.Service`
+        :raise:         InvalidUUIDException
         """
+        # If a string is provided as UUID, convert it to the corresponding
+        # UUID object. This could raise an InvalidUUIDException.
+        if isinstance(uuid, str):
+            uuid = UUID(uuid)
+
+        # Search for a service matching the given UUID
         for _, obj in self.__attr_db.items():
             if isinstance(obj, (PrimaryService, SecondaryService)):
-                if obj.uuid == service_uuid:
+                if obj.uuid == uuid:
                     return obj
 
         # Not found
         return None
 
-    def get_characteristic_by_uuid(self, charac_uuid: UUID):
+    def get_service_by_uuid(self, uuid: Union[str, UUID]) -> Optional[Service]:
+        """Retrieve a Service object given its UUID.
+
+        :param uuid:    Service UUID
+        :type  uuid:    :class:`whad.ble.profile.attribute.UUID`
+        :type  uuid:    str
+        :return:        Corresponding Service object if found, `None` otherwise.
+        :rtype:         :class:`whad.ble.profile.service.Service`
+        :raise:         InvalidUUIDException
+
+        .. deprecated:: 1.3.0
+            Use the :py:meth:`~whad.ble.profile.service` method to find a service
+            based on its UUID (simpler syntax).
+        """
+        return self.service(uuid)
+
+    def char(self, uuid: Union[str, UUID]) -> Optional[Characteristic]:
         """Get characteristic by its UUID.
 
-        :param      charac_uuid:   Characteristic UUID to look for
-        :type       charac_uuid:   :class:`whad.ble.profile.attribute.UUID`
-        :return:    Characteristic if found, ``None`` otherwise
-        :rtype:     :class:`whad.ble.profile.characteristic.Characteristic`
+        :param      uuid:   Characteristic UUID to look for
+        :type       uuid:   :class:`whad.ble.profile.attribute.UUID`
+        :type       uuid:   str
+        :return:            Characteristic if found, ``None`` otherwise
+        :rtype:             :class:`whad.ble.profile.characteristic.Characteristic`
         """
+        # If a string is provided as UUID, convert it to the corresponding
+        # UUID object. This could raise an InvalidUUIDException.
+        if isinstance(uuid, str):
+            uuid = UUID(uuid)
+
+        # Search for a characteristic with the given UUID
         for _, obj in self.__attr_db.items():
             if isinstance(obj, Characteristic):
-                if obj.uuid == charac_uuid:
+                if obj.uuid == uuid:
                     return obj
 
         # Not found
         return None
 
+    def get_characteristic_by_uuid(self, uuid: Union[str, UUID]):
+        """Get characteristic by its UUID.
+
+        :param      uuid:   Characteristic UUID to look for
+        :type       uuid:   :class:`whad.ble.profile.attribute.UUID`
+        :type       uuid:   str
+        :return:            Characteristic if found, ``None`` otherwise
+        :rtype:             :class:`whad.ble.profile.characteristic.Characteristic`
+        :raise:             InvalidUUIDException
+        """
+        return self.char(uuid)
 
     def attr_by_type_uuid(self, uuid, start=1, end=0xFFFF) -> Iterator[Attribute]:
         """Enumerate attributes that have a specific type UUID.
