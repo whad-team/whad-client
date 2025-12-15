@@ -11,17 +11,21 @@ for a given connected device:
 import logging
 from struct import unpack
 from time import sleep
-from typing import Iterator, Optional, Union, Type
+from typing import Iterator, Optional, Union, Type, TypeVar
 
+from whad.ble.profile import PrimaryService
 from whad.ble.profile.service import Service
+from whad.ble.profile.services.defs import ServiceNotFound
 from whad.ble.profile.characteristic import (
-    CharacteristicProperties, Characteristic, CharacteristicValue,
+    Properties, Characteristic, CharacteristicValue,
     CharacteristicDescriptor,
 )
 from whad.ble.profile import GenericProfile
 from whad.ble.profile.attribute import UUID, Attribute, InvalidUUIDException
 
 logger = logging.getLogger(__name__)
+
+PT = TypeVar("PT")
 
 class RemoteAttribute:
     """Remote GATT attribute interface.
@@ -99,7 +103,8 @@ class PeripheralCharacteristicDescriptor(CharacteristicDescriptor, RemoteAttribu
         :param CharacteristicDescriptor descriptor: Descriptor to wrap.
         :param GattClient gatt: GATT client to use for GATT operations (read/write).
         """
-        CharacteristicDescriptor.__init__(self,descriptor.characteristic, descriptor.uuid, descriptor.handle, descriptor.value)
+        CharacteristicDescriptor.__init__(self, descriptor.uuid, descriptor.handle, descriptor.value,
+                                          descriptor.characteristic)
         RemoteAttribute.__init__(self, descriptor.handle, gatt)
 
     @property
@@ -260,8 +265,8 @@ class PeripheralCharacteristic(Characteristic, RemoteAttribute):
         :rtype: bool
         """
         # If characteristic is only writeable without response, force without_response to True.
-        access_mask = CharacteristicProperties.WRITE_WITHOUT_RESPONSE | CharacteristicProperties.WRITE
-        if (self.properties & access_mask) == CharacteristicProperties.WRITE_WITHOUT_RESPONSE:
+        access_mask = Properties.WRITE_WITHOUT_RESPONSE | Properties.WRITE
+        if (self.properties & access_mask) == Properties.WRITE_WITHOUT_RESPONSE:
             without_response = True
 
         return super().write(value, without_response)
@@ -357,7 +362,7 @@ class PeripheralService(Service):
     def __init__(self, service, gatt):
         """Initialize a peripheral service from discovered GATT service."""
         self.__gatt = gatt
-        super().__init__(service.uuid, service.type_uuid, service.handle, service.end_handle)
+        super().__init__(service.type_uuid, service.uuid, service.handle, service.end_handle)
 
         # Copy characteristics and wrap each of them into a `PeripheralCharacteristic` object.
         for charac in service.characteristics():
@@ -365,7 +370,7 @@ class PeripheralService(Service):
 
         # Copy included services
         for inc_service in service.included_services():
-            self.add_include_service(inc_service)
+            self.add_included_service(inc_service)
 
     def __iter__(self) -> Iterator[UUID]:
         """Iterator over the discovered characteristics."""
@@ -760,6 +765,74 @@ class PeripheralDevice(GenericProfile):
             return service.get_characteristic(charac_uuid)
         return None
 
+    def has(self, interface: Type[PT]) -> bool:
+        """Check if device exposes a specific service interface."""
+        if issubclass(interface, PrimaryService):
+            service_model = interface()
+
+            # Raise an exception if service's UUID is undefined
+            if service_model.uuid is None:
+                return False
+
+            # Check if we have such service
+            remote_serv = self.service(service_model.uuid)
+            if remote_serv is None:
+                return False
+
+            # Check if we have all the required characteristics
+            for char in service_model.characteristics():
+                # Make sure the service's characteristic has an UUID
+                if char.uuid is None:
+                    return False
+
+                # Search for mandatory characteristics
+                if remote_serv.char(char.uuid) is None:
+                    if char.required:
+                        return False
+
+            # success if we loaded at least one service
+            return True
+
+        # Failure.
+        return False
+
+
+    def query(self, interface: Type[PT]) -> PT:
+        """Dynamically load a pluggable service into this device definition."""
+        if issubclass(interface, PrimaryService):
+            # Create an instance of our associated primary service class. We will later
+            # inject our own characteristics into it.
+            service = interface()
+            if service.uuid is not None:
+                # Retrieve the remote service based on this UUID
+                remote_service = self.service(service.uuid)
+                if remote_service is not None:
+
+                    # Loop on characteristics defined in this service,
+                    # search for them in our attribute DB and inject
+                    # our wrapped objects into our remote service with
+                    # the corresponding aliases
+                    for char in service.characteristics():
+                        # Make sure the service's characteristic has an UUID
+                        if char.uuid is None:
+                            raise ServiceNotFound()
+
+                        # Query the corresponding characteristic object
+                        # and inject it into our pluggable instance.
+                        remote_char = remote_service.char(char.uuid)
+                        if remote_char is not None and char.name:
+                           setattr(service, char.name, remote_char)
+                        elif char.required:
+                            raise ServiceNotFound()
+                        elif char.name:
+                            # Inject the characteristic but set it to None (undefined)
+                            setattr(service, char.name, None)
+
+                    # Return the populated service interface instance
+                    return service
+
+        # Pluggable cannot be loaded.
+        raise ServiceNotFound()
 
     def service(self, uuid: Union[str, UUID]):
         """Retrieve a PeripheralService object given its UUID.
