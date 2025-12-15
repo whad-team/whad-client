@@ -7,6 +7,7 @@ from whad.ble.profile.characteristic import Characteristic
 class DeviceInformationService(PrimaryService):
     """Define Device Information Service
     """
+    _uuid = UUID(0x180a)
 
     manufacturer= Characteristic(
         uuid=UUID(0x2A29),
@@ -44,8 +45,4 @@ class DeviceInformationService(PrimaryService):
         uuid=UUID(0x2A50),
         permissions=['read']
     )
-
-    def __init__(self):
-        super().__init__(uuid = UUID(0x180a))
-
 

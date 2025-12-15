@@ -3,13 +3,14 @@
 from struct import pack, unpack
 from whad.ble.profile.attribute import UUID
 from whad.ble.profile.characteristic import Characteristic, Properties
-from whad.ble.profile.service import PrimaryService
+from whad.ble.profile.service import StandardService
 
-class BatteryService(PrimaryService):
+class BatteryService(StandardService):
     """Battery Service Profile
 
     This service implements the BLE Battery Service as described in the spec.
     """
+    _uuid = UUID(0x180f)
 
     level = Characteristic(
         uuid = UUID(0x2A19),
@@ -18,9 +19,10 @@ class BatteryService(PrimaryService):
         value=pack('B', 100),
     )
 
-    def __init__(self):
+    def __init__(self, handle: int = 0, end_handle: int = 0):
         super().__init__(
-            uuid = UUID(0x180f),
+            handle,
+            end_handle
         )
 
     @property
