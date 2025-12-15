@@ -2,28 +2,29 @@
 """
 import pytest
 import json
-from whad.ble.profile import GenericProfile, PrimaryService, Characteristic, UUID, \
-    read, write
-from whad.ble.profile.service import PrimaryService as BlePrimaryService
-from whad.ble.profile.characteristic import CharacteristicValue, Characteristic as BleCharacteristic
+from whad.ble.profile import GenericProfile, UUID, read, write
+from whad.ble.profile.service import PrimaryService
+from whad.ble.profile.characteristic import CharacteristicValue, Characteristic
+
+class BasicProfile(GenericProfile):
+    """A custom profile
+    """
+
+    foo = PrimaryService(
+        UUID(0x1234),
+        bar=Characteristic(
+            uuid=UUID(0x5678),
+            permissions=["read", "write"],
+            value=b"DummyValue",
+            notify=False,
+            indicate=False
+        )
+    )
 
 @pytest.fixture
 def basic_profile():
-    class BasicProfile(GenericProfile):
-        """A custom profile
-        """
-
-        foo = PrimaryService(
-            uuid=UUID(0x1234),
-            bar=Characteristic(
-                uuid=UUID(0x5678),
-                permissions=["read", "write"],
-                value=b"DummyValue",
-                notify=False,
-                indicate=False
-            )
-        )
-    return BasicProfile()
+    obj = BasicProfile()
+    return obj
 
 @pytest.fixture
 def complex_profile():
@@ -59,7 +60,7 @@ def complex_profile():
         @read(device_info.device_name)
         def on_device_name_read(self, *args):
             return b"Foobar"
-        
+
         @write(vendor.vendor_char1)
         def on_vendor_write(self, *args):
             pass
@@ -88,7 +89,7 @@ def test_profile_att_service_by_uuid(basic_profile: GenericProfile):
     """Test accessing service by UUID
     """
     foo = basic_profile.get_service_by_uuid(UUID(0x1234))
-    assert(isinstance(foo, BlePrimaryService))
+    assert(isinstance(foo, PrimaryService))
     assert(foo.handle == 1)
     assert(len(list(foo.characteristics())) == 1)
 
@@ -101,7 +102,7 @@ def test_profile_find_obj_by_handle(basic_profile: GenericProfile):
     assert(char_value is not None)
     assert(isinstance(char_value, CharacteristicValue))
     assert(service is not None)
-    assert(isinstance(service, BlePrimaryService))
+    assert(isinstance(service, PrimaryService))
 
 def test_profile_find_objs_by_range(basic_profile: GenericProfile):
     """Test getting multiple ATT attributes by range
@@ -111,7 +112,7 @@ def test_profile_find_objs_by_range(basic_profile: GenericProfile):
     assert(basic_profile.foo in attrs)
     assert(basic_profile.foo.bar in attrs)
     assert(len(attrs) == 2)
-    
+
 def test_profile_find_charac_by_handle(basic_profile: GenericProfile):
     """Test finding a characteristic from its value handle
     """
@@ -123,19 +124,19 @@ def test_profile_find_charac_by_handle(basic_profile: GenericProfile):
 def test_profile_find_charac_end_handle(basic_profile: GenericProfile, complex_profile:GenericProfile):
     """Test characteristic end handle from charac handle
     """
+    print(complex_profile.db)
     # Test for basic profile
     end_handle = basic_profile.find_characteristic_end_handle(2)
     assert(end_handle == 3)
 
     # Test for complex profile
-    print(complex_profile)
-    end_handle = complex_profile.find_characteristic_end_handle(7)
-    assert(end_handle == 9)
+    end_handle = complex_profile.find_characteristic_end_handle(9)
+    assert(end_handle == 10)
 
 def test_profile_find_service_by_charac_handle(complex_profile:GenericProfile):
     """Test finding service from one of its characteristic handle.
     """
-    service = complex_profile.find_service_by_characteristic_handle(10)
+    service = complex_profile.find_service_by_characteristic_handle(9)
     assert(service.uuid == UUID("fc0d6e0a-bfa8-4cf7-bd37-215d1f96efab"))
 
 def test_profile_hooks(complex_profile:GenericProfile):
@@ -154,7 +155,7 @@ def test_profile_hooks(complex_profile:GenericProfile):
 def test_profile_add_remove_service(basic_profile: GenericProfile):
     """Test adding and removing a service
     """
-    service = BlePrimaryService(uuid=UUID(0xabcd), handle=0)
+    service = PrimaryService(uuid=UUID(0xabcd), handle=0)
     basic_profile.add_service(service)
     assert(basic_profile.get_service_by_uuid(UUID(0xabcd)) == service)
     basic_profile.remove_service(service)
@@ -218,7 +219,7 @@ def test_profile_json_import():
     }"""
     custom_profile = GenericProfile(from_json=profile)
     assert(custom_profile.get_service_by_uuid(UUID(0x1234)) is not None)
-    charac: BleCharacteristic = custom_profile.get_characteristic_by_uuid(UUID(0x5678))
+    charac: Characteristic = custom_profile.get_characteristic_by_uuid(UUID(0x5678))
     assert(charac is not None)
     assert(charac.handle == 2)
     assert(charac.readable() == True)
