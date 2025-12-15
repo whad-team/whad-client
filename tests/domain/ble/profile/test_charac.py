@@ -2,7 +2,7 @@
 """
 
 import pytest
-from whad.ble.profile.characteristic import Characteristic, UUID, CharacteristicUserDescriptionDescriptor, ReportReferenceDescriptor
+from whad.ble.profile.characteristic import Characteristic, UUID, UserDescription, ReportReference
 from whad.ble.profile.service import PrimaryService
 
 def test_charac_simple_new():
@@ -21,10 +21,10 @@ def test_charac_simple_new():
 def test_charac_desc_new():
     """Test characteristic instanciation with descriptors
     """
-    dummy_desc = ReportReferenceDescriptor()
+    dummy_desc = ReportReference()
     charac = Characteristic(UUID(0x1234), value=b"foobar",
                             permissions=["read", "write"], notify=False, indicate=False,
-                            security=None, dummy_desc=dummy_desc)
+                            security=None, descriptors=[dummy_desc])
     desc_list = list(charac.descriptors())
     assert(dummy_desc in desc_list)
     assert(desc_list[0] == dummy_desc) 
@@ -48,7 +48,7 @@ def test_charac_description():
     charac = Characteristic(UUID(0x1234), value=b"foobar",
                         permissions=["read", "write"], notify=False, indicate=False,
                         security=None, description="Foobar")
-    assert charac.get_descriptor(CharacteristicUserDescriptionDescriptor) is not None
+    assert charac.get_descriptor(UserDescription) is not None
 
 def test_charac_service_attach():
     """Test characteristic service setter.
