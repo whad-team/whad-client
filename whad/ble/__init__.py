@@ -41,6 +41,7 @@ __all__ = [
     'GattServer',
     'BDAddress',
     'UUID',
+    'GenericProfile',
     'Profile',
     'read',
     'write',
