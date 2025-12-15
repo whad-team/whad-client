@@ -19,7 +19,7 @@ from whad.ble.stack.gatt.message import *
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.ble.profile import GenericProfile
 from whad.ble.stack.smp import Pairing
-from whad.ble.profile.characteristic import Characteristic, CharacteristicDescriptor, ClientCharacteristicConfig, CharacteristicValue
+from whad.ble.profile.characteristic import Characteristic, Descriptor, ClientCharacteristicConfig, CharacteristicValue
 from whad.ble.profile.service import PrimaryService, SecondaryService, IncludeService
 
 from whad.common.stack import Layer, source, alias
@@ -807,7 +807,7 @@ class GattClient(GattLayer):
 
                 handle += 1
 
-    def get_descriptor(self, characteristic: Characteristic, uuid: UUID, handle: int) -> CharacteristicDescriptor:
+    def get_descriptor(self, characteristic: Characteristic, uuid: UUID, handle: int) -> Descriptor:
         """Read a characteristic descriptor identified by its handle.
 
         @param handle: Descriptor handle
@@ -819,7 +819,7 @@ class GattClient(GattLayer):
         desc_value = self.read(handle)
 
         # Return descriptor object based on value and UUID
-        return CharacteristicDescriptor.from_uuid(characteristic, handle,
+        return Descriptor.from_uuid(characteristic, handle,
                                                       uuid, desc_value)
 
     def discover(self, save_values: bool = False):
@@ -1325,7 +1325,7 @@ class GattServer(GattLayer):
 
                 # If attribute is a characteristic value or a descriptor, we make sure the characteristic
                 # is readable before matching its value with the request value
-                if isinstance(attr, CharacteristicValue) or isinstance(attr, CharacteristicDescriptor):
+                if isinstance(attr, CharacteristicValue) or isinstance(attr, Descriptor):
                     # Find characteristic end handle
                     if attr.value == request.attr_data:
                         matching_attrs.append((handle, attr.characteristic.end_handle))
@@ -1495,7 +1495,7 @@ class GattServer(GattLayer):
                 self.att.read_response(
                     attr.payload()
                 )
-            elif isinstance(attr, CharacteristicDescriptor):
+            elif isinstance(attr, Descriptor):
                 # Make sure the returned value matches the boundaries
                 self.att.read_response(
                     attr.value[:local_mtu - 1]
@@ -1622,7 +1622,7 @@ class GattServer(GattLayer):
                             gatt_error.handle if gatt_error.handle is not None else request.handle,
                             gatt_error.error if gatt_error.error is not None else BleAttErrorCode.ATTRIBUTE_NOT_FOUND
                         )
-                elif isinstance(attr, CharacteristicDescriptor):
+                elif isinstance(attr, Descriptor):
                     # Valid offset, return data[offset:offset + MTU - 1]
                     self.att.read_blob_response(
                         attr.value[request.offset:request.offset + local_mtu - 1]

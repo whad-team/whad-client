@@ -4,7 +4,7 @@ BLE GATT Characteristic Model
 """
 from re import I
 from struct import pack, unpack
-from typing import Union, Type, Optional, List
+from typing import Union, Type, Optional, List, Iterator
 
 from whad.ble.stack.att.constants import BleAttProperties, SecurityAccess
 from whad.ble.profile.attribute import Attribute, UUID, get_uuid_alias
@@ -17,7 +17,7 @@ class desc_type:
         self.__uuid = uuid
 
     def __call__(self, cls):
-        CharacteristicDescriptor.register_type(self.__uuid, cls)
+        Descriptor.register_type(self.__uuid, cls)
         return cls
 
 class Properties:
@@ -35,7 +35,7 @@ class Properties:
 class CharacteristicProperties(Properties):
     """Old name, defined for compatibility"""
 
-class CharacteristicDescriptor(Attribute):
+class Descriptor(Attribute):
     """BLE Characteristic descriptor
     """
     desc_types = {}
@@ -76,12 +76,12 @@ class CharacteristicDescriptor(Attribute):
     @staticmethod
     def register_type(uuid: UUID, cls):
         """Register descriptor type (associate a descriptor UUID with the
-        corresponding Python class (must inherit from CharacteristicDescriptor)
+        corresponding Python class (must inherit from Descriptor)
         """
         uuid_value = uuid.value()
-        if uuid_value not in CharacteristicDescriptor.desc_types:
-            if issubclass(cls, CharacteristicDescriptor):
-                CharacteristicDescriptor.desc_types[uuid_value] = cls
+        if uuid_value not in Descriptor.desc_types:
+            if issubclass(cls, Descriptor):
+                Descriptor.desc_types[uuid_value] = cls
 
     @staticmethod
     def get_type_uuid(desc_cls) -> Optional[UUID]:
@@ -91,7 +91,7 @@ class CharacteristicDescriptor(Attribute):
         :return: Descriptor's type UUID if found, `None` otherwise.
         :rtype: UUID
         """
-        for desc_type,desc_cls in CharacteristicDescriptor.desc_types.items():
+        for desc_type,desc_cls in Descriptor.desc_types.items():
             if desc_cls == desc_cls:
                 return UUID(desc_type)
 
@@ -103,24 +103,24 @@ class CharacteristicDescriptor(Attribute):
         """Create an instance of a descriptor based on the provided UUID and
         descriptor value.
 
-        @param uuid: Descriptor UUID
-        @type uuid: UUID
-        @param value: Descriptor value
-        @type value: bytes
-        @return Instance of the corresponding descriptor
-        @rtype CharacteristicDescriptor
+        :param uuid: Descriptor UUID
+        :type  uuid: UUID
+        :param value: Descriptor value
+        :type  value: bytes
+        :return: Instance of the corresponding descriptor
+        :rtype: Descriptor
         """
         uuid_value = uuid.value()
-        if uuid_value in CharacteristicDescriptor.desc_types:
-            cls = CharacteristicDescriptor.desc_types[uuid_value]
+        if uuid_value in Descriptor.desc_types:
+            cls = Descriptor.desc_types[uuid_value]
             return cls.from_value(characteristic, handle, value)
 
         # Cannot find any class matching the provided UUID, return a generic
         # descriptor.
-        return CharacteristicDescriptor(uuid, handle, value, characteristic)
+        return Descriptor(uuid, handle, value, characteristic)
 
     @classmethod
-    def _build(cls, instance: Type['CharacteristicDescriptor']):
+    def _build(cls, instance: Type['Descriptor']):
         """Build a new descriptor based on current template."""
         return cls(
             instance.uuid,
@@ -132,8 +132,17 @@ class CharacteristicDescriptor(Attribute):
     def build(self):
         return self.__class__._build(self)
 
+class CharacteristicDescriptor(Descriptor):
+    """Old class defining a characteristic descriptor, kept for backward compatibility.
+
+    .. deprecated:: 1.3.0
+        Renamed for clarity purpose ('Characteristic' in this class name has been removed
+        as this class is already defined in the *characteristic* module), please use
+        the new :class:`~whad.ble.profile.characteristic.Descriptor` class instead.
+    """
+
 @desc_type(UUID(0x2902))
-class ClientCharacteristicConfig(CharacteristicDescriptor):
+class ClientCharacteristicConfig(Descriptor):
     """Client Characteristic Configuration Descriptor
     """
 
@@ -187,7 +196,7 @@ class ClientCharacteristicConfig(CharacteristicDescriptor):
             characteristic=instance.characteristic
         )
 
-class ReportReferenceDescriptor(CharacteristicDescriptor):
+class ReportReference(Descriptor):
     """Report Reference Descriptor, used in HID profile
     """
 
@@ -206,15 +215,24 @@ class ReportReferenceDescriptor(CharacteristicDescriptor):
         )
 
     @classmethod
-    def _build(cls, instance: 'ReportReferenceDescriptor'):
+    def _build(cls, instance: 'ReportReference'):
         """Build a new descriptor based on current template."""
         return cls(
             0,
             characteristic=instance.characteristic
         )
 
+class ReportReferenceDescriptor(ReportReference):
+    """Old report reference descriptor class, kept for backward compatibility.
+
+
+    .. deprecated:: 1.3.0
+        Use the new :class:`~whad.ble.profile.characteristic.ReportReference` class that defines
+        an HID ReportReference descriptor.
+    """
+
 @desc_type(UUID(0x2901))
-class CharacteristicUserDescriptionDescriptor(CharacteristicDescriptor):
+class UserDescription(Descriptor):
     """Characteristic description defined by user, contains
     a textual description of the related characteristic.
     """
@@ -255,18 +273,21 @@ class CharacteristicUserDescriptionDescriptor(CharacteristicDescriptor):
     def from_value(characteristic, handle, value):
         """Create CUD descriptor from value
         """
-        return CharacteristicUserDescriptionDescriptor(
+        return UserDescription(
              handle, description=value.decode('utf-8'), characteristic=characteristic
         )
 
     @classmethod
-    def _build(cls, instance: 'CharacteristicUserDescriptionDescriptor'):
+    def _build(cls, instance: 'UserDescription'):
         """Build a new descriptor based on current template."""
         return cls(
             0,
             instance.value.decode('utf-8'),
             characteristic=instance.characteristic
         )
+
+class CharacteristicUserDescriptionDescriptor(UserDescription):
+    """Old name of the UserDescription descriptor."""
 
 class CharacteristicValue(Attribute):
     """Characteristic value attribute.
@@ -305,7 +326,7 @@ class Characteristic(Attribute):
     def __init__(self, uuid: UUID, handle: int = 0, end_handle: int = 0, value: bytes = b'',
                  properties: int = 0, permissions: Optional[List[str]] = None, notify: bool = False,
                  indicate: bool = False, required: bool = True, description: Optional[str] = None, security:
-                 Optional[SecurityAccess] = None, **descriptors):
+                 Optional[SecurityAccess] = None, descriptors: List[Descriptor] = []):
         """Instantiate a BLE characteristic object
 
         :param uuid: 16-bit or 128-bit UUID
@@ -379,23 +400,27 @@ class Characteristic(Attribute):
         if handle == 0:
             # If this characteristic's handle is not set, we automatically add a ClientCharacteristicConfig
             # descriptor if its properties say it supports indication and/or notification.
-            if self.can_indicate() or self.can_notify():
+            if (self.can_indicate() or self.can_notify()):
                 self.add_descriptor(ClientCharacteristicConfig(
                     characteristic=self
                 ))
 
             # Add a CharacteristicUserDescriptionDescriptor if description is set and handle is 0
-            if description is not None and handle == 0:
-                self.add_descriptor(CharacteristicUserDescriptionDescriptor(
+            if (description is not None and handle == 0):
+                self.add_descriptor(UserDescription(
                     description=description,
                     characteristic=self
                 ))
 
             # Add additional descriptors
-            for desc in descriptors.values():
-                if isinstance(desc, CharacteristicDescriptor):
+            for desc in descriptors:
+                if isinstance(desc, Descriptor):
                     # Bind descriptor to this characteristic
                     desc.characteristic = self
+
+                    # Don't add a CCC descriptor if characteristic already has one.
+                    if isinstance(desc, ClientCharacteristicConfig) and self.get_descriptor(ClientCharacteristicConfig):
+                        continue
 
                     # Add descriptor to our list of descriptors
                     self.add_descriptor(desc)
@@ -407,6 +432,8 @@ class Characteristic(Attribute):
         descriptors = []
         for desc in instance.descriptors():
             descriptors.append(desc.build())
+
+        print(f"charac:build(): add descriptors {descriptors} for {instance.uuid}")
         # Create a new object based on current template.
         charac = cls(
             instance.uuid,
@@ -415,6 +442,7 @@ class Characteristic(Attribute):
             value=instance.value,
             properties=instance.properties,
             security=instance.security,
+            descriptors=descriptors
         )
         if instance.alias is not None:
             charac.alias = instance.alias
@@ -642,11 +670,11 @@ class Characteristic(Attribute):
                 return cccd.config == 0x0002
         return False
 
-    def add_descriptor(self, descriptor: CharacteristicDescriptor):
+    def add_descriptor(self, descriptor: Descriptor) -> 'Characteristic':
         """Add a descriptor
 
-        :param CharacteristicDescriptor descriptor: Descriptor instance to add
-                                                    to this characteristic.
+        :param descriptor: Descriptor instance to add to this characteristic.
+        :type  descriptor: :class:`whad.ble.profile.characteristic.Descriptor`
         """
         # Set descriptor's handle and update end handle
         if descriptor.handle == 0:
@@ -658,13 +686,15 @@ class Characteristic(Attribute):
         # Update our end handle
         self.__end_handle = max(descriptor.handle, self.__end_handle)
 
-    def get_descriptor(self, desc_type: Union[UUID, Type[CharacteristicDescriptor]]) -> Optional[CharacteristicDescriptor]:
+        return self
+
+    def get_descriptor(self, desc_type: Union[UUID, Type[Descriptor]]) -> Optional[Descriptor]:
         """Retrieve a decriptor based on its type UUID or class."""
         # Validate descriptor type (UUID or class)
         if isinstance(desc_type, UUID):
             # Descriptor's type UUID is provided, use it as-is
             type_uuid = desc_type
-        elif issubclass(desc_type, CharacteristicDescriptor):
+        elif issubclass(desc_type, Descriptor):
             # Descriptor class provided, search for corresponding type UUID
             for desc in self.__descriptors:
                 if isinstance(desc, desc_type):
@@ -679,7 +709,7 @@ class Characteristic(Attribute):
         # Not found
         return None
 
-    def descriptors(self):
+    def descriptors(self) -> Iterator[Descriptor]:
         """Iterate over the registered descriptors (generator)
         """
         yield from self.__descriptors
