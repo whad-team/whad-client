@@ -365,13 +365,17 @@ class Characteristic(Attribute):
 
         # Update properties according to defined permissions, if any (only used when object is considered a template)
         if permissions is not None:
-            perms = list(map(lambda x: x.lower(), permissions))
+            perms = list(map(lambda x: x.lower().strip(), permissions))
             if 'read' in perms:
-                self.__properties |= Properties.READ
+                self.__properties |= Characteristic.READ
             if 'write' in perms:
-                self.__properties |= Properties.WRITE
+                self.__properties |= Characteristic.WRITE
             if 'write_without_response' in perms:
-                self.__properties |= Properties.WRITE_WITHOUT_RESPONSE
+                self.__properties |= Characteristic.WRITE_WITHOUT_RESPONSE
+            if 'notify' in perms:
+                self.__properties |= Characteristic.NOTIFY
+            if 'indicate' in perms:
+                self.__properties |= Characteristic.INDICATE
 
         # If characteristic is set as supporting notifications, define the correct property.
         if notify:
