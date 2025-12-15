@@ -150,6 +150,7 @@ def test_get_characteristic(central_mock):
     assert target.conn_handle != 0
 
     target.discover()
+    print(target)
     charac = target.get_characteristic(UUID("1800"), UUID("2a00"))
     assert charac is not None
     assert type(charac) == PeripheralCharacteristic
@@ -622,6 +623,8 @@ def test_discover(central_mock):
     # Discovery services and characteristics
     try:
         target.discover()
+        print(target)
+        print(target.db)
         assert target.get_service(UUID(0x1800)) is not None
         assert target.get_service(UUID(0x180f)) is not None
         assert target.get_service(UUID("6d02b600-1b51-4ef9-b753-1399e05debfd"))
