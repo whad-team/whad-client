@@ -661,13 +661,18 @@ class PeripheralDevice(GenericProfile):
         # Not found
         return None
 
-    def char(self, uuid: Union[str, UUID]) -> Optional[PeripheralCharacteristic]:
+    def char(self, uuid: Union[str, UUID], service: Optional[Union[str, UUID]] = None) -> Optional[PeripheralCharacteristic]:
         """Retrieve a characteristic by its UUID. If more than one characteristic is found,
         returns the first match.
+
+        Search can be narrowed to a specific service if the `service` parameter is set.
 
         :param uuid: Characteristic's UUID
         :type  uuid: UUID
         :type  uuid: str
+        :param service: Service's UUID
+        :type  service: UUID
+        :type  service: str
         :return:     First matching characteristic, `None` if not found
         :rtype:      PeripheralCharacteristic
         :raise:      InvalidUUIDException
@@ -677,10 +682,21 @@ class PeripheralDevice(GenericProfile):
             uuid = UUID(uuid)
 
         # Search for characteristic
-        for service in self.services():
-            for charac in service.characteristics():
-                if charac.uuid == uuid:
-                    return charac
+        if service is None:
+            for s in self.services():
+                for charac in s.characteristics():
+                    if charac.uuid == uuid:
+                        return charac
+        else:
+            # Convert service UUID if provided as a string
+            if isinstance(service, str):
+                service_uuid = UUID(service)
+            else:
+                service_uuid = service
+
+            s = self.service(service_uuid)
+            if s is not None:
+                return s.char(uuid)
 
         # Not found
         return None
