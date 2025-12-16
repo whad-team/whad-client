@@ -1,7 +1,7 @@
 """Test WHAD BLE GATT Service models.
 """
 
-from whad.ble.profile.service import Service, PrimaryService, SecondaryService
+from whad.ble.profile.service import Service, PrimaryService, SecondaryService, IncludeService
 from whad.ble.profile.characteristic import Characteristic, UUID, CharacteristicUserDescriptionDescriptor
 
 
@@ -35,10 +35,10 @@ def test_service_handle_update():
 def test_service_include():
     """Create a BLE GATT service with an included service
     """
-    inc_service = SecondaryService(uuid=UUID(0x5678))
+    inc_service = SecondaryService(UUID(0x5678))
     service = PrimaryService(uuid=UUID(0x1234), inc_service=inc_service)
     assert(len(list(service.included_services())) == 1)
-    assert(list(service.included_services())[0].uuid == inc_service.uuid)
+    assert(list(service.included_services())[0].service_uuid == inc_service.uuid)
 
 def test_service_char_add():
     """Create service and add characteristic
@@ -55,12 +55,10 @@ def test_service_char_add():
 def test_service_include_add():
     """Create service and add secondary service.
     """
-    inc_service = SecondaryService(uuid=UUID(0x5678), handle=10)
+    inc_service = IncludeService(uuid=UUID(0x5678), handle=10)
     service = PrimaryService(uuid=UUID(0x1234))
     service.add_included_service(inc_service)
-    assert(inc_service in list(service.included_services()))
+    assert(len(list(service.included_services())) == 1)
+    assert(list(service.included_services())[0].service_uuid == UUID(0x5678))
     assert(service.end_handle == 10)
 
-
-
-    
