@@ -41,7 +41,6 @@ __all__ = [
     'GattServer',
     'BDAddress',
     'UUID',
-    'GenericProfile',
     'Profile',
     'read',
     'write',
@@ -93,6 +92,7 @@ __all__ = [
     'ConnectionEventTrigger',
     'ManualTrigger',
     'ReceptionTrigger',
+    'Advertiser',
 
     # Old classes to remove later
     'GenericProfile',
