@@ -197,7 +197,7 @@ class ClientCharacteristicConfig(Descriptor):
         )
 
 class ReportReference(Descriptor):
-    """Report Reference Descriptor, used in HID profile
+    """Report Reference descriptor, used in HID profile
     """
 
     def __init__(self, handle: int = 0, characteristic: Optional['Characteristic'] = None):
@@ -233,13 +233,18 @@ class ReportReferenceDescriptor(ReportReference):
 
 @desc_type(UUID(0x2901))
 class UserDescription(Descriptor):
-    """Characteristic description defined by user, contains
-    a textual description of the related characteristic.
+    """Characteristic user description descriptor.
+
+    This descriptor specifies a textual description of the characteristic it is attached to. This description
+    is exposed by the GATT server and can be read by a GATT client.
     """
     def __init__(self, handle: int = 0, description: str = '', characteristic: Optional['Characteristic'] = None):
         """Instantiate a Characteristic User Description descriptor
 
         :param description: Set characteristic text description
+        :type  description: str
+        :param characteristic: Characteristic this descriptor is attached to, not required when defining a GATT model.
+        :type  characteristic: Characteristic, optional
         """
         self.__description = description
         super().__init__(
@@ -692,7 +697,13 @@ class Characteristic(Attribute):
         return self
 
     def get_descriptor(self, desc_type: Union[UUID, Type[Descriptor]]) -> Optional[Descriptor]:
-        """Retrieve a decriptor based on its type UUID or class."""
+        """Retrieve a decriptor based on its type UUID or class.
+
+        :param desc_type: Descriptor type
+        :type  desc_type: UUID, :class:`whad.ble.profile.characteristic.Descriptor`
+        :return: First matching descriptor belonging to this characteristic
+        :rtype: :class:`whad.ble.profile.Descriptor`, optional
+        """
         # Validate descriptor type (UUID or class)
         if isinstance(desc_type, UUID):
             # Descriptor's type UUID is provided, use it as-is
