@@ -1,6 +1,9 @@
 Getting started
 ===============
 
+.. contents::
+   :local:
+
 WHAD provides a set of classes and features related to Bluetooth Low Energy allowing
 to advertise, scan, connect, interact and even emulate BLE devices. This section
 introduces these different classes with minimal examples to get you started.
@@ -70,8 +73,8 @@ Advertisement core parameters like the advertisement type used, channel map or e
 advertising interval can be updated by using their associated properties but only when the
 advertiser is stopped.
 
-Scan available devices
-~~~~~~~~~~~~~~~~~~~~~~
+Enumerating available devices (scanning)
+----------------------------------------
 
 Use the :class:`~whad.ble.connector.scanner.Scanner` class to instantiate
 a BLE device scanner and detect all the available devices.
@@ -98,8 +101,8 @@ a BLE device scanner and detect all the available devices.
         for device in scanner.discover_devices():
             print(device)
 
-Initiate a connection to a BLE device
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Initiating a connection to a BLE device
+---------------------------------------
 
 Use the :class:`~whad.ble.connector.central.Central` class to create a
 BLE central device and initiate a connection to a BLE peripheral device.
@@ -118,8 +121,8 @@ BLE central device and initiate a connection to a BLE peripheral device.
 The `connect()` method returns a :class:`~whad.ble.profile.device.PeripheralDevice` object
 that represents the remote device.
 
-Enumerate services and characteristics
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Enumerating services and characteristics
+----------------------------------------
 
 Once connected, it is possible to discover all the services and characteristics
 and display them.
@@ -132,8 +135,8 @@ and display them.
     # Display target profile
     print(target)
 
-The :class:`~whad.ble.profile.device.PeripheralDevice` also provides some methods
-to iterate over services and characteristics:
+The :class:`~whad.ble.profile.device.PeripheralDevice` object returned by :py:meth:`~whad.ble.connector.Central.connect`
+provides some methods to iterate over services and characteristics:
 
 .. code-block:: python
 
@@ -142,10 +145,10 @@ to iterate over services and characteristics:
         for charac in service.characteristics():
             print(' + Characteristic %s' % charac.uuid)
 
-Read a characteristic
-~~~~~~~~~~~~~~~~~~~~~
+Reading a characteristic's value
+--------------------------------
 
-To read a characteristic from an device, just get the corresponding characteristic object
+To read a characteristic from a connected device, just get the corresponding characteristic object
 and read its value:
 
 .. code-block:: python
@@ -167,8 +170,8 @@ textual representation) or as instances of :class:`~whad.ble.profile.attribute.U
 If no service's UUID is specified, it will return the first characteristic with the
 specified UUID, or `None` if not found.
 
-Write to characteristic
-~~~~~~~~~~~~~~~~~~~~~~~
+Writing into a characteristic's value
+-------------------------------------
 
 To write a value into a characteristic, this is as simple as reading one:
 
@@ -178,8 +181,8 @@ To write a value into a characteristic, this is as simple as reading one:
     if charac is not None:
         charac.value = b'Something'
 
-Subscribe for notification/indication
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Subscribing for notification/indication
+---------------------------------------
 
 Sometimes it is needed to subscribe to notifications or indications for a given
 characteristic. This is done through the `subscribe()` method of :class:`whad.ble.profile.device.PeripheralDevice`, as shown below:
@@ -199,8 +202,8 @@ characteristic. This is done through the `subscribe()` method of :class:`whad.bl
             callback=on_charac_updated
         )
 
-Close connection
-~~~~~~~~~~~~~~~~
+Closing current connection
+--------------------------
 
 To close an existing connection, simply call the `disconnect()` method of the :class:`whad.ble.profile.device.PeripheralDevice` class:
 
@@ -209,8 +212,8 @@ To close an existing connection, simply call the `disconnect()` method of the :c
     target.disconnect()
 
 
-Create a peripheral device
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+Creating a peripheral device
+----------------------------
 
 Creating a BLE peripheral device requires to define a custom profile that determines
 the device services and characteristics:
@@ -218,9 +221,10 @@ the device services and characteristics:
 .. code-block:: python
 
     from whad.device import Device
-    from whad.ble import Peripheral, PrimaryService, Characteristic
-    from whad.ble.profile import GattProfile
-    from whad.ble.profile.advdata import AdvCompleteLocalName, AdvDataFieldList, AdvFlagsField
+    from whad.ble import (
+        Peripheral, Profile, PrimaryService, Characteristic,
+        AdvCompleteLocalName, AdvDataFieldList, AdvFlagsField,
+    )
 
     class MyPeripheral(GenericProfile):
 
@@ -240,7 +244,7 @@ the device services and characteristics:
             ),
         )
 
-Once this profile defined, instantiate a :class:`whad.ble.connector.Peripheral` object
+Once this profile defined, instantiate a :class:`~whad.ble.connector.Peripheral` object
 using this profile:
 
 .. code-block:: python
@@ -261,6 +265,9 @@ using this profile:
 
     # Start advertising
     periph.start()
+
+    # Wait for user to press 'Enter' to stop
+    input("Press enter to stop...")
 
 It is also possible to trigger specific actions when a characteristic is read or written,
 through the dedicated callbacks provided by :class:`whad.ble.profile.Profile`.
