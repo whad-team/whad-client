@@ -10,9 +10,11 @@ from whad.hub.ble.chanmap import ChannelMap
 
 from whad.ble.profile.attribute import UUID
 from whad.ble.profile import (
-    GenericProfile, Profile, Characteristic, CharacteristicDescriptor, ClientCharacteristicConfig,
-    ReportReferenceDescriptor, CharacteristicUserDescriptionDescriptor, PrimaryService, SecondaryService,
-    read, write, written, subscribed, unsubscribed,
+    GenericProfile, Profile, Characteristic, Descriptor, ClientCharacteristicConfig,
+    ReportReference, UserDescription, Service, PrimaryService, SecondaryService,
+    IncludeService, read, write, written, subscribed, unsubscribed,
+
+    CharacteristicDescriptor, CharacteristicUserDescriptionDescriptor, ReportReferenceDescriptor
 )
 from whad.ble.profile.advdata import (
     AdvDataFieldList, AdvFlagsField, AdvDataField, AdvCompleteLocalName,
@@ -36,7 +38,6 @@ __all__ = [
     'GattServer',
     'BDAddress',
     'UUID',
-    'GenericProfile',
     'Profile',
     'read',
     'write',
@@ -46,12 +47,14 @@ __all__ = [
     'BatteryService',
     'DeviceInformationService',
     'Characteristic',
-    'CharacteristicDescriptor',
+    'Descriptor',
     'ClientCharacteristicConfig',
-    'ReportReferenceDescriptor',
-    'CharacteristicUserDescriptionDescriptor',
+    'ReportReference',
+    'UserDescription',
+    'Service',
     'PrimaryService',
     'SecondaryService',
+    'IncludeService',
 
     # Advertising data classes
     'AdvDataFieldList',
@@ -83,5 +86,11 @@ __all__ = [
     'ConnectionEventTrigger',
     'ManualTrigger',
     'ReceptionTrigger',
-    'Advertiser'
+    'Advertiser',
+
+    # Old classes to remove later
+    'GenericProfile',
+    'CharacteristicDescriptor',
+    'CharacteristicUserDescriptionDescriptor',
+    'ReportReferenceDescriptor',
 ]
