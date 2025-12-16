@@ -449,7 +449,7 @@ class PeripheralService(Service):
         """Look for a specific characteristic belonging to this service, identified by its UUID.
 
         :param uuid: Characteristic UUID
-        :type  uuid: UUID
+        :type  uuid: UUID, str
         :return: Found characteristic if any, `None` otherwise.
         :rtype: PeripheralCharacteristic
         :raise: InvalidUUIDException
@@ -668,11 +668,10 @@ class PeripheralDevice(GenericProfile):
         Search can be narrowed to a specific service if the `service` parameter is set.
 
         :param uuid: Characteristic's UUID
-        :type  uuid: UUID
-        :type  uuid: str
+        :type  uuid: :class:`whad.ble.profile.attribute.UUID`, str
+        :type  uuid: :class:`str`
         :param service: Service's UUID
-        :type  service: UUID
-        :type  service: str
+        :type  service: :class:`whad.ble.profile.attribute.UUID`, :class:`str`, optional
         :return:     First matching characteristic, `None` if not found
         :rtype:      PeripheralCharacteristic
         :raise:      InvalidUUIDException
