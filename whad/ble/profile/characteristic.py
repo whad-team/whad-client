@@ -330,7 +330,7 @@ class Characteristic(Attribute):
 
     def __init__(self, uuid: UUID, handle: int = 0, end_handle: int = 0, value: bytes = b'',
                  properties: int = 0, permissions: Optional[List[str]] = None, notify: bool = False,
-                 indicate: bool = False, required: bool = True, description: Optional[str] = None, security:
+                 indicate: bool = False, required: bool = False, description: Optional[str] = None, security:
                  Optional[SecurityAccess] = None, descriptors: List[Descriptor] = []):
         """Instantiate a BLE characteristic object
 
