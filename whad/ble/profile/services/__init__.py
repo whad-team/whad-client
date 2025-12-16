@@ -6,8 +6,10 @@ This module provides different default GATT services as defined in
 """
 from whad.ble.profile.services.bas import BatteryService
 from whad.ble.profile.services.dis import DeviceInformationService
+from whad.ble.profile.services.gap import GapService
 
 __all__ = [
-    "BatteryService",
-    "DeviceInformationService"
+    'GapService',
+    'BatteryService',
+    'DeviceInformationService'
 ]
