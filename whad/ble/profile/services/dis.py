@@ -1,48 +1,53 @@
 """Bluetooth Low Energy Device Information Service Profile
 """
 from whad.ble.profile.attribute import UUID
-from whad.ble.profile.service import PrimaryService
+from whad.ble.profile.service import StandardService
 from whad.ble.profile.characteristic import Characteristic
 
-class DeviceInformationService(PrimaryService):
-    """Define Device Information Service
+class DeviceInformationService(StandardService):
+    """Device Information Service version 1.2 as defined in
+    [specification](https://www.bluetooth.com/specifications/specs/html/?src=DIS_v1.2/out/en/index-en.html)
     """
     _uuid = UUID(0x180a)
 
     manufacturer= Characteristic(
-        uuid=UUID(0x2A29),
+        UUID(0x2A29),
         permissions=['read'],
     )
     model_number=Characteristic(
-        uuid=UUID(0x2A24),
+        UUID(0x2A24),
         permissions=['read']
     )
     serial_number=Characteristic(
-        uuid=UUID(0x2A25),
+        UUID(0x2A25),
         permissions=['read']
     )
     hw_revision=Characteristic(
-        uuid=UUID(0x2A27),
+        UUID(0x2A27),
         permissions=['read']
     )
     fw_revision=Characteristic(
-        uuid=UUID(0x2A26),
+        UUID(0x2A26),
         permissions=['read']
     )
     sw_revision=Characteristic(
-        uuid=UUID(0x2A28),
+        UUID(0x2A28),
         permissions=['read']
     )
     system_id=Characteristic(
-        uuid=UUID(0x2A23),
+        UUID(0x2A23),
         permissions=['read']
     )
     ieee_rcdl=Characteristic(
-        uuid=UUID(0x2A2A),
+        UUID(0x2A2A),
         permissions=['read']
     )
     pnp_id=Characteristic(
-        uuid=UUID(0x2A50),
+        UUID(0x2A50),
         permissions=['read']
+    )
+    udi=Characteristic(
+        UUID(0x2BFF),
+        permissions = ['read'],
     )
 
