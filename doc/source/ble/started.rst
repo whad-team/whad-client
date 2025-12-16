@@ -1,6 +1,9 @@
 Getting started
 ===============
 
+.. contents::
+   :local:
+
 WHAD provides a set of classes and features related to Bluetooth Low Energy allowing
 to advertise, scan, connect, interact and even emulate BLE devices. This section
 introduces these different classes with minimal examples to get you started.
@@ -70,8 +73,8 @@ Advertisement core parameters like the advertisement type used, channel map or e
 advertising interval can be updated by using their associated properties but only when the
 advertiser is stopped.
 
-Scan available devices
-~~~~~~~~~~~~~~~~~~~~~~
+Enumerating available devices (scanning)
+----------------------------------------
 
 Use the :class:`~whad.ble.connector.scanner.Scanner` class to instantiate
 a BLE device scanner and detect all the available devices.
