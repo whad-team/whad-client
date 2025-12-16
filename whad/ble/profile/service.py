@@ -3,7 +3,7 @@ BLE GATT Service Model
 ======================
 """
 import logging
-from typing import Optional
+from typing import Optional, Type, Iterator, Union
 from struct import pack
 
 from whad.ble.exceptions import InvalidHandleValueException
@@ -18,6 +18,19 @@ class Service(Attribute):
     """
 
     def __init__(self, type_uuid: UUID, uuid: UUID, handle: int = 0, end_handle: int = 0, **children):
+        """Instantiate a new service attribute with the specified handle.
+
+        :param type_uuid: Attribute type UUID
+        :type  type_uuid: UUID
+        :param uuid: Service UUID
+        :type  uuid: UUID
+        :param handle: Service handle
+        :type  handle: int
+        :param end_handle: Handle of last attribute in the service
+        :type  end_handle: int
+        :param children: List of children attributes to add into this service
+        :type  children: dict, optional
+        """
         # Create our base attribute with type UUID, handle and value.
         super().__init__(uuid=type_uuid,handle=handle, value=uuid.to_bytes())
 
@@ -50,7 +63,7 @@ class Service(Attribute):
                     setattr(self, name, charac)
                 elif isinstance(obj, Service):
                     service = obj.build()
-                    self.add_included_service(service)
+                    self.add_included_service(IncludeService(service.uuid))
 
             # Add defined children (characteristic & include service)
             for name, obj in children.items():
@@ -62,7 +75,7 @@ class Service(Attribute):
                     setattr(self, name, charac)
                 elif isinstance(obj, Service):
                     service = obj.build()
-                    self.add_included_service(service)
+                    self.add_included_service(IncludeService(service.uuid))
 
     @property
     def uuid(self) -> UUID:
@@ -101,6 +114,10 @@ class Service(Attribute):
     @property
     def name(self) -> str:
         """Readable service name
+
+        :return: Service name as readable text, if either defined in the Bluetooth
+                 specification or known from DarkMentorLLC's CLUES database.
+        :rtype: str
         """
         # Search in Bluetooth known UUIDs
         alias = get_uuid_alias(self.__service_uuid)
@@ -119,12 +136,18 @@ class Service(Attribute):
         return str(self.__service_uuid)
 
     def payload(self):
-        """Return service UUID as bytes
+        """Return service attribute's value.
+
+        :return: Service attribute value
+        :rtype: bytes
         """
         return self.__service_uuid.packed
 
-    def add_characteristic(self, characteristic):
-        """Add characteristic, update end handle
+    def add_characteristic(self, characteristic: Characteristic):
+        """Add characteristic into this service.
+
+        :param characteristic: Characteristic object to add into this service.
+        :type  characteristic: Characteristic
         """
         # If characteristic's handle is 0, we define its handle before
         # adding it into our list of characteristics.
@@ -137,8 +160,11 @@ class Service(Attribute):
         # Update our end handle
         self.__end_handle = max(characteristic.end_handle, self.__end_handle)
 
-    def remove_characteristic(self, characteristic):
+    def remove_characteristic(self, characteristic: Union[UUID, Type[Characteristic]]):
         """Remove a specific characteristic
+
+        :param characteristic: Characteristic object to remove from service's characteristics.
+        :type  characteristic: Characteristic, UUID
         """
         if isinstance(characteristic, UUID):
             # Look for characteristic and remove it if found
@@ -160,21 +186,31 @@ class Service(Attribute):
         # Update service end_handle value
         self.__end_handle = char_handle
 
-    def characteristics(self):
-        """Enumerate characteristics
+    def characteristics(self) -> Iterator[Characteristic]:
+        """Enumerate characteristics.
+
+        :return: Iterator over this service's characteristics.
         """
         yield from self.__characteristics
 
-    def get_characteristic(self, uuid):
-        """Get characteristic by UUID
+    def get_characteristic(self, uuid: UUID) -> Optional[Characteristic]:
+        """Get characteristic by UUID.
+
+        :param uuid: Searched characteristic's UUID
+        :type uuid: UUID
+        :return: Characteristic object if found, None otherwise
+        :rtype: Characteristic, optional
         """
         for charac in self.__characteristics:
             if charac.uuid == uuid:
                 return charac
         return None
 
-    def add_included_service(self, included_service):
-        """Add include service definition, update end handle
+    def add_included_service(self, included_service: 'IncludeService'):
+        """Add include service definition.
+
+        :param included_service: Include service definition
+        :type  included_service: IncludeService
         """
         # Set included service handle if not already set.
         if included_service.handle == 0:
@@ -186,8 +222,11 @@ class Service(Attribute):
         # Update end handle
         self.__end_handle = max(included_service.handle, self.__end_handle)
 
-    def remove_include_service(self, included_service):
-        """Remove a specific characteristic
+    def remove_include_service(self, included_service: Union[UUID, Type['IncludeService']]):
+        """Remove a specific include service definition.
+
+        :param included_service: Include service definition or its UUID
+        :type  included_service: IncludeService, UUID
         """
         if isinstance(included_service, UUID):
             # Look for characteristic and remove it if found
@@ -212,13 +251,13 @@ class Service(Attribute):
         # Update service end_handle value
         self.__end_handle = char_handle
 
-    def included_services(self):
+    def included_services(self) -> Iterator['IncludeService']:
         """Enumerate included services
         """
         yield from self.__included_services
 
     @classmethod
-    def _build(cls, instance):
+    def _build(cls, instance: 'Service'):
         """Build a service based on the current object (template)."""
         assert instance.handle == 0
 
@@ -244,7 +283,18 @@ class PrimaryService(Service):
     This attribute has a type UUID of 0x2800.
     """
 
-    def __init__(self, uuid, handle: int = 0, end_handle: int = 0, **characteristics):
+    def __init__(self, uuid: UUID, handle: int = 0, end_handle: int = 0, **characteristics):
+        """Initialize a primary service of UUID `uuid` and declare the requested characteristics.
+
+        :param uuid: Service UUID
+        :type  uuid: UUID
+        :param handle: Service handle
+        :type  handle: int, optional
+        :param end_handle: Handle of service's last attribute
+        :type  end_handle: int, optional
+        :param characteristics: Additional characteristics's definitions to add into this service
+        :type  characteristics: dict
+        """
         super().__init__( UUID(0x2800), uuid, handle=handle, end_handle=end_handle, **characteristics)
 
 
@@ -296,6 +346,7 @@ class SecondaryService(Service):
     """
 
     def __init__(self, uuid, handle: int = 0):
+        """Initialize a secondary service identified by UUID `uuid`,"""
         super().__init__( UUID(0x2801), uuid, handle=handle)
 
     @classmethod
