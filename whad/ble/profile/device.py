@@ -217,7 +217,7 @@ class PeripheralCharacteristic(Characteristic, RemoteAttribute):
     def value(self) -> bytes:
         """Characteristic's value"""
         # Read value from characteristic
-        value = super().read_long()
+        value = super().read()
 
         # Update the underlying attribute value
         if Attribute.value.fset:
@@ -835,13 +835,13 @@ class PeripheralDevice(GenericProfile):
                         # Query the corresponding characteristic object
                         # and inject it into our pluggable instance.
                         remote_char = remote_service.char(char.uuid)
-                        if remote_char is not None and char.name:
-                           setattr(service, char.name, remote_char)
+                        if remote_char is not None and char.alias:
+                            setattr(service, char.alias, remote_char)
                         elif char.required:
                             raise ServiceNotFound()
-                        elif char.name:
+                        elif char.alias:
                             # Inject the characteristic but set it to None (undefined)
-                            setattr(service, char.name, None)
+                            setattr(service, char.alias, None)
 
                     # Return the populated service interface instance
                     return service
