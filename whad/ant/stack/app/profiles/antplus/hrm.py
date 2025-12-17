@@ -1,8 +1,8 @@
 from whad.ant.stack.app.profiles.antplus import AntPlusMasterProfile, AntPlusSlaveProfile
 from whad.scapy.layers.ant import ANT_MANUFACTURERS_ID, ANT_Plus_HR_Header_Hdr, ANT_HR_Default_Data_Page,\
     ANT_HR_Battery_Status_Data_Page, ANT_HR_Manufacturer_Information_Data_Page, ANT_HR_Product_Information_Data_Page,\
-    ANT_HR_Common_Payload, ANT_Plus_Header_Hdr, ANT_Request_Data_Page
-from time import sleep
+    ANT_HR_Common_Payload, ANT_Plus_Header_Hdr, ANT_Request_Data_Page, ANT_HR_Previous_Heart_Beat_Data_Page
+from time import sleep, time
 from threading import Thread
 class HeartRateMonitor(AntPlusMasterProfile):
     DEVICE_TYPE = 120
@@ -17,6 +17,7 @@ class HeartRateMonitor(AntPlusMasterProfile):
     def reset(self):
         self.__request = None
         self.computed_heart_rate = 60 
+        self.previous_heart_beat = self.computed_heart_rate
         self.heart_beat_count = 0
         self.heart_beat_event_time = 0
         self.manufacturer = "Garmin"
@@ -102,6 +103,25 @@ class HeartRateMonitor(AntPlusMasterProfile):
             )
         )
 
+    def send_previous_heart_rate_beat(self):
+        self.broadcast(
+            ANT_Plus_Header_Hdr()  /
+            ANT_Plus_HR_Header_Hdr(
+                toggle_bit = self.toggle_bit
+            ) / 
+            ANT_HR_Previous_Heart_Beat_Data_Page(
+                manufacturer = (
+                    ANT_MANUFACTURERS_ID[self.manufacturer] if 
+                    self.manufacturer in ANT_MANUFACTURERS_ID else 
+                    0),
+                previous_heart_beat = self.previous_heart_beat
+            ) / 
+            ANT_HR_Common_Payload(
+                heart_beat_event_time = self.heart_beat_event_time, 
+                heart_beat_count = self.heart_beat_count, 
+                computed_heart_rate = self.computed_heart_rate
+            )
+        )
 
     def start(self):
         super().start()
@@ -109,33 +129,35 @@ class HeartRateMonitor(AntPlusMasterProfile):
         self.__thread.start()
 
     def main_loop(self):
+        start_time = time()
         sequence = (
-            [self.send_default_page for _ in range(16)] + 
+            [self.send_previous_heart_rate_beat for _ in range(16)] + 
             [self.send_manufacturer_information] + 
-            [self.send_default_page for _ in range(16)] + 
+            [self.send_previous_heart_rate_beat for _ in range(16)] + 
             [self.send_product_information] +
-            [self.send_default_page for _ in range(16)] + 
+            [self.send_previous_heart_rate_beat for _ in range(16)] + 
             [self.send_battery_level]
         )
         sequence_index = 0
         while self.is_started():
-            if self.__request is None:
-                sequence[sequence_index]()
-            else:
-                print(self.__request)
-                if self.__request == 2:
-                    self.send_manufacturer_information()
-                elif self.__request == 3:
-                    self.send_product_information()
-                elif self.__request == 7:
-                    self.send_battery_level()
+            for _ in range(4):
+                if self.__request is None:
+                    sequence[sequence_index]()
                 else:
-                    self.__request = None
+                    print(self.__request)
+                    if self.__request == 2:
+                        self.send_manufacturer_information()
+                    elif self.__request == 3:
+                        self.send_product_information()
+                    elif self.__request == 7:
+                        self.send_battery_level()
+                    else:
+                        self.__request = None
+                sleep(1/4.06)
             self.toggle_bit = 1 - self.toggle_bit
             self.heart_beat_count = (self.heart_beat_count + 1) & 0xFF 
-            self.heart_beat_event_time = (self.heart_beat_event_time + 1000) & 0xFFFF
+            self.heart_beat_event_time = int((time() - start_time) * 1024) & 0xFFFF
             sequence_index = (sequence_index + 1) % len(sequence)
-            sleep(0.8)
 
     def on_ack_burst(self, payload):
         if ANT_Request_Data_Page in payload:
