@@ -21,7 +21,7 @@ from whad.ble.profile.characteristic import Characteristic
 
 class HeartRateService(StandardService):
     """Heart Rate service version 1.0 as defined in
-    [specification](https://www.bluetooth.com/specifications/specs/html/?src=HRS_v1.0/out/en/index-en.html).
+    `specification <https://www.bluetooth.com/specifications/specs/html/?src=HRS_v1.0/out/en/index-en.html>`_.
     """
 
     class UpdateEvent(ServiceEvent):
@@ -146,6 +146,10 @@ class HeartRateService(StandardService):
 
     def on_update(self, _: Characteristic, value: bytes, __: bool = False):
         """Process incoming notifications."""
+        # We should at least get two bytes
+        if len(value) < 2:
+            raise ValueError()
+
         # Retrieve flags
         flags = value[0]
         offset = 1
@@ -163,6 +167,10 @@ class HeartRateService(StandardService):
 
         # Fetch heart rate value
         if (flags & self.FLAG_VALUE_FORMAT) > 0:
+            # Check size
+            if len(value) < 3:
+                raise ValueError()
+            # Parse
             self.__heart_rate = unpack('<H', value[1:3])[0]
             offset += 2
         else:
@@ -170,7 +178,11 @@ class HeartRateService(StandardService):
             offset += 1
 
         # Fetch energy expended value if present
-        if (flags & self.FLAG_ENERGY_EXP) > 0 and len(value) >= (offset + 2):
+        if (flags & self.FLAG_ENERGY_EXP) > 0:
+            # Check size
+            if len(value) < (offset + 2):
+                raise ValueError()
+            # Parse value
             self.__energy_expended = unpack('<H', value[offset:offset+2])[0]
         else:
             self.__energy_expended = None
