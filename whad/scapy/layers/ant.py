@@ -1,6 +1,6 @@
 from scapy.packet import Packet, bind_layers
 from scapy.fields import StrFixedLenField, ByteField, ByteEnumField, \
- 	BitField, BitEnumField,LEX3BytesField, LEShortField, LEIntField, \
+ 	BitField, BitEnumField,LEX3BytesField, LEShortField, LEIntField, SignedShortField, \
 	SignedByteField, ShortField, LEShortEnumField, XLEShortField, ConditionalField
 from struct import pack
 
@@ -333,6 +333,81 @@ class  ANT_Plus_Header_Hdr(Packet):
 		else:
 			return Packet.guess_payload_class(self, payload)
 
+
+class ANT_Plus_Weight_Scale_Header_Hdr(Packet):
+	name = "ANT Plus Weight Scale Header"
+	fields_desc = [
+		ByteField("data_page_number", None),
+	]
+
+class ANT_Plus_Weight_Scale_Body_Weight_Data_Page(Packet):
+	name = "Body Weight Data Page"
+	fields_desc = [
+		ShortField("user_profile_identification", None), 
+		BitEnumField("display_user_profile_storage", None, 1, {0:"no", 1 : "yes"}), 
+		BitField("reserved1", None, 2), 
+		BitEnumField("scale_user_specific_data", None, 2, {0:"unknown", 1 : "yes",  2 : "no", 3 : "reserved"}), 
+		BitEnumField("scale_antfs_support", None, 1, {0:"no", 1 : "yes"}), 
+		BitEnumField("scale_user_profile_exchange", None, 1, {0:"no", 1 : "yes"}), 
+		BitEnumField("scale_user_profile_selected", None, 1, {0:"no", 1 : "yes"}), 
+		ShortField("reserved2", None), 
+		ShortField("body_weight", None)
+	]
+
+class ANT_Plus_Weight_Scale_Body_Composition_Percentage_Data_Page(Packet):
+	name = "Body Weight Data Page"
+	fields_desc = [
+		ShortField("user_profile_identification", None), 
+		ByteField("reserved", None), 
+
+		ShortField("hydration", None), 
+		ShortField("body_fat", None)
+	]
+
+class ANT_Plus_Weight_Scale_Body_Metabolic_Information_Data_Page(Packet):
+	name = "Metabolic Information Data Page"
+	fields_desc = [
+		ShortField("user_profile_identification", None), 
+		ByteField("reserved", None), 
+
+		ShortField("active_metabolic_rate", None), 
+		ShortField("basal_metabolic_rate", None)
+	]
+
+
+class ANT_Plus_Weight_Scale_Body_Composition_Mass_Data_Page(Packet):
+	name = "Body Composition Mass Data Page"
+	fields_desc = [
+		ShortField("user_profile_identification", None), 
+		ShortField("reserved", None), 
+
+		ShortField("muscle_mass", None), 
+		ByteField("bone_mass", None)
+	]
+
+class ANT_Plus_User_Profile_Data_Page(Packet):
+	name = "User Profile Data Page"
+	fields_desc = [
+		ShortField("user_profile_identification", None), 
+		BitEnumField("display_user_profile_storage", None, 2, {0:"no", 1 : "yes"}), 
+		BitField("reserved1", None, 2), 
+		BitEnumField("scale_user_specific_data", None, 2, {0:"unknown", 1 : "yes",  2 : "no", 3 : "reserved"}), 
+		BitEnumField("scale_antfs_support", None, 1, {0:"no", 1 : "yes"}), 
+		BitEnumField("scale_user_profile_exchange", None, 1, {0:"no", 1 : "yes"}), 
+		BitEnumField("scale_user_profile_selected", None, 1, {0:"no", 1 : "yes"}), 
+		ByteField("reserved2", None), 
+
+		BitField("age", None, 7), 
+		BitEnumField("gender", None, 1, {0 : "female", 1 : "male"}), 
+		
+		ByteField("user_height", None),
+		BitEnumField("athlete_setting", None, 1, { 0 : "standard", 1 : "lifetime_athlete"}),
+		BitField("reserved3", None, 4), 
+		BitField("activity_class", None, 3)
+		
+	]
+
+
 class ANT_Plus_HR_Header_Hdr(Packet):
 	name = "ANT Heart Rate Header"
 	fields_desc = [
@@ -553,6 +628,264 @@ class ANT_Bicycle_Speed_Motion_And_Cadence_Data_Page(Packet):
 		LEShortField("bike_speed_event_time", None),
 		LEShortField("cumulative_speed_revolution_count", None),
 	]
+
+
+
+class ANT_Plus_Speed_Distance_Header_Hdr(Packet):
+	name = "ANT Speed & Distance Header"
+	fields_desc = [
+		ByteField("data_page_number", None),
+	]
+
+class ANT_Plus_Speed_Distance_Default_Data_Page(Packet):
+	name = "ANT Speed & Distance Default Data Page"
+	fields_desc = [
+		ByteField("time_frac", None), 
+		ByteField("time", None), 
+		ByteField("distance", None), 
+		BitField("distance_frac", None, 4), 
+		BitField("instantaneous_speed", None, 4), 
+		ByteField("instantaneous_speed_frac", None), 
+		ByteField("stride_count", None), 
+		ByteField("update_latency", None)	
+	]
+
+
+class ANT_Plus_Speed_Distance_Base_Page(Packet):
+	name = "ANT Speed & Distance Base Page"
+	fields_desc = [
+		ShortField("reserved1", 0xFFFF), 
+		ByteField("cadence", None), 
+		BitField("cadence_frac", None, 4), 
+		BitField("instantaneous_speed", None, 4), 
+		ByteField("instantaneous_speed_frac", None), 
+		ByteField("reserved2", None), 
+		BitEnumField("sdm_location", None,2, {0b00 : "laces", 0b01 : "midsole", 0b10 : "other", 0b11 : "ankle"}), 	
+		BitEnumField("battery_status", None,2, {0b00 : "ok_new", 0b01 : "ok_good", 0b10 : "ok", 0b11 : "low"}), 	
+		BitEnumField("sdm_health", None,2 ,{0b00 : "ok", 0b01 : "error", 0b10 : "warning", 0b11 : "reserved"}), 	
+		BitEnumField("use_state", None,2,  {0b00 : "inactive", 0b01 : "active", 0b10 : "reserved", 0b11 : "reserved"}), 	
+
+	]
+
+
+class ANT_Plus_Speed_Distance_Calories_Page(Packet):
+	name = "ANT Speed & Distance Calories Page"
+	fields_desc = [
+		ShortField("reserved1", 0xFFFF), 
+		ByteField("cadence", None), 
+		BitField("cadence_frac", None, 4), 
+		BitField("instantaneous_speed", None, 4), 
+		ByteField("instantaneous_speed_frac", None), 
+		ByteField("calories", None), 
+		BitEnumField("sdm_location", None,2, {0b00 : "laces", 0b01 : "midsole", 0b10 : "other", 0b11 : "ankle"}), 	
+		BitEnumField("battery_status", None,2, {0b00 : "ok_new", 0b01 : "ok_good", 0b10 : "ok", 0b11 : "low"}), 	
+		BitEnumField("sdm_health", None,2 ,{0b00 : "ok", 0b01 : "error", 0b10 : "warning", 0b11 : "reserved"}), 	
+		BitEnumField("use_state", None,2,  {0b00 : "inactive", 0b01 : "active", 0b10 : "reserved", 0b11 : "reserved"}), 	
+
+	]
+
+
+class ANT_Plus_Bike_Power_Header_Hdr(Packet):
+	name = "ANT Bike Power Header"
+	fields_desc = [
+		ByteField("data_page_number", None)
+	]
+
+
+class ANT_Plus_Bike_Power_Standard_Power_Only_Main_Data_Page(Packet):
+	name = "ANT Bike Power Standard Power-Only Main Data Page"
+	fields_desc = [
+		ByteField("update_event_count", None), 
+		BitEnumField("pedal_differentiation", None, 1, { 0 : "right_pedal", 1: "unknown_pedal"}), 
+		BitField("pedal_power_percent", None, 7), 
+		ByteField("instantaneous_cadence", None), 
+		ShortField("accumulated_power", None), 
+		ShortField("instantaneous_power", None)
+	]
+
+
+
+class ANT_Plus_Bike_Power_Standard_Wheel_Torque_Main_Data_Page(Packet):
+	name = "ANT Bike Power Standard Wheel Torque Main Data Page"
+	fields_desc = [
+		ByteField("update_event_count", None), 
+		ByteField("wheel_ticks", None), 
+		ByteField("instantaneous_cadence", None), 
+		ShortField("wheel_period", None), 
+		ShortField("accumulated_torque", None)
+	]
+
+
+class ANT_Plus_Bike_Power_Standard_Crank_Torque_Main_Data_Page(Packet):
+	name = "ANT Bike Power Standard Crank Torque Main Data Page"
+	fields_desc = [
+		ByteField("update_event_count", None), 
+		ByteField("crank_ticks", None), 
+		ByteField("instantaneous_cadence", None), 
+		ShortField("crank_period", None), 
+		ShortField("accumulated_torque", None)
+	]
+
+
+class ANT_Plus_Bike_Power_Torque_Effectiveness_And_Pedal_Smoothness_Main_Data_Page(Packet):
+	name = "ANT Bike Power Torque Effectiveness and Pedal Smoothness Main Data Page"
+	fields_desc = [
+		ByteField("update_event_count", None), 
+		ByteField("left_torque_effectiveness", None), 
+		ByteField("right_torque_effectiveness", None), 
+		ByteField("left_pedal_smoothness", None), 
+		ByteField("right_pedal_smoothness", None), 
+		ShortField("reserved", None)
+	]
+
+class ANT_Plus_Bike_Power_Crank_Torque_Frequency_Main_Data_Page(Packet):
+	name = "ANT Bike Power Crank Torque Frequency Main Data Page"
+	fields_desc = [
+		ByteField("update_event_count", None), 
+		ShortField("slope", None), 
+		ShortField("timestamp", None), 
+		ShortField("torque_ticks_stamp", None), 
+	]
+
+class ANT_Plus_Bike_Power_Standard_Calibration_Message(Packet):
+	name = "ANT Bike Power Standard Calibration Message"
+	fields_desc = [
+		ByteEnumField("calibration_id", None, {
+			0xAA : "Calibration Request: Manual Zero",
+			0xAB : "Calibration Request: Auto Zero Configuration",
+			0xAC : "Calibration Response: Manual Zero Successful",
+			0xAF : "Calibration Response: Failed",
+			0x10 : "Crank Torque Frequency (CTF) Power sensor Defined Message",
+			0x12 : "Auto Zero Support",
+			0xBA : "Custom Calibration Parameter Request",
+			0xBB : "Custom Calibration Parameter Response",
+			0xBC : "Custom Calibration Parameter Update",
+			0xBD : "Custom Calibration Parameter Update Response",
+		})
+	]
+class ANT_Plus_Bike_Power_Crank_Torque_Frequency_Power_Sensor_Defined_Message(Packet):
+	name = "Crank Torque Frequency (CTF) Power sensor Defined Message"
+	fields_desc = [
+		ByteEnumField("ctf_defined_id", None, {1 : "offset", 2 : "slope", 3 : "serial_number", 0xac: "ack"}), 
+
+	]
+class ANT_Plus_Bike_Power_CTF_Power_Sensor_Offset(Packet):
+	name = "Offset"
+	fields_desc = [
+		StrFixedLenField("reserved", None, length=3),
+		ShortField("offset", None)
+	]
+
+class ANT_Plus_Bike_Power_CTF_Power_Sensor_Slope(Packet):
+	name = "Slope"
+	fields_desc = [
+		StrFixedLenField("reserved", None, length=3),
+		ShortField("slope", None)
+	]
+
+class ANT_Plus_Bike_Power_CTF_Power_Sensor_Serial_Number(Packet):
+	name = "Serial Number"
+	fields_desc = [
+		StrFixedLenField("reserved", None, length=3),
+		ShortField("serial_number", None)
+	]
+
+class ANT_Plus_Bike_Power_CTF_Power_Sensor_Acked(Packet):
+	name = "Acked"
+	fields_desc = [
+		ByteField("acked_ctf_defined_id", None),
+		StrFixedLenField("reserved", None, length=4),
+	]
+
+
+class ANT_Plus_Bike_Power_Standard_Calibration_Request_Manual_Zero(Packet):
+	name = "Calibration Req. : Manual Zero"
+	fields_desc = [
+		StrFixedLenField("reserved", None, length=6)
+	]
+
+
+class ANT_Plus_Bike_Power_Standard_Calibration_Request_Auto_Zero_Configuration(Packet):
+	name = "Calibration Req. : Auto Zero Configuration"
+	fields_desc = [
+		ByteEnumField("auto_zero_status", None, { 0 : "off", 1 : "on", 0xFF: "not_supported"}),
+		StrFixedLenField("reserved", None, length=5)
+	]
+
+
+
+class ANT_Plus_Bike_Power_Standard_Calibration_Response_Manual_Zero_Successful(Packet):
+	name = "Calibration Resp. : Manual Zero Successful"
+	fields_desc = [
+		ByteEnumField("auto_zero_status", None, { 0 : "off", 1 : "on", 0xFF: "not_supported"}),
+		StrFixedLenField("reserved", None, length=3), 
+		SignedShortField("calibration_data", None)
+	]
+
+
+class ANT_Plus_Bike_Power_Standard_Calibration_Response_Failed(Packet):
+	name = "Calibration Resp. : Failed"
+	fields_desc = [
+		ByteEnumField("auto_zero_status", None, { 0 : "off", 1 : "on", 0xFF: "not_supported"}),
+		StrFixedLenField("reserved", None, length=3), 
+		SignedShortField("calibration_data", None)
+	]
+
+
+class ANT_Plus_Bike_Power_Standard_Auto_Zero_Support(Packet):
+	name = "Auto Zero Support"
+	fields_desc = [
+		BitField("reserved1", 0, 6), 
+		BitEnumField("auto_zero_status", None, 1, { 0 : "off", 1 : "on"}),
+		BitEnumField("auto_zero_enable", None, 1, { 0 : "not_supported", 1 : "supported"}),
+		StrFixedLenField("reserved2", None, length=5)
+	]
+
+
+class ANT_Plus_Bike_Power_Standard_Custom_Calibration_Parameter_Request(Packet):
+	name = "Custom Parameter Calibration Request"
+	fields_desc = [
+		StrFixedLenField("manufacturer_specific", None, length=6)
+	]
+
+class ANT_Plus_Bike_Power_Standard_Custom_Calibration_Parameter_Response(Packet):
+	name = "Custom Parameter Calibration Response"
+	fields_desc = [
+		StrFixedLenField("manufacturer_specific", None, length=6)
+	]
+
+class ANT_Plus_Bike_Power_Standard_Set_Custom_Calibration_Parameter(Packet):
+	name = "Set Custom Calibration Parameter"
+	fields_desc = [
+		StrFixedLenField("manufacturer_specific", None, length=6)
+	]
+
+class ANT_Plus_Bike_Power_Standard_Set_Custom_Parameter_Successful(Packet):
+	name = "Set Custom Parameter Successful"
+	fields_desc = [
+		StrFixedLenField("manufacturer_specific", None, length=6)
+	]
+
+class ANT_Plus_Bike_Power_Battery_Status_Data_Page(Packet):
+	name = "ANT Plus Bike Power Battery Status Data Page"
+	fields_desc = [
+		ByteField("reserved",0xFF),
+		BitField("identifier",None, 4),
+		BitField("number_of_batteries",None, 4),
+		LEX3BytesField("cumulative_operating_time", None),
+		ByteField("fractional_battery_voltage", None),
+		ByteField("descriptive_bit_field", None),
+
+	]
+
+
+
+bind_layers(ANT_Plus_Bike_Power_Header_Hdr, ANT_Plus_Bike_Power_Standard_Wheel_Torque_Main_Data_Page, data_page_number=0x11)
+bind_layers(ANT_Plus_Bike_Power_Header_Hdr, ANT_Plus_Bike_Power_Standard_Crank_Torque_Main_Data_Page, data_page_number=0x12)
+bind_layers(ANT_Plus_Bike_Power_Header_Hdr, ANT_Plus_Bike_Power_Torque_Effectiveness_And_Pedal_Smoothness_Main_Data_Page, data_page_number=0x13)
+bind_layers(ANT_Plus_Bike_Power_Header_Hdr, ANT_Plus_Bike_Power_Crank_Torque_Frequency_Main_Data_Page, data_page_number=0x20)
+bind_layers(ANT_Plus_Bike_Power_Header_Hdr, ANT_Plus_Bike_Power_Standard_Calibration_Message, data_page_number=0x01)
+bind_layers(ANT_Plus_Bike_Power_Header_Hdr, ANT_Plus_Bike_Power_Battery_Status_Data_Page, data_page_number=0x52)
 
 class ANT_Plus_Bicycle_Cadence_Header_Hdr(Packet):
 	name = "ANT Bicycle Cadence Header"
@@ -846,7 +1179,10 @@ ANT_PLUS_PROFILES = {
 	121 : ANT_Plus_Bicycle_Speed_And_Cadence, 
 	122 : ANT_Plus_Bicycle_Cadence_Header_Hdr, 
 	123 : ANT_Plus_Bicycle_Speed_Header_Hdr, 
-	16  : ANT_Plus_Ranging_Header_Hdr 
+	124 : ANT_Plus_Speed_Distance_Header_Hdr,
+	16  : ANT_Plus_Ranging_Header_Hdr,
+	11 :  ANT_Plus_Bike_Power_Header_Hdr, 
+	119 : ANT_Plus_Weight_Scale_Header_Hdr
 }
 bind_layers(ANT_Hdr, ANT_Plus_Header_Hdr, preamble=0xc5a6)
 bind_layers(ANT_Hdr, ANT_FS_Header_Hdr, preamble=0xa33b)
@@ -856,6 +1192,9 @@ bind_layers(ANT_Plus_Header_Hdr,ANT_Plus_HR_Header_Hdr, device_type=120)
 bind_layers(ANT_Plus_Header_Hdr,ANT_Plus_Bicycle_Speed_And_Cadence, device_type=121)
 bind_layers(ANT_Plus_Header_Hdr,ANT_Plus_Bicycle_Cadence_Header_Hdr, device_type=122)
 bind_layers(ANT_Plus_Header_Hdr,ANT_Plus_Bicycle_Speed_Header_Hdr, device_type=123)
+bind_layers(ANT_Plus_Header_Hdr,ANT_Plus_Speed_Distance_Header_Hdr, device_type=124)
+bind_layers(ANT_Plus_Header_Hdr,ANT_Plus_Bike_Power_Header_Hdr, device_type=11)
+
 bind_layers(ANT_Plus_Header_Hdr,ANT_Plus_Ranging_Header_Hdr, device_type=16)
 
 bind_layers(ANT_Plus_HR_Header_Hdr, ANT_HR_Default_Data_Page,data_page_number=0)
@@ -879,9 +1218,22 @@ bind_layers(ANT_HR_Capabilities_Data_Page, ANT_HR_Common_Payload)
 bind_layers(ANT_HR_Battery_Status_Data_Page, ANT_HR_Common_Payload)
 
 
+bind_layers(ANT_Plus_Header_Hdr, ANT_Plus_Weight_Scale_Header_Hdr, device_type=119)
+bind_layers(ANT_Plus_Weight_Scale_Header_Hdr, ANT_Plus_Weight_Scale_Body_Weight_Data_Page, data_page_number = 1)
+bind_layers(ANT_Plus_Weight_Scale_Header_Hdr, ANT_Plus_Weight_Scale_Body_Composition_Percentage_Data_Page, data_page_number = 2)
+bind_layers(ANT_Plus_Weight_Scale_Header_Hdr, ANT_Plus_Weight_Scale_Body_Metabolic_Information_Data_Page, data_page_number = 3)
+bind_layers(ANT_Plus_Weight_Scale_Header_Hdr, ANT_Plus_Weight_Scale_Body_Composition_Mass_Data_Page, data_page_number = 4)
+bind_layers(ANT_Plus_Weight_Scale_Header_Hdr, ANT_Plus_User_Profile_Data_Page, data_page_number = 0x3A)
+
+
 bind_layers(ANT_Plus_Ranging_Header_Hdr,ANT_Ranging_Measurement_Data_Page, data_page_number=0x10)
 bind_layers(ANT_Plus_Ranging_Header_Hdr,ANT_Ranging_Set_Measurement_Mode_Data_Page, data_page_number=0x30)
 
+bind_layers(ANT_Plus_Bike_Power_Header_Hdr, ANT_Plus_Bike_Power_Standard_Power_Only_Main_Data_Page, data_page_number=0x10)
+
+bind_layers(ANT_Plus_Speed_Distance_Header_Hdr, ANT_Plus_Speed_Distance_Default_Data_Page, data_page_number = 1) 
+bind_layers(ANT_Plus_Speed_Distance_Header_Hdr, ANT_Plus_Speed_Distance_Base_Page, data_page_number = 2) 
+bind_layers(ANT_Plus_Speed_Distance_Header_Hdr, ANT_Plus_Speed_Distance_Calories_Page, data_page_number = 3) 
 
 bind_layers(ANT_Plus_Bicycle_Cadence_Header_Hdr,ANT_Bicycle_Cadence_Default_Data_Page,data_page_number=0)
 bind_layers(ANT_Plus_Bicycle_Cadence_Header_Hdr,ANT_Bicycle_Cadence_Cumulative_Operating_Time_Data_Page,data_page_number=1)
@@ -896,6 +1248,21 @@ bind_layers(ANT_Plus_Bicycle_Speed_Header_Hdr,ANT_Bicycle_Speed_Manufacturer_Inf
 bind_layers(ANT_Plus_Bicycle_Speed_Header_Hdr,ANT_Bicycle_Speed_Product_Information_Data_Page,data_page_number=3)
 bind_layers(ANT_Plus_Bicycle_Speed_Header_Hdr,ANT_Bicycle_Speed_Battery_Status_Data_Page, data_page_number=4)
 bind_layers(ANT_Plus_Bicycle_Speed_Header_Hdr,ANT_Bicycle_Speed_Motion_And_Cadence_Data_Page,data_page_number=5)
+
+bind_layers(ANT_Plus_Bike_Power_Standard_Calibration_Message, ANT_Plus_Bike_Power_Standard_Calibration_Request_Manual_Zero,calibration_id = 0xAA)
+bind_layers(ANT_Plus_Bike_Power_Standard_Calibration_Message, ANT_Plus_Bike_Power_Standard_Calibration_Request_Auto_Zero_Configuration,calibration_id = 0xAB)
+bind_layers(ANT_Plus_Bike_Power_Standard_Calibration_Message, ANT_Plus_Bike_Power_Standard_Calibration_Response_Manual_Zero_Successful,calibration_id = 0xAC)
+bind_layers(ANT_Plus_Bike_Power_Standard_Calibration_Message, ANT_Plus_Bike_Power_Standard_Calibration_Response_Failed,calibration_id = 0xAF)
+bind_layers(ANT_Plus_Bike_Power_Standard_Calibration_Message, ANT_Plus_Bike_Power_Standard_Auto_Zero_Support,calibration_id = 0x12)
+bind_layers(ANT_Plus_Bike_Power_Standard_Calibration_Message, ANT_Plus_Bike_Power_Standard_Custom_Calibration_Parameter_Request,calibration_id = 0xBA)
+bind_layers(ANT_Plus_Bike_Power_Standard_Calibration_Message, ANT_Plus_Bike_Power_Standard_Custom_Calibration_Parameter_Response,calibration_id = 0xBB)
+bind_layers(ANT_Plus_Bike_Power_Standard_Calibration_Message, ANT_Plus_Bike_Power_Standard_Set_Custom_Calibration_Parameter,calibration_id = 0xBC)
+bind_layers(ANT_Plus_Bike_Power_Standard_Calibration_Message, ANT_Plus_Bike_Power_Standard_Set_Custom_Parameter_Successful,calibration_id = 0xBD)
+
+bind_layers(ANT_Plus_Bike_Power_Crank_Torque_Frequency_Power_Sensor_Defined_Message, ANT_Plus_Bike_Power_CTF_Power_Sensor_Offset, ctf_defined_id = 1)
+bind_layers(ANT_Plus_Bike_Power_Crank_Torque_Frequency_Power_Sensor_Defined_Message, ANT_Plus_Bike_Power_CTF_Power_Sensor_Slope, ctf_defined_id = 2)
+bind_layers(ANT_Plus_Bike_Power_Crank_Torque_Frequency_Power_Sensor_Defined_Message, ANT_Plus_Bike_Power_CTF_Power_Sensor_Serial_Number, ctf_defined_id = 3)
+bind_layers(ANT_Plus_Bike_Power_Crank_Torque_Frequency_Power_Sensor_Defined_Message, ANT_Plus_Bike_Power_CTF_Power_Sensor_Acked, ctf_defined_id = 0xac)
 
 bind_layers(ANT_FS_Type_Hdr,ANT_FS_Beacon_Packet, packet_type=0x43)
 bind_layers(ANT_FS_Beacon_Packet,ANT_FS_Beacon_Link_Packet, state=0x00)
