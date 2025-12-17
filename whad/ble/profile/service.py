@@ -8,7 +8,9 @@ from typing import Optional, Type, Iterator, Union
 from struct import pack
 from threading import Thread
 
-from whad.ble.profile.attribute import Attribute, UUID, get_uuid_alias
+from whad.ble.profile.attribute import (
+    Attribute, UUID, get_uuid_alias, InvalidUUIDException
+)
 from whad.ble.profile.characteristic import Characteristic
 from whad.ble.utils.clues import CluesDb
 
@@ -194,14 +196,34 @@ class Service(Attribute):
         """
         yield from self.__characteristics
 
-    def get_characteristic(self, uuid: UUID) -> Optional[Characteristic]:
+    def get_characteristic(self, uuid: Union[str, UUID]) -> Optional[Characteristic]:
+        """Get characteristic by UUID.
+
+        .. deprecated:: 1.3.0
+            Use :py:meth:`~whad.ble.profile.service.Service.char` instead of
+            :py:meth:`.get_characteristic`.
+
+        :param uuid: Searched characteristic's UUID
+        :type uuid: UUID, str
+        :return: Characteristic object if found, None otherwise
+        :rtype: Characteristic, optional
+        :raises InvalidUUIDException: Invalid UUID
+        """
+        return self.char(uuid)
+
+    def char(self, uuid: Union[str, UUID]) -> Optional[Characteristic]:
         """Get characteristic by UUID.
 
         :param uuid: Searched characteristic's UUID
         :type uuid: UUID
         :return: Characteristic object if found, None otherwise
         :rtype: Characteristic, optional
+        :raises InvalidUUIDException: Invalid UUID
         """
+        # Convert characteristic's string UUID to an UUID object
+        if isinstance(uuid, str):
+            uuid = UUID(uuid)
+
         for charac in self.__characteristics:
             if charac.uuid == uuid:
                 return charac
