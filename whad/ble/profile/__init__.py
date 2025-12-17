@@ -295,7 +295,8 @@ class Profile:
                     inc_service.service_start_handle = service_obj.handle
                     inc_service.service_end_handle = service_obj.end_handle
 
-        # Register any hook function
+
+        # Register any hook function declared in profile class
         props = dir(self)
         for prop in props:
             prop_obj = getattr(self, prop)
