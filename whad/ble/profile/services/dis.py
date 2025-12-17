@@ -6,7 +6,7 @@ from whad.ble.profile.characteristic import Characteristic
 
 class DeviceInformationService(StandardService):
     """Device Information Service version 1.2 as defined in
-    [specification](https://www.bluetooth.com/specifications/specs/html/?src=DIS_v1.2/out/en/index-en.html)
+    `specification <https://www.bluetooth.com/specifications/specs/html/?src=DIS_v1.2/out/en/index-en.html>`_.
     """
     _uuid = UUID(0x180a)
 
