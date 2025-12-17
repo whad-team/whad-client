@@ -573,6 +573,74 @@ code shows how to handle GATT write errors:
         except AttError:
             print("An error occurred while disconnecting from target.")
 
+Querying and interacting with standard services
+-----------------------------------------------
+
+The Bluetooth specification defines a set of standard services designed to be used by devices
+providing one or more standardized features. Services like the *Battery* service, the *Device Information* service
+or the *Heart Rate* service define each one or more characteristics and how data is exchanged
+between them and a GATT client. Each service exposes one or more information that can be queried,
+usually specifically stored inside its characteristic's values using a specific encoding.
+
+WHAD offers an easy way to query standard services through a specific asbtraction, allowing direct
+access to the stored information without dealing with the way it is encoded or knowing the expected
+service's and characteristics' UUIDs. The current stable version supports the following services:
+
+- Device Information service
+- Battery service
+- Heart Rate service
+
+In a case of a connection to a GATT server from a central device, a specific can be queried through
+the :py:meth:`~whad.ble.profile.device.PeripheralDevice.query` method. An additional method
+:py:meth:`~whad.ble.profile.device.PeripheralDevice.has` is available to check if a device exposes
+the expected primary service and mandatory characteristics, based on their respective UUIDs.
+It is then quite easy, once a connection to a GATT server established, to get an instance of the
+:class:`~whad.ble.profile.services.bas.BatteryService` class and interact in a transparent way.
+Each time this service's characteristic's value is read, a read operation is performed and the
+returned data is parsed and converted in a value in a convenient format.
+
+The example below shows how this feature should be used to read the battery level of a device:
+
+.. code-block:: python
+
+    from whad.device import Device
+    from whad.ble import Central, UUID, BatteryService
+    from whad.ble.exceptions import PeripheralNotFound
+
+    # We assign a BLE central role to our HCI adapter
+    central = Central(Device.create("hci0"))
+
+    # Target not connected
+    target = None
+
+    try:
+        # Connect to remote device and discover services and characteristics
+        target = central.connect("00:11:22:33:44:55", random=True)
+        target.discover()
+
+        # Check the device exposes a Battery service, queries it and read
+        # the battery's level as a percentage
+        if target.has(BatteryService):
+            battery = target.query(BatteryService)
+            print(f"Battery level: {battery.percentage}%")
+        else:
+            print("Battery service is not supported by this device.")
+
+        # Closing connection
+        target.disconnect()
+
+    # Handle connection error
+    except PeripheralNotFound:
+        print("Target device not found.")
+
+.. note::
+   Custom services can also be defined using the same mechanisms, and used in profile definition as
+   well as in GATT clients. More information about how services are defined in the device model section.
+
+.. attention::
+    WHAD provides a very limited set of services for now, but we expect to implement more of
+    them in future versions.
+
 
 Central connector and events
 ----------------------------
