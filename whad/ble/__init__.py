@@ -22,7 +22,7 @@ from whad.ble.profile.advdata import (
     AdvDataFieldListOverflow, AdvURI, AdvLeRole, AdvAppearance, AdvUuid128List,
     AdvUuid16List, AdvDataError
 )
-from whad.ble.profile.services import BatteryService, DeviceInformationService, GapService
+from whad.ble.profile.services import BatteryService, DeviceInformationService, GapService, HeartRateService
 from whad.ble.connector.base import BLE
 from whad.ble.connector import (
     Central, Peripheral, Sniffer, Hijacker, Injector, Scanner, PeripheralClient, Scanner
@@ -48,6 +48,7 @@ __all__ = [
     'unsubscribed',
     'BatteryService',
     'GapService',
+    'HeartRateService',
     'DeviceInformationService',
     'Characteristic',
     'Descriptor',

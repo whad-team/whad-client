@@ -2,11 +2,12 @@
 BLE GATT Service Model
 ======================
 """
+from abc import abstractmethod, ABC
 import logging
 from typing import Optional, Type, Iterator, Union
 from struct import pack
+from threading import Thread
 
-from whad.ble.exceptions import InvalidHandleValueException
 from whad.ble.profile.attribute import Attribute, UUID, get_uuid_alias
 from whad.ble.profile.characteristic import Characteristic
 from whad.ble.utils.clues import CluesDb
@@ -318,6 +319,19 @@ class PrimaryService(Service):
         # Return our cloned service
         return service
 
+class ServiceEvent:
+    """Default service event"""
+
+class ServiceEventHandler(ABC):
+    """Abstract class for service event handlers."""
+    @abstractmethod
+    def on_event(self, event: ServiceEvent):
+        """Process a service event.
+
+        :param event: Service event to process
+        :type  event: ServiceEvent
+        """
+
 class StandardService(PrimaryService):
     """Standard service class.
 
@@ -327,8 +341,41 @@ class StandardService(PrimaryService):
 
     _uuid = None
 
-    def __init__(self, handle: int = 0, end_handle: int = 0, **characteristics):
-        super().__init__(self._uuid, handle, end_handle, **characteristics)
+    def __init__(self, handle: int = 0, end_handle: int = 0, **children):
+        """Initialize a standard service.
+
+        :param handle: Service start handle
+        :type  handle: int, optional
+        :param end_handle: Service end handle
+        :type  end_handle: int, optional
+        :param kwargs: Extra named parameters passed to the underlying :class:`PrimaryService`
+        :type  kwargs: dict
+        """
+        self.__event_handlers = []
+        super().__init__(self._uuid, handle, end_handle, **children)
+
+    def add_event_handler(self, handler):
+        """Add an event handler to this standard service."""
+        if handler not in self.__event_handlers:
+            self.__event_handlers.append(handler)
+
+    def remove_event_handler(self, handler):
+        """Remove event handler from this standard service."""
+        if handler in self.__event_handlers:
+            self.__event_handlers.remove(handler)
+
+    def __threaded_event(self, handlers, event):
+        """Send an event to handlers from a separate thread."""
+        for handler in handlers:
+            handler(event)
+
+    def send_event(self, event):
+        """Send event to registered event handlers."""
+        # Get a copy of event handlers
+        handlers = [handler for handler in self.__event_handlers]
+
+        # Send event from another thread to avoid concurrency issues
+        Thread(target=self.__threaded_event, args=(handlers, event)).start()
 
     @classmethod
     def _build(cls, instance):
