@@ -5,6 +5,7 @@ from argparse import Namespace
 
 from prompt_toolkit import print_formatted_text, HTML
 
+from whad.exceptions import WhadDeviceDisconnected
 from whad.ble.profile.characteristic import CharacteristicProperties
 from whad.cli.app import command, CommandLineApp
 from whad.ble import Central, Scanner
@@ -89,10 +90,10 @@ def profile_discover(app: CommandLineApp, device, include_values: bool = False) 
 
 
             # Show values if requested
-            if include_values:
+            if include_values and charac.cached_value is not None:
                 print_formatted_text(
                     HTML("    <ansiblue>Value</ansiblue>: {value}")
-                        .format(value=charac.value.hex())
+                        .format(value=charac.cached_value.hex())
                 )
         print('')
 
@@ -164,49 +165,71 @@ def profile_handler(app, command_args):
 
         scanner.stop()
 
-        # Switch to central mode
-        central = Central(app.interface)
-        central.start()
+        retries = 3
+        json = None
+        while retries > 0:
+            # Switch to central mode
+            central = Central(app.interface, from_json=json)
+            central.start()
 
-        try:
-            print("Connecting to target device ...")
+            try:
+                print("Connecting to target device ...")
 
-            # Connect to target device
-            device = central.connect(app.args.bdaddr, random=app.args.random)
-            if device is None:
-                app.error("Cannot connect to %s, device does not respond.", app.args.bdaddr)
-            else:
-                try:
-                    print("Enumerating services and characteristics ...")
-                    # Perform profile discovery
-                    result = profile_discover(app, device, include_values=(len(command_args) >= 1))
+                # Connect to target device
+                device = central.connect(app.args.bdaddr, random=app.args.random)
+                if device is None:
+                    app.error("Cannot connect to %s, device does not respond.", app.args.bdaddr)
+                else:
+                    try:
+                        print("Enumerating services and characteristics ...")
+                        # Perform profile discovery
+                        result = profile_discover(app, device, include_values=(len(command_args) >= 1))
 
-                    # Export profile to JSON file if required
-                    if result and len(command_args) >= 1:
-                        # Load GATT profile JSON data
-                        json_data = device.export_json()
-                        profile = loads(json_data)
+                        # Export profile to JSON file if required
+                        if result and len(command_args) >= 1:
+                            # Load GATT profile JSON data
+                            json_data = device.export_json()
+                            profile = loads(json_data)
 
-                        # Add specific device info (for emulating)
-                        profile['devinfo'] = device_metadata
-                        json_data = dumps(profile)
-                        try:
-                            print(f"Writing profile JSON data to {command_args[0]} ...")
-                            with open(command_args[0], 'w', encoding='utf-8') as profile:
-                                profile.write(json_data)
-                        except IOError:
-                            app.error(f"An error occurred when writing to {command_args[0]}")
+                            # Add specific device info (for emulating)
+                            profile['devinfo'] = device_metadata
+                            json_data = dumps(profile)
+                            try:
+                                print(f"Writing profile JSON data to {command_args[0]} ...")
+                                with open(command_args[0], 'w', encoding='utf-8') as profile:
+                                    profile.write(json_data)
+                            except IOError:
+                                app.error(f"An error occured when writing to {command_args[0]}")
 
-                    # Disconnect
-                    device.disconnect()
-                except ConnectionLostException:
-                    app.error("BLE device disconnected during discovery.")
+                        # Disconnect
+                        device.disconnect()
 
-        except PeripheralNotFound:
-            app.error(f"BLE peripheral {app.args.bdaddr} cannot be found.")
+                        # Exit while loop
+                        retries = 0
+                        break
+                    except ConnectionLostException:
+                        app.error("BLE device disconnected during discovery.")
+                        if retries > 0:
+                            # Try again and feed all the discovered information into the profile used in Central,
+                            # to speed up discovery.
+                            retries -= 1
+                            json = device.export_json()
+                            app.warning(f"BLE peripheral {app.args.bdaddr} has disconnected, retrying ({retries} attempt(s) left)")
+                        else:
+                            app.error(f"BLE peripheral {app.args.bdaddr} has disconnected, exiting.")
+                            break
 
-        # Terminate central
-        central.stop()
+            except PeripheralNotFound:
+                app.error(f"BLE peripheral {app.args.bdaddr} cannot be found.")
+            except WhadDeviceDisconnected:
+                if retries > 0:
+                    retries -= 1
+                    app.warning(f"BLE peripheral {app.args.bdaddr} has disconnected, retrying ({retries} attempt(s) left)")
+                else:
+                    app.error(f"BLE peripheral {app.args.bdaddr} has disconnected, exiting.")
+
+            # Terminate central
+            central.stop()
 
     # Piped interface
     elif app.args.bdaddr is None and app.is_piped_interface():
