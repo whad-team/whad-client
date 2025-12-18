@@ -1,6 +1,7 @@
 """GATT Server and Client implementation
 """
 import logging
+from typing import Optional
 
 from time import time
 from queue import Queue, Empty
@@ -20,8 +21,8 @@ from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.ble.profile import GenericProfile
 from whad.ble.stack.smp import Pairing
 from whad.ble.profile.characteristic import Characteristic, Descriptor, ClientCharacteristicConfig, CharacteristicValue
-from whad.ble.profile.service import PrimaryService, SecondaryService, IncludeService
-
+from whad.ble.profile.service import Service, PrimaryService, SecondaryService, IncludeService
+from whad.exceptions import WhadDeviceDisconnected
 from whad.common.stack import Layer, source, alias
 
 logger = logging.getLogger(__name__)
@@ -644,13 +645,13 @@ class GattClient(GattLayer):
                 raise error_response_to_exc(msg.reason, msg.request, msg.handle)
 
     @proclock
-    def discover_primary_services(self):
+    def discover_primary_services(self, start: int = 1):
         """Discover remote Primary Services.
 
         This function will yield every discovered primary service.
         """
         # List primary services handles
-        handle = 1
+        handle = start
         while True:
             # Send a Read By Group Type Request
             self.lock_tx()
@@ -718,16 +719,19 @@ class GattClient(GattLayer):
                     error_response_to_exc(msg.reason, msg.request, msg.handle)
 
     @proclock
-    def discover_characteristics(self, service, save_values: bool = False):
+    def discover_characteristics(self, service, save_values: bool = False, start: Optional[int] = None):
         """
         Discover service characteristics
         """
         logger.debug("discover characteristics for service %s", service.uuid)
-        logger.debug("discover characteristics from handle %d to %d", 
+        logger.debug("discover characteristics from handle %d to %d",
             service.handle, service.end_handle
         )
-        if isinstance(service, PrimaryService):
-            handle = service.handle
+        if isinstance(service, Service):
+            if start is not None:
+                handle = start
+            else:
+                handle = service.handle
         else:
             return
 
@@ -757,12 +761,15 @@ class GattClient(GattLayer):
                     charac.value_handle = charac_value_handle
                     charac.service = service
 
+                    # Add characteristic as soon as we discovered it and set its value
+                    service.add_characteristic(charac)
+
                     # Read value if requested and characteristic is readable
                     if save_values and (charac_properties & 0x02) > 0:
                         try:
                             charac.value = self.read(charac_value_handle)
                         except (AttError, GattTimeoutException):
-                            charac.value = b""
+                            charac.value = None
 
                     handle = charac.handle+2
                     logger.debug("found characteristic %s with handle %d", charac_uuid, charac_value_handle)
@@ -823,15 +830,92 @@ class GattClient(GattLayer):
                                                       uuid, desc_value)
 
     def discover(self, save_values: bool = False):
+        """Discover device services, characteristics and descriptors.
+
+        This method performs a GATT server discovery procedure, in four distinct steps:
+
+        1. Enumeration of all primary services,
+        2. For each service, enumeration of all its characteristics,
+        3. For each characteristic, enumeration of all its descriptors,
+        4. For each readable characteristic, read of its value if `save_values` is set to True.
+
+        The current profile may be incomplete, resulting from a previous discovery process that
+        failed for some reason:
+
+        - Remote device has disconnected due to a timeout during the discovery process
+        - Reading a descriptor's definition attribute failed
+        - Reading a characteristic value failed
+
+        We need to identify the most probable cause of failure and skip the attribute causing
+        it to achieve a complete discovery. Our discovery process is designed to save discovered
+        information as soon as it gets it, so based on the state of the current profile we may
+        determine which step failed, and from this recover from our previous failure.
+
+        - First, we check that all services have successfully been discovered by searching for
+          services with handle greater than the greatest service's end handle we have discovered
+          so far. If some new service is discovered, then we failed during first step.
+
+        - Then, we check that all characteristics have successfully been discovered by searching
+          for characteristics with handle greater than the greatest service's characteristic's\
+          end handle discovered so far, for each service. If new characteristics have been discovered,
+          then we failed at step 2.
+
+        - If no new service or characteristic has been found, we search for new descriptors for each
+          characteristic belonging to our discovered services, if new descriptors have been found it
+          means we failed at step 3.
+
+        - If everything went smooth so far, it means we failed at reading a characteristic. We search
+          for the last readable characteristic with no value set and skip it.
+
+        :param save_values: If `True`, save every characteristic's value in the generated profile
+        :type  save_values: bool
+        """
+        service_last_handle = 1
+        for service in self.__model.services():
+            if service.end_handle > service_last_handle:
+                service_last_handle = service.end_handle
+
         # Discover services
         services = []
-        for service in self.discover_primary_services():
+        for service in self.discover_primary_services(start=service_last_handle):
             services.append(service)
 
-        for service in services:
-            for characteristic in self.discover_characteristics(service, save_values=save_values):
-                service.add_characteristic(characteristic)
+            # Add service into model
             self.__model.add_service(service)
+
+
+        # If we discovered new services with a non-empty model, we are recovering
+        # from a previously failed attempt.
+        if len(services) > 0 and service_last_handle > 1:
+            logger.debug("recovery: discovered %d more services than previous discovery procedure", len(services))
+        elif service_last_handle > 1:
+            services = list(self.__model.services())
+
+        # Discover characteristics for each service, skipping already discovered services
+        for service in services:
+            # First, we search for the last characteristic discovered
+            last_charac = None
+            for charac in service.characteristics():
+                if last_charac is None:
+                    last_charac = charac
+                elif charac.handle > last_charac.handle:
+                    last_charac = charac
+
+            # If no characteristic in service, start with service handle
+            if last_charac is None:
+                handle = service.handle
+            else:
+                handle = last_charac.end_handle
+
+            # Enumerating characteristics
+            for characteristic in self.discover_characteristics(service, save_values=save_values, start=handle):
+                if handle > service.handle:
+                    logger.debug("recovery: found new characteristic %s with handle %s", characteristic.uuid,
+                                 characteristic.handle)
+
+            # Update service into model
+            self.__model.add_service(service)
+
 
         # Searching for descriptors
         for service in services:
@@ -1070,7 +1154,7 @@ class GattClient(GattLayer):
                 raise error_response_to_exc(msg.reason, msg.request, msg.handle)
         else:
             return None
-        
+
     def on_mtu_changed(self, mtu):
         """MTU has changed, notify client.
         """
