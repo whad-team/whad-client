@@ -199,12 +199,14 @@ class Profile:
                     if UUID(service['type_uuid']) == UUID(0x2800):
                         service_obj = PrimaryService(
                             uuid=UUID(service['uuid']),
-                            handle=service['start_handle']
+                            handle=service['start_handle'],
+                            end_handle=service['end_handle'],
                         )
                     elif UUID(service['type_uuid']) == UUID(0x2801):
                         service_obj = SecondaryService(
                             uuid=UUID(service['uuid']),
-                            handle=service['start_handle']
+                            handle=service['start_handle'],
+                            end_handle=service['end_handle']
                         )
                     else:
                         # This is not a known service type UUID, continue with
@@ -387,7 +389,7 @@ class Profile:
             service.handle = self.__alloc_handle()
 
         # Append service to the list of our services
-        if not handles_only:
+        if not handles_only and service not in self.__services:
             self.__services.append(service)
 
         # Register service as an attribute
@@ -594,7 +596,7 @@ class Profile:
         into the profile.
         """
         for _, obj in self.__attr_db.items():
-            if isinstance(obj, (PrimaryService, SecondaryService)):
+            if isinstance(obj, Service):
                 yield obj
 
     def included_services(self) -> Iterator[IncludeService]:
