@@ -590,12 +590,12 @@ service's and characteristics' UUIDs. The current stable version supports the fo
 - Battery service
 - Heart Rate service
 
-In a case of a connection to a GATT server from a central device, a specific can be queried through
+In case of a connection to a GATT server from a central device, a specific service can be queried through
 the :py:meth:`~whad.ble.profile.device.PeripheralDevice.query` method. An additional method
 :py:meth:`~whad.ble.profile.device.PeripheralDevice.has` is available to check if a device exposes
 the expected primary service and mandatory characteristics, based on their respective UUIDs.
 It is then quite easy, once a connection to a GATT server established, to get an instance of the
-:class:`~whad.ble.profile.services.bas.BatteryService` class and interact in a transparent way.
+:class:`~whad.ble.profile.services.bas.BatteryService` service class, for instance, and interact in a transparent way.
 Each time this service's characteristic's value is read, a read operation is performed and the
 returned data is parsed and converted in a value in a convenient format.
 
@@ -635,7 +635,7 @@ The example below shows how this feature should be used to read the battery leve
 
 .. note::
    Custom services can also be defined using the same mechanisms, and used in profile definition as
-   well as in GATT clients. More information about how services are defined in the device model section.
+   well as in GATT clients. More information about how services are defined in :ref:`ble-profile-standard-service`.
 
 .. attention::
     WHAD provides a very limited set of services for now, but we expect to implement more of

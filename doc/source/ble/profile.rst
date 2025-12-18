@@ -52,17 +52,16 @@ Of course, this can also be done when the peripheral is running and will cause
 the BLE stack to send notifications or indications based on the characteristics
 properties.
 
-Standard services
------------------
+.. _ble-profile-standard-service:
+
+Defining and using a standard service
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 WHAD provides a :class:`~.service.StandardService` class used to
 define *standard* services in a custom profile. This class is a wrapper around the
 generic :class:`~.PrimaryService` that automatically retrieves the service's UUID
 from a special class property and equip the service class with additional methods
 allowing to provide an abstraction level from its characteristics.
-
-Definition of a standard service
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 A standard service shall be defined as follows:
 
@@ -293,8 +292,7 @@ GATT Profile API
    :members:
 
 Deprecated
-^^^^^^^^^^
-
+----------
 .. autoclass:: whad.ble.GenericProfile
     :members:
 
