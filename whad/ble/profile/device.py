@@ -645,6 +645,31 @@ class PeripheralDevice(GenericProfile):
         # Discover
         self.__gatt.discover(save_values=include_values)
 
+    def discover_primary_services(self, start: int = 1):
+        """Discovers primary services only, starting from handle `start`.
+        Discovered services are added to the current GATT profile and can be listed
+        with :py:meth:`.services()`.
+
+        :param start: Discover services with handle in range [`start`, 0xFFFF]
+        :type  start: int
+        """
+        self.__gatt.discover_primary_services(start)
+
+    def discovery_service_characteristics(self, service: Service, values: bool = False,
+                                          start: int = 1) -> Iterator[Characteristic]:
+        """Discovers characteristics that belong to a specific service.
+
+        :param service: Service to discover characteristics from
+        :type  service: Service
+        :param values: When set to `True`, characteristics' value will be read and loaded into their
+                       corresponding CharacteristicValue's value
+        :type  values: bool, optional
+        :param  start: Handle value used as the starting value for this discovery procedure
+        :type   start: int, optional
+        :return: Iterator over discovered characteristics
+        :rtype: Iterator[Characteristic]
+        """
+        yield from self.__gatt.discovery_service_characteristics(service, save_values=values, start=start)
 
     def find_service_by_uuid(self, uuid: UUID) -> Optional[Service]:
         """Find service by its UUID
