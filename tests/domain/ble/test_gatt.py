@@ -12,6 +12,7 @@ import pytest
 
 from scapy.layers.bluetooth import *
 
+from whad.ble.profile.characteristic import CharacteristicValue
 from whad.common.stack.tests import Sandbox, LayerMessage
 
 from whad.ble.stack.att import ATTLayer
@@ -334,7 +335,9 @@ class TestGattClientProcedures(object):
         resp.append(GattAttributeValueItem(77, char_value))
         gatt.on_gatt_message(resp)
         result = gatt.read_characteristic_by_uuid(UUID(0x1234), 77, 79)
-        assert result == char_value
+        assert len(result) == 1
+        assert isinstance(result[0], CharacteristicValue)
+        assert result[0].value == char_value
 
     def test_characteristic_read_by_uuid_fail(self, att, gatt):
         '''GATT client characteristic read by UUID (invalid handle)

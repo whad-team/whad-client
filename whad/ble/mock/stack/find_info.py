@@ -17,7 +17,7 @@ from scapy.layers.bluetooth import (
 from whad.ble.profile.attribute import UUID
 from whad.ble.stack.att.constants import BleAttErrorCode, BleAttOpcode
 
-from .attribute import find_attr_by_range
+from .attribute import find_attr_by_range, find_attr_by_type
 from .procedure import BleServerProcedure, BleClientProcedure, UnexpectedProcError
 
 class ServerFindInformationProcedure(BleServerProcedure):
@@ -131,6 +131,67 @@ class ClientFindInformationProcedure(BleClientProcedure):
             self.set_result(None)
             self.set_state(self.states.ERROR)
             return []
+
+class ServerFindByTypeValueProcedure(BleServerProcedure):
+    """ATT FindInformation procedure."""
+
+    # ATT Operation code
+    OPCODE = BleAttOpcode.FIND_BY_TYPE_VALUE_REQUEST
+
+    def __init__(self, attributes: list, mtu: int):
+        """Initialize our ServerFindByTypeValue procedure."""
+        super().__init__(attributes, mtu)
+
+    @classmethod
+    def trigger(cls, request) -> bool:
+        """Determine if the procedure should be triggered."""
+        return ATT_Find_By_Type_Value_Request in request
+
+    def process_request(self, request: Packet) -> list[Packet]:
+        """React only on a ATT_Find_Information_Request."""
+        if ATT_Find_By_Type_Value_Request not in request:
+            self.set_state(self.states.ERROR)
+            raise UnexpectedProcError()
+
+        # Extract request
+        request = request[ATT_Find_By_Type_Value_Request]
+
+        # List attributes with handles between start and end handles
+        attrs = find_attr_by_type(self.attributes, UUID(request.uuid), start_handle=request.start, end_handle=request.end)
+        if len(attrs) == 0:
+            self.set_state(self.states.DONE)
+            return self.att_error_response(request.start, BleAttErrorCode.ATTRIBUTE_NOT_FOUND)
+
+        # Build response
+        resp = b""
+        attr_uuid_type = None
+        for attr in attrs:
+            # If attribute value does not match, skip attribute.
+            if attr.value != request.data:
+                continue
+            if attr_uuid_type is None:
+                attr_uuid_type = attr.uuid.type
+            if attr_uuid_type == attr.uuid.type:
+                attr_data = pack("<HH", attr.handle, attr.end_handle)
+                if self.mtu - 2 - len(resp) >= len(attr_data):
+                    resp += attr_data
+                else:
+                    break
+            else:
+                break
+
+        # If we did not find any service, return an error
+        if resp == b'':
+            self.set_state(self.states.DONE)
+            return self.att_error_response(request.start, BleAttErrorCode.ATTRIBUTE_NOT_FOUND)
+
+        # Send response
+        self.set_state(self.states.DONE)
+        return [
+            ATT_Find_By_Type_Value_Response(
+                handles=resp
+            )
+        ]
 
 class ClientFindByTypeValueProcedure(BleClientProcedure):
     """GATT Client FindByTypeValue procedure."""
