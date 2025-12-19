@@ -890,7 +890,7 @@ class GattClient(GattLayer):
         """
         # Discover services
         services = []
-        for service in self.discover_primary_services(start=service_last_handle):
+        for service in self.discover_primary_services():
             services.append(service)
 
             # Add service into model
