@@ -18,7 +18,7 @@ from whad.ble.profile.service import Service
 from whad.ble.profile.services.defs import ServiceNotFound
 from whad.ble.profile.characteristic import (
     Properties, Characteristic, CharacteristicValue,
-    CharacteristicDescriptor,
+    Descriptor,
 )
 from whad.ble.profile import GenericProfile
 from whad.ble.profile.attribute import UUID, Attribute, InvalidUUIDException
@@ -93,7 +93,7 @@ class RemoteAttribute:
         # Force result to a bool
         return result == True
 
-class PeripheralCharacteristicDescriptor(CharacteristicDescriptor, RemoteAttribute):
+class PeripheralCharacteristicDescriptor(Descriptor, RemoteAttribute):
     """Wrapper for a peripheral characteristic descriptor.
     """
 
@@ -103,7 +103,7 @@ class PeripheralCharacteristicDescriptor(CharacteristicDescriptor, RemoteAttribu
         :param CharacteristicDescriptor descriptor: Descriptor to wrap.
         :param GattClient gatt: GATT client to use for GATT operations (read/write).
         """
-        CharacteristicDescriptor.__init__(self, descriptor.uuid, descriptor.handle, descriptor.value,
+        Descriptor.__init__(self, descriptor.uuid, descriptor.handle, descriptor.value,
                                           descriptor.characteristic)
         RemoteAttribute.__init__(self, descriptor.handle, gatt)
 
@@ -201,7 +201,7 @@ class PeripheralCharacteristic(Characteristic, RemoteAttribute):
         # Initialize the remote attribute interface
         RemoteAttribute.__init__(self,characteristic.value_handle, gatt)
 
-    def get_descriptor(self, desc_type: Union[UUID, Type[CharacteristicDescriptor]]):
+    def get_descriptor(self, desc_type: Union[UUID, Type[Descriptor]]):
         """Retrieve a specific descriptor from those associated with this characteristic."""
         result = super().get_descriptor(desc_type)
         # Not found? return None.
@@ -752,7 +752,7 @@ class PeripheralDevice(GenericProfile):
                 )
             return obj
 
-        if isinstance(obj, CharacteristicDescriptor):
+        if isinstance(obj, Descriptor):
             # wrap descriptor if required
             if not isinstance(obj, PeripheralCharacteristicDescriptor):
                 return PeripheralCharacteristicDescriptor(
