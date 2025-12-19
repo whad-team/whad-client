@@ -1,7 +1,7 @@
 """GATT Server and Client implementation
 """
 import logging
-from typing import Optional
+from typing import Optional, List
 
 from time import time
 from queue import Queue, Empty
@@ -634,7 +634,7 @@ class GattClient(GattLayer):
         if isinstance(msg, GattFindByTypeValueResponse):
             for item in msg:
                 return PrimaryService(
-                    uuid=None,
+                    uuid=uuid,
                     handle=item.handle,
                     end_handle=item.end
                 )
@@ -813,6 +813,62 @@ class GattClient(GattLayer):
                         error_response_to_exc(msg.reason, msg.request, msg.handle)
 
                 handle += 1
+    @proclock
+    def discover_characteristic_by_uuid(self, uuid: UUID, start: int = 1, end: int = 0xffff):
+        """Discover a characteristic by its UUID.
+
+        :param UUID uuid: Characteristic UUID
+        :return: Characteristic if characteristic has been found, None otherwise
+        """
+        # Send FindByTypeValueRequest
+        uuid_packed = uuid.packed
+        uuid1 = uuid_packed[:4]
+        uuid2 = uuid_packed[4:]
+        self.lock_tx()
+        self.att.read_by_type_request(
+            start,
+            end,
+            0x2803,
+            uuid.packed
+        )
+        self.unlock_tx()
+
+
+
+        msg = self.wait_for_message(GattReadByTypeResponse)
+        if isinstance(msg, GattReadByTypeResponse):
+            for item in msg:
+                charac_properties = item.value[0]
+                #charac_handle = unpack('<H', item.value[1:3])[0]
+                charac_handle = item.handle
+                charac_value_handle = unpack('<H', item.value[1:3])[0]
+                charac_uuid = UUID(item.value[3:])
+                charac = Characteristic(
+                    handle=charac_handle,
+                    uuid=charac_uuid,
+                    properties=charac_properties
+                )
+                charac.value_handle = charac_value_handle
+                charac.service = service
+
+                # Add characteristic as soon as we discovered it and set its value
+                service.add_characteristic(charac)
+
+
+
+        msg = self.wait_for_message(GattReadByTypeResponse)
+        if isinstance(msg, GattReadByTypeResponse):
+            for item in msg:
+                return Characteristic(
+                    uuid=None,
+                    handle=item.handle,
+                    end_handle=item.end
+                )
+        elif isinstance(msg, GattErrorResponse):
+            if msg.reason == AttErrorCode.ATTR_NOT_FOUND:
+                return None
+            else:
+                raise error_response_to_exc(msg.reason, msg.request, msg.handle)
 
     def get_descriptor(self, characteristic: Characteristic, uuid: UUID, handle: int) -> Descriptor:
         """Read a characteristic descriptor identified by its handle.
@@ -832,85 +888,29 @@ class GattClient(GattLayer):
     def discover(self, save_values: bool = False):
         """Discover device services, characteristics and descriptors.
 
-        This method performs a GATT server discovery procedure, in four distinct steps:
+        This method performs a GATT server discovery procedure, in three distinct steps:
 
-        1. Enumeration of all primary services,
-        2. For each service, enumeration of all its characteristics,
-        3. For each characteristic, enumeration of all its descriptors,
-        4. For each readable characteristic, read of its value if `save_values` is set to True.
-
-        The current profile may be incomplete, resulting from a previous discovery process that
-        failed for some reason:
-
-        - Remote device has disconnected due to a timeout during the discovery process
-        - Reading a descriptor's definition attribute failed
-        - Reading a characteristic value failed
-
-        We need to identify the most probable cause of failure and skip the attribute causing
-        it to achieve a complete discovery. Our discovery process is designed to save discovered
-        information as soon as it gets it, so based on the state of the current profile we may
-        determine which step failed, and from this recover from our previous failure.
-
-        - First, we check that all services have successfully been discovered by searching for
-          services with handle greater than the greatest service's end handle we have discovered
-          so far. If some new service is discovered, then we failed during first step.
-
-        - Then, we check that all characteristics have successfully been discovered by searching
-          for characteristics with handle greater than the greatest service's characteristic's\
-          end handle discovered so far, for each service. If new characteristics have been discovered,
-          then we failed at step 2.
-
-        - If no new service or characteristic has been found, we search for new descriptors for each
-          characteristic belonging to our discovered services, if new descriptors have been found it
-          means we failed at step 3.
-
-        - If everything went smooth so far, it means we failed at reading a characteristic. We search
-          for the last readable characteristic with no value set and skip it.
+        1. Enumerate all primary services,
+        2. For each service, enumerate all its characteristics and read values if needed
+        3. For each characteristic, enumerate all its descriptors
 
         :param save_values: If `True`, save every characteristic's value in the generated profile
         :type  save_values: bool
         """
-        service_last_handle = 1
-        for service in self.__model.services():
-            if service.end_handle > service_last_handle:
-                service_last_handle = service.end_handle
-
         # Discover services
         services = []
-        for service in self.discover_primary_services(start=service_last_handle):
+        for service in self.discover_primary_services():
             services.append(service)
 
             # Add service into model
             self.__model.add_service(service)
 
 
-        # If we discovered new services with a non-empty model, we are recovering
-        # from a previously failed attempt.
-        if len(services) > 0 and service_last_handle > 1:
-            logger.debug("recovery: discovered %d more services than previous discovery procedure", len(services))
-        elif service_last_handle > 1:
-            services = list(self.__model.services())
-
         # Discover characteristics for each service, skipping already discovered services
         for service in services:
-            # First, we search for the last characteristic discovered
-            last_charac = None
-            for charac in service.characteristics():
-                if last_charac is None:
-                    last_charac = charac
-                elif charac.handle > last_charac.handle:
-                    last_charac = charac
-
-            # If no characteristic in service, start with service handle
-            if last_charac is None:
-                handle = service.handle
-            else:
-                handle = last_charac.end_handle
-
             # Enumerating characteristics
-            for characteristic in self.discover_characteristics(service, save_values=save_values, start=handle):
-                if handle > service.handle:
-                    logger.debug("recovery: found new characteristic %s with handle %s", characteristic.uuid,
+            for characteristic in self.discover_characteristics(service, save_values=save_values):
+                    logger.debug("found new characteristic %s with handle %s", characteristic.uuid,
                                  characteristic.handle)
 
             # Update service into model
@@ -1094,35 +1094,59 @@ class GattClient(GattLayer):
             raise error_response_to_exc(msg.reason, msg.request, msg.handle)
 
     @proclock
-    def read_characteristic_by_uuid(self, uuid, start=1, end=0xFFFF):
-        """Read a characteristic given its UUID if its handle is comprised in a given range.
+    def find_characteristics_by_uuid(self, uuid, start=1, end=0xFFFF) -> List[Characteristic]:
+        """Find a characteristic given its UUID if its handle is comprised in a given range.
 
         :param UUID uuid: Characteristic UUID
         :param int start: Start handle value
         :param int end: End handle value
         """
-        if uuid.type == UUID.TYPE_16:
-            self.att.read_by_type_request(start, end, uuid.value())
-        elif uuid.type == UUID.TYPE_128:
-            # Required by scapy
-            uuid1 = unpack('<Q', uuid.packed[:8])[0]
-            uuid2 = unpack('<Q', uuid.packed[8:])[0]
-
+        output = []
+        handle = start
+        while handle <= end:
             self.lock_tx()
-            self.att.read_by_type_request_128bit(start, end, uuid1, uuid2)
+            self.att.read_by_type_request(
+                handle,
+                end,
+                0x2803
+            )
             self.unlock_tx()
 
-        msg = self.wait_for_message(GattReadByTypeResponse)
-        if isinstance(msg, GattReadByTypeResponse):
-            output = []
-            for item in msg:
-                output.append(item.value)
-            if len(output) == 1:
-                return output[0]
-            else:
-                return output
-        elif isinstance(msg, GattErrorResponse):
-            raise error_response_to_exc(msg.reason, msg.request, msg.handle)
+            msg = self.wait_for_message(GattReadByTypeResponse)
+            if isinstance(msg, GattReadByTypeResponse):
+                for item in msg:
+                    # Retrieve characteristic handle and UUID
+                    charac_handle = item.handle
+                    charac_uuid = UUID(item.value[3:])
+
+                    # If characteristic has been found, add it to our output
+                    if charac_uuid == uuid:
+                        # Parse remaining fields
+                        charac_properties = item.value[0]
+                        charac_value_handle = unpack('<H', item.value[1:3])[0]
+
+                        # Create a new Characteristic object
+                        charac = Characteristic(
+                            handle=charac_handle,
+                            uuid=charac_uuid,
+                            properties=charac_properties
+                        )
+                        charac.value_handle = charac_value_handle
+
+                        # Add to our found characteristics
+                        output.append(charac)
+
+                    handle = charac_handle+2
+
+
+            elif isinstance(msg, GattErrorResponse):
+                if msg.reason == AttErrorCode.ATTR_NOT_FOUND:
+                    break
+                else:
+                    error_response_to_exc(msg.reason, msg.request, msg.handle)
+
+        # Return found characteristic(s)
+        return output
 
     @proclock
     def set_mtu(self, mtu):
