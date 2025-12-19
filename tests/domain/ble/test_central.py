@@ -168,6 +168,30 @@ def test_get_characteristic_error(central_mock):
     charac = target.get_characteristic(UUID("1800"), UUID("3300"))
     assert charac is None
 
+def test_find_service_by_uuid(central_mock):
+    """Find service by its uuid, with no discovery."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    service = target.find_service_by_uuid(UUID('1800'))
+    assert service is not None
+    assert service.handle == 1
+    assert service.uuid == UUID('1800')
+
+def test_find_service_by_uuid_error(central_mock):
+    """Find service by its (invalid) uuid, with no discovery."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    service = target.find_service_by_uuid(UUID('1337'))
+    assert service is None
+
 def test_get_service(central_mock):
     """Retrieve a specific service from its UUID with `get_service()`."""
     # Connect to emulate device
@@ -292,6 +316,32 @@ def test_device_service_in_uuid(central_mock):
 
     target.discover()
     assert UUID('1800') in target
+
+def test_find_characteristics(central_mock):
+    """Look for a specific characteristic from its UUID."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    target.discover()
+    characs = target.find_characteristics_by_uuid(UUID('2a00'))
+    assert len(characs) == 1
+    assert characs[0].uuid == UUID('2a00')
+    assert characs[0].handle == 2
+
+def test_find_characteristics_error(central_mock):
+    """Look for a specific characteristic from its (invalid) UUID."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    target.discover()
+    characs = target.find_characteristics_by_uuid(UUID('1337'))
+    assert len(characs) == 0
 
 def test_service_get_char(central_mock):
     """Retrieve a specific characteristic from its UUID with `get_characteristic()`."""

@@ -814,61 +814,37 @@ class GattClient(GattLayer):
 
                 handle += 1
     @proclock
-    def discover_characteristic_by_uuid(self, uuid: UUID, start: int = 1, end: int = 0xffff):
-        """Discover a characteristic by its UUID.
+    def read_characteristic_by_uuid(self, uuid: UUID, start: int = 1, end: int = 0xffff) -> Optional[List[CharacteristicValue]]:
+        """Read a characteristic by its UUID.
 
         :param UUID uuid: Characteristic UUID
         :return: Characteristic if characteristic has been found, None otherwise
         """
-        # Send FindByTypeValueRequest
-        uuid_packed = uuid.packed
-        uuid1 = uuid_packed[:4]
-        uuid2 = uuid_packed[4:]
-        self.lock_tx()
-        self.att.read_by_type_request(
-            start,
-            end,
-            0x2803,
-            uuid.packed
-        )
-        self.unlock_tx()
+        output = []
 
-
+        if uuid.type == UUID.TYPE_16:
+            self.lock_tx()
+            self.att.read_by_type_request(start, end, uuid.packed)
+            self.unlock_tx()
+        elif uuid.type == UUID.TYPE_128:
+            uuid1 = uuid.packed[0:4]
+            uuid2 = uuid.packed[4:8]
+            self.lock_tx()
+            self.att.read_by_type_request_128(start, end, uuid1, uuid2)
+            self.unlock_tx()
 
         msg = self.wait_for_message(GattReadByTypeResponse)
         if isinstance(msg, GattReadByTypeResponse):
             for item in msg:
-                charac_properties = item.value[0]
-                #charac_handle = unpack('<H', item.value[1:3])[0]
-                charac_handle = item.handle
-                charac_value_handle = unpack('<H', item.value[1:3])[0]
-                charac_uuid = UUID(item.value[3:])
-                charac = Characteristic(
-                    handle=charac_handle,
-                    uuid=charac_uuid,
-                    properties=charac_properties
-                )
-                charac.value_handle = charac_value_handle
-                charac.service = service
-
-                # Add characteristic as soon as we discovered it and set its value
-                service.add_characteristic(charac)
-
-
-
-        msg = self.wait_for_message(GattReadByTypeResponse)
-        if isinstance(msg, GattReadByTypeResponse):
-            for item in msg:
-                return Characteristic(
-                    uuid=None,
-                    handle=item.handle,
-                    end_handle=item.end
-                )
+                output.append(CharacteristicValue(uuid, item.handle, item.value))
         elif isinstance(msg, GattErrorResponse):
             if msg.reason == AttErrorCode.ATTR_NOT_FOUND:
                 return None
             else:
                 raise error_response_to_exc(msg.reason, msg.request, msg.handle)
+
+        # Return found characteristic values
+        return output
 
     def get_descriptor(self, characteristic: Characteristic, uuid: UUID, handle: int) -> Descriptor:
         """Read a characteristic descriptor identified by its handle.
