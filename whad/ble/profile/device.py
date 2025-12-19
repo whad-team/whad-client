@@ -11,7 +11,7 @@ for a given connected device:
 import logging
 from struct import unpack
 from time import sleep
-from typing import Iterator, Optional, Union, Type, TypeVar
+from typing import Iterator, Optional, Union, Type, TypeVar, List
 
 from whad.ble.profile import PrimaryService
 from whad.ble.profile.service import Service
@@ -428,7 +428,7 @@ class PeripheralService(Service):
         except InvalidUUIDException as uuid_err:
             raise IndexError() from uuid_err
 
-    def read_characteristic_by_uuid(self, uuid):
+    def read_characteristic_by_uuid(self, uuid) -> Optional[bytes]:
         """Read a characteristic belonging to this service identified by its UUID, using a GATT ReadByType
         procedure as defined in the specification (Vol 3, Part G, Section 4.8.2).
 
@@ -439,11 +439,15 @@ class PeripheralService(Service):
         :type  uuid: UUID
         :return bytes: Characteristic value
         """
-        return self.__gatt.read_characteristic_by_uuid(
+        values = self.__gatt.read_characteristic_by_uuid(
             uuid,
             self.handle,
             self.end_handle
         )
+        if len(values) > 0:
+            return values[0].value
+        else:
+            return None
 
     def char(self, uuid: Union[str, UUID]) -> Optional[PeripheralCharacteristic]:
         """Look for a specific characteristic belonging to this service, identified by its UUID.
@@ -701,7 +705,7 @@ class PeripheralDevice(GenericProfile):
         return None
 
 
-    def find_characteristic_by_uuid(self, uuid: UUID) -> Optional[Characteristic]:
+    def find_characteristics_by_uuid(self, uuid: UUID) -> List[PeripheralCharacteristic]:
         """Find characteristic by its UUID
 
         :param  uuid:   Characteristic UUID
@@ -710,8 +714,8 @@ class PeripheralDevice(GenericProfile):
                         if characteristic has been found, None otherwise.
         :rtype: :class:`whad.ble.profile.device.PeripheralCharacteristic`
         """
-        return self.char(uuid)
-
+        characs = self.__gatt.find_characteristics_by_uuid(uuid)
+        return [PeripheralCharacteristic(charac, self.__gatt) for charac in characs]
 
     def find_object_by_handle(self, handle) -> Optional[Attribute]:
         """Find an existing object (service, attribute, descriptor) based on its handle,

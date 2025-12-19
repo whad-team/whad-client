@@ -29,7 +29,7 @@ from .read import ServerReadProcedure
 from .readblob import ServerReadBlobProcedure
 from .read_by_group_type import ServerReadByGroupTypeProcedure
 from .read_by_type import ServerReadByTypeProcedure
-from .find_info import ServerFindInformationProcedure
+from .find_info import ServerFindInformationProcedure, ServerFindByTypeValueProcedure
 from .write import ServerWriteProcedure
 from .writecmd import ServerWriteCommandProcedure
 
@@ -101,6 +101,7 @@ class GattServer:
             ServerReadByGroupTypeProcedure,
             ServerReadByTypeProcedure,
             ServerFindInformationProcedure,
+            ServerFindByTypeValueProcedure,
         ]
 
     @property
