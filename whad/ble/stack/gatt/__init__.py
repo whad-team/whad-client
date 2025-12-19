@@ -719,9 +719,21 @@ class GattClient(GattLayer):
                     error_response_to_exc(msg.reason, msg.request, msg.handle)
 
     @proclock
-    def discover_characteristics(self, service, save_values: bool = False, start: Optional[int] = None):
+    def discover_characteristics(self, service: Service, save_values: bool = False, start: Optional[int] = None):
         """
-        Discover service characteristics
+        Discover a given service's characteristics and automatically add them to the specified service object.
+
+        Discovered characteristics are also yielded by this method, providing a way to determine what characteristics
+        have been discovered.
+
+        :param service: Service to discover
+        :type  service: Service
+        :param save_values: When set to `True`, will read the discovered characteristics' values and save them
+        :type  save_values: bool, optional
+        :param start: If set, discover characteristics with handle in range [`start`, 0xFFFF]
+        :type  start: int, optional
+        :return: Iterator for discovered characteristics enumeration
+        :rtype: Iterator[Characteristic]
         """
         logger.debug("discover characteristics for service %s", service.uuid)
         logger.debug("discover characteristics from handle %d to %d",
