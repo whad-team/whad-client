@@ -162,7 +162,7 @@ class Sniffer(WirelessHart, EventsManager):
                                                       c.slot_number,
                                                       c.channel_offset, 
                                                       packet.src_addr,
-                                                      c.neighbor_nickname,
+                                                      c.neighbor_nickname if c.link_type==Link.TYPE_NORMAL else 0xffff, #the neighbor in response is not 0xFFFF when discovery, broadcast and join => hand handle it
                                                       Link.OPTIONS_TRANSMIT if c.transmit else Link.OPTIONS_RECEIVE if c.receive else Link.OPTIONS_SHARED, 
                                                       c.link_type)
                             
