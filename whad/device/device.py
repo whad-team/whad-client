@@ -479,6 +479,10 @@ class Device:
 
         available_devices = []
         for device_class in device_classes:
+            # Reset device index before enumerating.
+            device_class.reset_dev_index()
+
+            # Enumerating
             device_class_list = device_class.list()
             if device_class_list is not None:
                 if isinstance(device_class_list, list):
@@ -623,6 +627,17 @@ class Device:
         """Determine if interface is opened.
         """
         return self.__opened
+
+    @classmethod
+    def reset_dev_index(cls) -> None:
+        """Reset the device index of the specified class.
+
+        :param cls: Device class
+        :type cls: Device
+        """
+        # Remove 'CURRENT_DEVICE_INDEX' attribute if set.
+        if hasattr(cls, 'CURRENT_DEVICE_INDEX'):
+            delattr(cls, 'CURRENT_DEVICE_INDEX')
 
     @classmethod
     def inc_dev_index(cls):
