@@ -451,7 +451,7 @@ class ZigbeeEndDeviceShell(InteractiveShell):
                 print()
 
             except EndpointsDiscoveryException:
-                self.error("An error occured during endpoints discovery.")
+                self.error("An error occurred during endpoints discovery.")
                 return
         else:
             self.error("You must join a network to perform a discovery.")
@@ -614,7 +614,7 @@ class ZigbeeEndDeviceShell(InteractiveShell):
                 getattr(cluster, selected_command_name)()
 
             except EndpointsDiscoveryException:
-                self.error("An error occured during cluster command.")
+                self.error("An error occurred during cluster command.")
                 return
         else:
             self.error("You must join a network to perform a cluster command.")

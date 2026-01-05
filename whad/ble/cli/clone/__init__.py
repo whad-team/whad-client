@@ -260,7 +260,7 @@ class BleCloneApp(CommandLineApp):
                 with open(profile_path, 'w', encoding="utf-8") as f:
                     f.write(json_data)
             except IOError:
-                self.error(f"An error occured when writing to {profile_path}")
+                self.error(f"An error occurred when writing to {profile_path}")
 
             # Disconnect
             device.disconnect()

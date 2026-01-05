@@ -4,7 +4,7 @@
 
 class APLTimeoutException(Exception):
     """
-    This exception is triggered when a timeout occured at the APL layer.
+    This exception is triggered when a timeout occurred at the APL layer.
     """
     def __init__(self):
         super().__init__()

@@ -648,7 +648,7 @@ class CommandLineApp(ArgumentParser):
             print_formatted_text(HTML("<aaa fg=\"#e97f11\">/!\\ <b>{message}</b></aaa>").format(message=message % args))
         except:
             print_formatted_text(HTML(
-                "<aaa fg=\"#e97f11\">/!\\ <b>an unknown warning occured</b></aaa>"
+                "<aaa fg=\"#e97f11\">/!\\ <b>an unknown warning occurred</b></aaa>"
             ))
 
     def error(self, message, *args):
@@ -659,7 +659,7 @@ class CommandLineApp(ArgumentParser):
                 HTML('<ansired>[!] <b>{message}</b></ansired>').format(message=message % args)
             )
         except Exception as err:
-            logger.error('[!] an unknown error occured: %s',err)
+            logger.error('[!] an unknown error occurred: %s',err)
 
 
 class CommandLineSource(CommandLineApp):
@@ -783,7 +783,7 @@ def run_app(application: CommandLineApp):
     try:
         application.run()
     except ApplicationError as err:
-        # If an error occured, display it.
+        # If an error occurred, display it.
         err.show()
     except KeyboardInterrupt:
         application.warning("Interrupted by user (CTL-C)")
@@ -796,7 +796,7 @@ def run_app(application: CommandLineApp):
     except UnsupportedDomain as domain_err:
         application.error(f"WHAD interface does not support {domain_err.domain}.")
     except Exception as exc:
-        application.error("An unexpected exception occured:")
+        application.error("An unexpected exception occurred:")
         traceback.print_exception(exc)
 
 if __name__ == '__main__':

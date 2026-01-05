@@ -839,7 +839,7 @@ class SMPLayer(Layer):
         try:
             return IOCAP_KEY_GENERATION_MAPPING[(initiator.iocap, responder.iocap)][int(use_lesc)]
         except IndexError:
-            # it looks like an error occured, let's return None
+            # it looks like an error occurred, let's return None
             return None
 
     def reset_state(self):

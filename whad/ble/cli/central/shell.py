@@ -526,7 +526,7 @@ class BleCentralShell(InteractiveShell):
                 try:
                     self.__target.discover()
                 except GattTimeoutException:
-                    self.error("GATT timeout occured")
+                    self.error("GATT timeout occurred")
                     return
                 except ConnectionLostException:
                     self.error("Services discovery failed (peripheral disconnected)")
@@ -589,7 +589,7 @@ class BleCentralShell(InteractiveShell):
                     self.__target.discover()
                     self.__cache.mark_as_discovered(self.__target_bd)
                 except GattTimeoutException:
-                    self.error("GATT timeout occured")
+                    self.error("GATT timeout occurred")
                     return
                 except ConnectionLostException:
                     self.error((
@@ -625,7 +625,7 @@ class BleCentralShell(InteractiveShell):
                     self.__target.discover()
                     self.__cache.mark_as_discovered(self.__target_bd)
                 except GattTimeoutException:
-                    self.error("GATT timeout occured")
+                    self.error("GATT timeout occurred")
                     return
                 except ConnectionLostException:
                     self.error((
@@ -931,7 +931,7 @@ class BleCentralShell(InteractiveShell):
                         conn_handle=self.__target.conn_handle
                     )
                     if not res:
-                        self.error("An error occured while sending PDU.")
+                        self.error("An error occurred while sending PDU.")
                 else:
                     self.error('Invalid hex value.')
             except ValueError:
@@ -1031,7 +1031,7 @@ class BleCentralShell(InteractiveShell):
                         conn_handle=self.__target.conn_handle
                     )
                     if not res:
-                        self.error("An error occured while sending PDU.")
+                        self.error("An error occurred while sending PDU.")
                 else:
                     self.error("Invalid hex value.")
 
@@ -1039,7 +1039,7 @@ class BleCentralShell(InteractiveShell):
                 self.error("Sending PDU failed (peripheral disconnected)")
 
             except Exception:
-                self.error("An error occured while assembling packet")
+                self.error("An error occurred while assembling packet")
         else:
             self.error("No device connected.")
 

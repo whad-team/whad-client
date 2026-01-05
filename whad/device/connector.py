@@ -512,7 +512,7 @@ class Connector:
             logger.debug("sending WHAD message to device: %s", message)
             self.__device.send_message(message, keep)
         except WhadDeviceError as device_error:
-            logger.debug("an error occured while communicating with the WHAD device !")
+            logger.debug("an error occurred while communicating with the WHAD device !")
             self.on_error(device_error)
 
     def send_command(self, message, keep=None):
@@ -528,7 +528,7 @@ class Connector:
         try:
             return self.__device.send_command(message, keep=keep)
         except WhadDeviceError as device_error:
-            logger.debug("an error occured while communicating with the WHAD device !")
+            logger.debug("an error occurred while communicating with the WHAD device !")
             self.on_error(device_error)
             return None
 
