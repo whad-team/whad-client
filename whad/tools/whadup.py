@@ -287,7 +287,7 @@ def main():
 
                     print('')
             except Exception:
-                error("[e] An error occured while requesting this device." +
+                error("[e] An error occurred while requesting this device." +
                       "We were not able to retrieve the supported domains.")
 
             dev.close()

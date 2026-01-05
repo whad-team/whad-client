@@ -69,7 +69,7 @@ def get_hci(index):
         logger.debug("Bluetooth socket successfully created.")
         return socket
     except BluetoothSocketError:
-        logger.debug("An error occured while creating bluetooth socket")
+        logger.debug("An error occurred while creating bluetooth socket")
         try:
             logger.debug("Shutting down HCI interface #%d", index)
             HCIConfig.down(index)
@@ -297,7 +297,7 @@ class Hci(VirtualDevice):
             # Open a Bluetooth user socket
             self.__socket = get_hci(self.__index)
             if self.__socket is None:
-                # An error occured, raising error
+                # An error occurred, raising error
                 logger.error("Whad device is not ready.")
                 raise WhadDeviceNotReady()
 

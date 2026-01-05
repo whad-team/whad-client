@@ -3,7 +3,7 @@ from whad.zigbee.profile.endpoint import Endpoint
 
 class EndpointsDiscoveryException(Exception):
     """
-    Default exception raised when an error occured during Endpoints discovery.
+    Default exception raised when an error occurred during Endpoints discovery.
     """
     def __init__(self):
         super().__init__()

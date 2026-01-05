@@ -613,7 +613,7 @@ class BLE(Connector):
                 logger.info('current BLE mode successfully started')
                 self.__started = True
             else:
-                logger.info('an error occured while starting !')
+                logger.info('an error occurred while starting !')
                 self.__started = False
 
             return self.__started

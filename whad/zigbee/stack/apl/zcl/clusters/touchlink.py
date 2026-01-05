@@ -337,7 +337,7 @@ class ZCLTouchLinkClient(ZCLClientCluster):
         start = time()
         while self.pending_responses[transaction] is None and time() - start < timeout:
             pass
-        # If we got a response return it, otherwise a timeout occured and we return None
+        # If we got a response return it, otherwise a timeout occurred and we return None
         if self.pending_responses[transaction] is not None:
             return_value = self.pending_responses[transaction]
         else:
