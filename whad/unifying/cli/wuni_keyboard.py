@@ -479,7 +479,6 @@ class DuckyScriptRunner(object):
             key = ""
 
         # Send key through connector
-        print(key, gui, alt, shift, ctrl)
         self.__connector.send_key(key, gui=gui, alt=alt, shift=shift, ctrl=ctrl)
         
     def set_delay(self, delay):
@@ -636,7 +635,7 @@ class UniKeyboardApp(CommandLineSink):
                         # If -p/--payload option is set, sync and replicate our mouse moves
                         if self.args.payload is not None:
                             aes_counter, forge_keystream = self.perform_replay_attack_capture(addr)
-                            self.send_payload(addr, self.args.payload, self.args.locale, key=enc_key, aes_counter=aes_counter, forge_keystream=hid_data)
+                            self.send_payload(addr, self.args.payload, self.args.locale, key=enc_key, aes_counter=aes_counter, forge_keystream=forge_keystream)
 
                         elif self.args.ducky is not None:
                             aes_counter, forge_keystream = self.perform_replay_attack_capture(addr)
