@@ -241,7 +241,7 @@ class Sniffer(WirelessHart, EventsManager):
         Sends a WirelessHart_Suspend_Devices_Request on the next slot in the next superframe"""
         
         #get the superframe and the link corresponding to this send
-        ans = self.superframes.get_link(dst, 0x1, Link.TYPE_BROADCAST)
+        ans = self.superframes.get_link(dst, 0xffff, Link.TYPE_BROADCAST)
         if ans:
             (sf, link) = ans
         else:
