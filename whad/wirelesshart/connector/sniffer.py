@@ -184,7 +184,7 @@ class Sniffer(WirelessHart, EventsManager):
                                                   Link.OPTIONS_TRANSMIT if c.transmit else Link.OPTIONS_RECEIVE if c.receive else Link.OPTIONS_SHARED, 
                                                   c.link_type)
                     
-                    if WirelessHart_Vendor_Specific_Dust_Networks_Ping_Response in cmd and packet.dest_addr in self.spoofed:
+                    if WirelessHart_Vendor_Specific_Dust_Networks_Ping_Request in cmd and packet.dest_addr in self.spoofed:
                     	self.ping_response(packet.dest_src, packet.src_addr)
                     	print("spoofing ping response")        
         if WirelessHart_DataLink_Advertisement in packet:

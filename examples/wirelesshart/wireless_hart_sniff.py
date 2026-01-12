@@ -27,7 +27,7 @@ if __name__ == '__main__':
 
             while True:
                 sleep(1)
-                str = input("write \"ping\" to send a ping request or \"deauth\" to send a mass deauthetication or \"disconnect\" to send a disconnect device request or \"jamm\" to start jamming\n")
+                str = input("write \"spoof\" to respond to ping requests, \"ping\" to send a ping request or \"deauth\" to send a mass deauthetication or \"disconnect\" to send a disconnect device request or \"jamm\" to start jamming\n")
                 try:
                     sniffer.print_decryptor()
                     match str:
@@ -47,6 +47,11 @@ if __name__ == '__main__':
                             encrypted = sniffer.disconnect_device(dst)
                         case "jamm":
                             print("Jamm:",sniffer.jam())
+                        case "spoof":
+                            str = input("write destination\n")
+                            dst = int(str)
+                            sniffer.process_ping(dst)
+                            print(f"adding {dst} to the spoofed list") 
                 except ValueError :
                     print("value error")
                 except MissingLink :
