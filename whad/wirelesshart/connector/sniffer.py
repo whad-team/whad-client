@@ -10,7 +10,7 @@ from whad.wirelesshart.connector.channelmap import ChannelMap
 from whad.wirelesshart.connector.link import Link
 from whad.wirelesshart.exceptions import MissingEncryptionKey, MissingLink
 from whad.wirelesshart.sniffing import SnifferConfiguration
-from whad.scapy.layers.wirelesshart import Superframe, WirelessHart_Add_Link_Request, WirelessHart_Add_Link_Response, WirelessHart_Command_Request_Hdr, WirelessHart_DataLink_Acknowledgement, WirelessHart_DataLink_Advertisement, WirelessHart_DataLink_Hdr, WirelessHart_Disconnect_Device_Request, WirelessHart_Network_Hdr, WirelessHart_Network_Security_SubLayer_Hdr, WirelessHart_Suspend_Devices_Request, WirelessHart_Suspend_Devices_Response, WirelessHart_Transport_Layer_Hdr, WirelessHart_Vendor_Specific_Dust_Networks_Ping_Request, WirelessHart_Write_Modify_Session_Command_Request, compute_dlmic
+from whad.scapy.layers.wirelesshart import Superframe, WirelessHart_Add_Link_Request, WirelessHart_Add_Link_Response, WirelessHart_Command_Request_Hdr, WirelessHart_Command_Response_Hdr, WirelessHart_DataLink_Acknowledgement, WirelessHart_DataLink_Advertisement, WirelessHart_DataLink_Hdr, WirelessHart_Disconnect_Device_Request, WirelessHart_Network_Hdr, WirelessHart_Network_Security_SubLayer_Hdr, WirelessHart_Suspend_Devices_Request, WirelessHart_Suspend_Devices_Response, WirelessHart_Transport_Layer_Hdr, WirelessHart_Vendor_Specific_Dust_Networks_Ping_Request, WirelessHart_Vendor_Specific_Dust_Networks_Ping_Response,  WirelessHart_Write_Modify_Session_Command_Request, compute_dlmic
 from scapy.layers.dot15d4 import Dot15d4Data, Dot15d4FCS
 from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter
@@ -45,6 +45,8 @@ class Sniffer(WirelessHart, EventsManager):
         
         self.__panid = None
         self.__asn = 0
+        
+        self.spoofed = []
         
         self.add_event_listener(self.on_event)
         
@@ -138,6 +140,9 @@ class Sniffer(WirelessHart, EventsManager):
         self.stop()
         self.__configuration = new_configuration
         self._enable_sniffing()
+   
+    def process_ping(self, src):
+    	self.spoofed.add(src)
 
     def process_packet(self, packet: Packet):
         """Process received Wireless Hart packet.
@@ -178,7 +183,10 @@ class Sniffer(WirelessHart, EventsManager):
                                                   c.neighbor_nickname,
                                                   Link.OPTIONS_TRANSMIT if c.transmit else Link.OPTIONS_RECEIVE if c.receive else Link.OPTIONS_SHARED, 
                                                   c.link_type)
-                            
+                    
+                    if WirelessHart_Vendor_Specific_Dust_Networks_Ping_Response in cmd and packet.dest_addr in self.spoofed:
+                    	self.ping_response(packet.dest_src, packet.src_addr)
+                    	print("spoofing ping response")        
         if WirelessHart_DataLink_Advertisement in packet:
             self.process_advertisement(packet)
             if first_adv :
@@ -241,7 +249,7 @@ class Sniffer(WirelessHart, EventsManager):
         Sends a WirelessHart_Suspend_Devices_Request on the next slot in the next superframe"""
         
         #get the superframe and the link corresponding to this send
-        ans = self.superframes.get_link(dst, 0x1, Link.TYPE_BROADCAST)
+        ans = self.superframes.get_link(dst, 0xffff, Link.TYPE_BROADCAST)
         if ans:
             (sf, link) = ans
         else:
@@ -377,6 +385,132 @@ class Sniffer(WirelessHart, EventsManager):
             self.send_in_slot(final_packet, asn_to_send)
             return final_packet
         
+        raise MissingEncryptionKey(dst)
+    def ping_response(self, src, dst_dl, hops=1):
+      """Prepare ping response"""
+      ans = self.superframes.get_link(dst, src, Link.TYPE_BROADCAST)
+       
+      (sf, link) = ans
+       
+      asn_to_send = (((self.__asn + 1000) // superframe.nb_slots) + 1) * superframe.nb_slots + link.join_slot
+      
+      ping_response = WirelessHart_Vendor_Specific_Dust_Networks_Ping_Response(
+          status=0,
+            expanded_device_type= 0xe0a2,
+            hops = hops,
+            temperature = 01,
+            voltage = 2700
+        )
+        response = WirelessHart_Command_Response_Hdr(
+            command_number=0xfc05,
+            len=9
+        )
+        transport_layer = WirelessHart_Transport_Layer_Hdr(
+            acknowledged=0,
+            response=1,
+            broadcast=0,
+            tr_seq_num=31,
+           
+            device_malfunction=0,
+            configuration_changed=0,
+            cold_start=0,
+            more_status_available=0,
+            loop_current_fixed=0,
+            loop_current_saturated=0,
+            non_primary_variable_out_of_limit=0,
+            primary_variable_out_of_limit=0,
+           
+            reserved=0,
+            function_check=0,
+            out_of_specification=0,
+            failure=0,
+            critical_power_failure=0,
+            device_variable_alert=0,
+            maintenance_required=0,
+           
+            commands = [response / ping_response]
+        )
+       
+        #get encryption key and peer (nonce)
+        key = self.__decryptor.get_unicast_session_key(0xf980, src)
+        peer = self.__decryptor.get_unicast_peer(0xf980, src)
+
+        if key and peer:
+
+            network_layer = WirelessHart_Network_Hdr(
+                nwk_dest_addr_length = 0,
+                nwk_src_addr_length = 0,
+                proxy_route = 0,
+                second_src_route_segment = 0,
+                first_src_route_segment = 1,
+                ttl = 0,
+                asn_snippet = (asn_to_send%0xffff) - 1,
+                graph_id = 0x1,
+                nwk_dest_addr = 0xf980,
+                nwk_src_addr = src,
+                first_route_segment = [src, 0x1, 0xffff, 0xffff]
+            )
+           
+            peer.incremenet_nonce()
+            security_sub_layer = WirelessHart_Network_Security_SubLayer_Hdr(
+                security_types=0,
+                counter=peer.get_nonce_counter()%256,
+                nwk_mic = 0
+            )
+           
+            data_link_layer = WirelessHart_DataLink_Hdr(
+                reserved = 0,
+                priority = 3,
+                network_key_use = 1,
+                pdu_type = 7,
+                mic = 0x0
+            )
+           
+            dot15d4_data = Dot15d4Data(
+                dest_panid = self.__panid,
+                dest_addr = dst_dl,
+                src_addr = src
+            )
+            dot15d4_fcs = Dot15d4FCS(
+                fcf_panidcompress = True,
+                fcf_ackreq = False,
+                fcf_pending = False,
+                fcf_security = False,
+                fcf_frametype = 1,
+                fcf_srcaddrmode = 2,
+                fcf_framever = 0,
+                fcf_destaddrmode = 2,
+                fcf_reserved_2 = 0,
+                seqnum = asn_to_send%256
+            )
+            packet = dot15d4_fcs / dot15d4_data / data_link_layer / network_layer / security_sub_layer /  transport_layer
+            #create manager with key and nonce
+            manager = WirelessHartNetworkLayerCryptoManager(key)
+            manager.nonce = manager.generateNonce(packet)
+            #put nonce, ttl, counter and nwk_mic to zero (WiHART encryption specifications)
+            security_sub_layer.nonce = 0x0
+           
+            #assemble pkt
+            packet = dot15d4_fcs / dot15d4_data / data_link_layer / network_layer / security_sub_layer /  transport_layer
+            #encrypt with AES CCM*
+            enciphered, nwk_mic = manager.encrypt(bytes(transport_layer), manager.generateAuth(packet))
+            #fill fields
+            security_sub_layer.nwk_mic = int.from_bytes(nwk_mic)
+            security_sub_layer.counter = peer.get_nonce_counter()%256
+            network_layer.ttl = 126
+           
+            packet = dot15d4_fcs / dot15d4_data / data_link_layer / network_layer / security_sub_layer /  enciphered
+           
+            #compute message integrity code and fill in the pkt
+            dl_mic = compute_dlmic(packet, self.__decryptor.get_network_key(), asn_to_send)
+            data_link_layer.mic = int.from_bytes(dl_mic)
+            final_packet = dot15d4_fcs / dot15d4_data / data_link_layer / network_layer / security_sub_layer /  enciphered
+
+            print(f"response to a ping request ")
+            #send command to butterfly
+            self.send_in_slot(final_packet, asn_to_send)
+            return final_packet
+       
         raise MissingEncryptionKey(dst)
     
     def ping_request(self, dst):
