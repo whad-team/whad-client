@@ -217,7 +217,7 @@ class UnixSocketServer(Device):
         """
         super().__init__()
 
-        # Indicate if a timeout occured during opening
+        # Indicate if a timeout occurred during opening
         self.__timedout = False
 
         # Create our Unix socket path
@@ -335,7 +335,7 @@ class UnixSocketServer(Device):
                 self.__timedout = True
                 self.__client = None
             except Exception as other_err:
-                logger.error("Another exception occured: %s", other_err)
+                logger.error("Another exception occurred: %s", other_err)
 
     def read(self) -> bytes:
         """Fetches data from the device, if there is any data to read. We call select()
@@ -372,7 +372,7 @@ class UnixSocketServer(Device):
         except ConnectionResetError:
             logger.debug('Connection reset by peer')
         except Exception as err:
-            #logger.error('Unknown exception occured (%s)' % err)
+            #logger.error('Unknown exception occurred (%s)' % err)
             raise WhadDeviceDisconnected() from err
 
     def write(self, payload):

@@ -162,8 +162,8 @@ class ProtocolHub(Registry):
                 msg = Message()
                 msg.ParseFromString(bytes(data))
             except DecodeError:
-                # Error occured when parsing message
-                logger.debug("Decoding error occured when parsing %s", data)
+                # Error occurred when parsing message
+                logger.debug("Decoding error occurred when parsing %s", data)
                 return None
         elif isinstance(data, Message):
             msg = data

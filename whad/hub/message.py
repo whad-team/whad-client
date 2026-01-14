@@ -158,10 +158,10 @@ class HubMessage(object):
 
     def callback(self, cb: Callable["HubMessage", int]):
         """Attach a callback to be notified when message is sent, or if an error
-        occured.
+        occurred.
 
         :param handler: Callback function to call when message is sent or if an error
-                        occured.
+                        occurred.
         :type handler: callable
         """
         self.__callback = cb

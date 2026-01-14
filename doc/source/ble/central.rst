@@ -361,7 +361,7 @@ method, and subscribing for notifications is pretty straightforward:
         if device_name.subscribe(notification=True, callback=notification_callback):
             print(f"Succesfully subscribed for notifications for characteristic {device_name.uuid}")
         else:
-            print(f"An error occured while subscribing for notifications.")
+            print(f"An error occurred while subscribing for notifications.")
 
 The provided callback function will be called each time a notification is received,
 with the new characteristic's value. For notifications, its `indication` argument
@@ -394,7 +394,7 @@ Subscribing for indications is very similar:
         if device_name.subscribe(indication=True, callback=notification_callback):
             print(f"Succesfully subscribed for indications for characteristic {device_name.uuid}")
         else:
-            print(f"An error occured while subscribing for indications.")
+            print(f"An error occurred while subscribing for indications.")
 
 The provided callback function will be called each time a notification is received,
 with the new characteristic's value. For notifications, its `indication` argument
@@ -485,7 +485,7 @@ code shows how to handle GATT write errors:
             if target is not None:
                 target.disconnect()
         except AttError:
-            print("An error occured while disconnecting from target.")
+            print("An error occurred while disconnecting from target.")
 
 
 Central connector and events

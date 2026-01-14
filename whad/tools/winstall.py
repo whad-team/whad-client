@@ -480,7 +480,7 @@ class WhadInstallApp(CommandLineApp):
         """Flash a compatible device with Bastille's RFStorm firmware.
         """
         if not self.install_sdcc():
-            error("An error occured during 'sdcc' installation.")
+            error("An error occurred during 'sdcc' installation.")
 
         r, _, _ = self.run_command("rm -rf /tmp/nrf-research-firmware-python3")
         if r != 0:
@@ -583,7 +583,7 @@ class WhadInstallApp(CommandLineApp):
         """Flash an ESP device with latest NodeMCU WHAD firmware.
         """
         if not self.install_esp_sdk():
-            error("An error occured uring ESP SDK installation.")
+            error("An error occurred uring ESP SDK installation.")
             return False
 
         info("Cloning 'nodemcu-esp32-firmware' github repository...")
@@ -709,7 +709,7 @@ class WhadInstallApp(CommandLineApp):
         """Flash a ST Nucleo WL55 devboard with compatible firmware.
         """
         if not self.install_stflash():
-            error("An error occured during 'st-flash' installation.")
+            error("An error occurred during 'st-flash' installation.")
             return False
 
 
@@ -725,7 +725,7 @@ class WhadInstallApp(CommandLineApp):
         """Flash a SeeedStudio LoRa-e5-mini board with compatible firmware.
         """
         if not self.install_stflash():
-            error("An error occured during 'st-flash' installation.")
+            error("An error occurred during 'st-flash' installation.")
             return False
 
 
@@ -1047,14 +1047,14 @@ class WhadInstallApp(CommandLineApp):
                             if flashfunc(port=self.args.port):
                                 success(f"Flashing successful for device '{device}'.")
                             else:
-                                error((f"An error occured during device flashing"
+                                error((f"An error occurred during device flashing"
                                       f" for device '{device}'."))
                                 sys.exit(1)
                         else:
                             if flashfunc():
                                 success(f"Flashing successful for device '{device}'.")
                             else:
-                                error((f"An error occured during device flashing"
+                                error((f"An error occurred during device flashing"
                                       f" for device '{device}'."))
                                 sys.exit(1)
                     else:
@@ -1066,7 +1066,7 @@ class WhadInstallApp(CommandLineApp):
                         if getattr(self, f"rules_{device}")():
                             success(f"Rules successfully added for device '{device}'.")
                         else:
-                            error((f"An error occured during device rules installation "
+                            error((f"An error occurred during device rules installation "
                                   f"for device '{device}'."))
                             sys.exit(1)
                     else:
@@ -1075,12 +1075,12 @@ class WhadInstallApp(CommandLineApp):
 
             if rules and self.need_reload:
                 if not self.reload_udev_rules():
-                    error("An error occured during udev rules reload, exiting.")
+                    error("An error occurred during udev rules reload, exiting.")
                     sys.exit(1)
                 else:
                     success("Rules successfully reloaded.")
         except Exception as e:
-            error("An error occured: " + repr(e))
+            error("An error occurred: " + repr(e))
 
         # Launch post-run tasks
         self.post_run()

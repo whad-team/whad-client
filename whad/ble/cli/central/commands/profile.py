@@ -114,7 +114,7 @@ def profile_export(app, command_args: list, device, device_metadata: dict):
         with open(command_args[0], 'w', encoding='utf-8') as profile:
             profile.write(json_data)
     except IOError:
-        app.error("An error occured when writing to %s", command_args[0])
+        app.error("An error occurred when writing to %s", command_args[0])
 
 @command('profile')
 def profile_handler(app, command_args):
@@ -195,7 +195,7 @@ def profile_handler(app, command_args):
                             with open(command_args[0], 'w', encoding='utf-8') as profile:
                                 profile.write(json_data)
                         except IOError:
-                            app.error(f"An error occured when writing to {command_args[0]}")
+                            app.error(f"An error occurred when writing to {command_args[0]}")
 
                     # Disconnect
                     device.disconnect()
