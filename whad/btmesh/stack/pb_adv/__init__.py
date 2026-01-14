@@ -162,7 +162,11 @@ class PBAdvBearerLayer(Layer):
                 else:
                     return
 
-        self.send_to_gen_prov(packet)
+        # In the unlikely event that two PB-ADV bearers exist at the same time
+        # between two distinct pairs of devices, do not process messages coming
+        # from another PB_ADV bearer
+        if self.state.current_link_id == packet.link_id:
+            self.send_to_gen_prov(packet)
 
     def on_new_unprovisoned_device(self, peer_uuid):
         """
