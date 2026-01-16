@@ -3,6 +3,7 @@ from time import sleep
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
 from whad.wirelesshart.connector.sniffer import *
+from whad.common.monitors.wireshark import WiresharkMonitor, PcapWriterMonitor
 
 
 if __name__ == '__main__':
@@ -12,18 +13,27 @@ if __name__ == '__main__':
 
         interface = sys.argv[1]
         channel = sys.argv[2]
+        enable_hopping = sys.argv[3]
+        logname = interface + "_" + str(channel) + ("_hopping" if enable_hopping == "on" else "_single")
+
         try:
             
             dev = WhadDevice.create(interface)
             # Instantiate a sniffer
-            sniffer = Sniffer(dev)
+            sniffer = Sniffer(dev, logname=logname)
             sniffer.channel = int(channel)
             sniffer.add_join_key(b"ABCDABCDABCDABCD")
             sniffer.decrypt = True
             sniffer.start()
             sleep(1)
-            sniffer.enable_hopping()
+            if enable_hopping == "on":
+                print("Channel hopping enabled")
+                sniffer.enable_hopping()
             sniffer.attach_callback(sniffer.process_packet)
+
+            pcap=PcapWriterMonitor(logname+".pcap")
+            pcap.attach(sniffer)
+            pcap.start()
 
             while True:
                 sleep(1)
@@ -60,7 +70,9 @@ if __name__ == '__main__':
             
             
         except (KeyboardInterrupt, SystemExit):
-            sniffer.superframes.print_table()
+            #sniffer.superframes.print_table()
+            pcap.stop()
+            pcap.close()
             dev.close()
             
 

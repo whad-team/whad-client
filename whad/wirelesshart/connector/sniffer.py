@@ -20,7 +20,7 @@ from whad.hub.dot15d4 import RawPduReceived, PduReceived
 from whad.hub.message import AbstractPacket
 from whad.exceptions import WhadDeviceDisconnected
 from whad.device import WhadDevice
-
+import time
 logger = logging.getLogger(__name__)
 
 class Sniffer(WirelessHart, EventsManager):
@@ -28,7 +28,7 @@ class Sniffer(WirelessHart, EventsManager):
     Wireless Hart Sniffer interface for compatible WHAD device.
     """
 
-    def __init__(self, device: WhadDevice):
+    def __init__(self, device: WhadDevice, logname = None):
         """Sniffer initialization.
 
         :param device: Device to use for sniffing
@@ -49,7 +49,12 @@ class Sniffer(WirelessHart, EventsManager):
         self.spoofed = []
         
         self.add_event_listener(self.on_event)
-        
+
+        self.file = None
+        if logname is not None:
+            self.file = open(logname + ".log","w")
+            self.logname = logname + ".log"
+
         # Check if device can perform sniffing
         if not self.can_sniff():
             raise UnsupportedCapability("Sniff")
@@ -144,6 +149,10 @@ class Sniffer(WirelessHart, EventsManager):
     def process_ping(self, src):
     	self.spoofed.add(src)
 
+    def __del__(self):
+        if hasattr(self, "file") and self.file is not None:
+            self.file.close()
+
     def process_packet(self, packet: Packet):
         """Process received Wireless Hart packet.
 
@@ -153,6 +162,14 @@ class Sniffer(WirelessHart, EventsManager):
         :rtype: :class:`scapy.packet.Packet`
         """
         global first_adv
+        if self.file is not None:
+            s=packet.__repr__()
+            self.file.write(str(time.time()) + ";" + str(packet.metadata.timestamp) +";"+ str(packet.metadata.channel) + ";"+str(packet.metadata.rssi)+";"+bytes(packet).hex())
+            self.file.write(";" + s)
+            self.file.write("\n")
+            self.file.flush()
+
+            print(repr(packet.metadata), repr(packet))
         if WirelessHart_Network_Security_SubLayer_Hdr in packet and self.__configuration.decrypt:
             self.__asn = (self.__asn & (0xffffff0000)) | (packet.asn_snippet%256) | packet.seqnum
             decrypted, success = self.__decryptor.attempt_to_decrypt(packet)
@@ -186,14 +203,12 @@ class Sniffer(WirelessHart, EventsManager):
                     
                     if WirelessHart_Vendor_Specific_Dust_Networks_Ping_Request in cmd and packet.dest_addr in self.spoofed:
                     	self.ping_response(packet.dest_src, packet.src_addr)
-                    	print("spoofing ping response")        
+                    	print("spoofing ping response")       
         if WirelessHart_DataLink_Advertisement in packet:
             self.process_advertisement(packet)
             if first_adv :
-                packet.show()
                 first_adv = False
-        else:
-            packet.show()
+        
         return packet
     
     def process_advertisement(self, pkt:Packet):
@@ -387,18 +402,17 @@ class Sniffer(WirelessHart, EventsManager):
         
         raise MissingEncryptionKey(dst)
     def ping_response(self, src, dst_dl, hops=1):
-      """Prepare ping response"""
-      ans = self.superframes.get_link(dst, src, Link.TYPE_BROADCAST)
+        """Prepare ping response"""
+        ans = self.superframes.get_link(dst, src, Link.TYPE_BROADCAST)
        
-      (sf, link) = ans
+        (sf, link) = ans
        
-      asn_to_send = (((self.__asn + 1000) // superframe.nb_slots) + 1) * superframe.nb_slots + link.join_slot
-      
-      ping_response = WirelessHart_Vendor_Specific_Dust_Networks_Ping_Response(
-          status=0,
+        asn_to_send = (((self.__asn + 1000) // superframe.nb_slots) + 1) * superframe.nb_slots + link.join_slot
+        ping_response = WirelessHart_Vendor_Specific_Dust_Networks_Ping_Response(
+        status=0,
             expanded_device_type= 0xe0a2,
             hops = hops,
-            temperature = 01,
+            temperature = 1,
             voltage = 2700
         )
         response = WirelessHart_Command_Response_Hdr(
