@@ -23,7 +23,7 @@ from whad.device import WhadDevice
 
 logger = logging.getLogger(__name__)
 
-class Sniffer(WirelessHart, EventsManager):
+class   Sniffer(WirelessHart, EventsManager):
     """
     Wireless Hart Sniffer interface for compatible WHAD device.
     """
@@ -47,6 +47,8 @@ class Sniffer(WirelessHart, EventsManager):
         self.__asn = 0
         
         self.spoofed = []
+
+        self.graphs = set()
         
         self.add_event_listener(self.on_event)
         
@@ -155,6 +157,8 @@ class Sniffer(WirelessHart, EventsManager):
         #print("pkt")
         global first_adv
         if WirelessHart_Network_Security_SubLayer_Hdr in packet and self.__configuration.decrypt:
+            self.graphs.add(packet.graph_id)
+
             self.__asn = (self.__asn & (0xffffff0000)) | (packet.asn_snippet%256) | packet.seqnum
             decrypted, success = self.__decryptor.attempt_to_decrypt(packet)
             if success:
@@ -190,6 +194,7 @@ class Sniffer(WirelessHart, EventsManager):
                     	print("spoofing ping response")        
         if WirelessHart_DataLink_Advertisement in packet:
             self.process_advertisement(packet)
+            self.graphs.add(packet.graph_id)
             if first_adv :
                 packet.show()
                 first_adv = False
@@ -313,13 +318,12 @@ class Sniffer(WirelessHart, EventsManager):
                 nwk_src_addr_length = 0,
                 proxy_route = 0,
                 second_src_route_segment = 0,
-                first_src_route_segment = 1,
+                first_src_route_segment = 0,
                 ttl = 0,
                 asn_snippet = (asn_to_send%0xffff) - 1,
                 graph_id = graph,
                 nwk_dest_addr = 0xffff,
                 nwk_src_addr = 0xf980,
-                first_route_segment = [0x1, dst, 0xffff, 0xffff]
             )
             
             #prepare security sublayer
@@ -358,7 +362,8 @@ class Sniffer(WirelessHart, EventsManager):
             )
             #put layers together
             packet = dot15d4_fcs / dot15d4_data / data_link_layer / network_layer / security_sub_layer /  transport_layer
-            
+            print("packet before encryption")
+            packet.show()
             #generate nonce for encryption
             manager = WirelessHartNetworkLayerCryptoManager(key)
             manager.nonce = manager.generateNonce(packet)
@@ -371,11 +376,12 @@ class Sniffer(WirelessHart, EventsManager):
             enciphered, nwk_mic = manager.encrypt(bytes(transport_layer), manager.generateAuth(packet))
             #update pkt values
             security_sub_layer.nwk_mic = int.from_bytes(nwk_mic)
-            security_sub_layer.counter = peer.get_nonce_counter()%256
+            security_sub_layer.counter = (peer.get_nonce_counter()+1)%256
             network_layer.ttl = 126
             #Put together
             packet = dot15d4_fcs / dot15d4_data / data_link_layer / network_layer / security_sub_layer /  enciphered
-            
+            print("sending this packet:")
+            packet.show()
             #Compute the message integrity code and update its value in the pkt
             dl_mic = compute_dlmic(packet, self.__decryptor.get_network_key(), asn_to_send)
             data_link_layer.mic = int.from_bytes(dl_mic)
@@ -387,7 +393,7 @@ class Sniffer(WirelessHart, EventsManager):
             return final_packet
         
         raise MissingEncryptionKey(dst)
-    def ping_response(self, src, dst_dl, hops=1):   
+    def ping_response(self, src, dst_dl, graph = 0x1, hops=1):   
         """prepare ping response"""
         ans = self.superframes.get_link(dst_dl, src, Link.TYPE_BROADCAST)
        
@@ -445,7 +451,7 @@ class Sniffer(WirelessHart, EventsManager):
                 first_src_route_segment = 1,
                 ttl = 0,
                 asn_snippet = (asn_to_send%0xffff) - 1,
-                graph_id = 0x1,
+                graph_id = graph,
                 nwk_dest_addr = 0xf980,
                 nwk_src_addr = src,
                 first_route_segment = [src, 0x1, 0xffff, 0xffff]
@@ -513,17 +519,17 @@ class Sniffer(WirelessHart, EventsManager):
        
         raise MissingEncryptionKey(dst)
     
-    def ping_request(self, dst, spoofed_src=0x1):
+    def ping_request(self, dst, spoofed_src=0x1, graph=0x1):
         """Looks for the link corresponding to the communication between src and dst and sends a ping request"""
         ans = self.superframes.get_link(dst, 0xffff, Link.TYPE_BROADCAST)
         
         if ans :
             (sf, link) = ans
-            return self.ping_request_on_link(dst, sf, link, spoofed_src=spoofed_src)
+            return self.ping_request_on_link(dst, sf, link, spoofed_src=spoofed_src, graph=graph)
         #no link found raise error
         raise MissingLink(spoofed_src, hex(dst), "TYPE_BROADCAST")
 
-    def ping_request_on_link(self, dst, superframe:Superframe, link: Link, spoofed_src=0x1):
+    def ping_request_on_link(self, dst, superframe:Superframe, link: Link, spoofed_src=0x1, graph=0x1):
         """Prepare and encrypt ping request paquet and sends on the given link"""
         
         #calculate asn to send : next slot of the link communication in the next superframe
@@ -577,13 +583,12 @@ class Sniffer(WirelessHart, EventsManager):
                 nwk_src_addr_length = 0,
                 proxy_route = 0,
                 second_src_route_segment = 0,
-                first_src_route_segment = 1,
+                first_src_route_segment = 0,
                 ttl = 0,
                 asn_snippet = (asn_to_send%0xffff) - 1,
-                graph_id = 0x1,
+                graph_id = graph,
                 nwk_dest_addr = dst,
                 nwk_src_addr = 0xf980,
-                first_route_segment = [spoofed_src, dst, 0xffff, 0xffff]
             )
             
             #peer.incremenet_nonce()
@@ -619,6 +624,8 @@ class Sniffer(WirelessHart, EventsManager):
                 seqnum = asn_to_send%256
             )
             packet = dot15d4_fcs / dot15d4_data / data_link_layer / network_layer / security_sub_layer /  transport_layer
+            print("packet before encryption")
+            packet.show()
             #create manager with key and nonce
             manager = WirelessHartNetworkLayerCryptoManager(key)
             manager.nonce = manager.generateNonce(packet)
@@ -631,10 +638,13 @@ class Sniffer(WirelessHart, EventsManager):
             enciphered, nwk_mic = manager.encrypt(bytes(transport_layer), manager.generateAuth(packet))
             #fill fields
             security_sub_layer.nwk_mic = int.from_bytes(nwk_mic)
-            security_sub_layer.counter = peer.get_nonce_counter()%256
+            security_sub_layer.counter = (peer.get_nonce_counter()+1)%256
             network_layer.ttl = 126
             
             packet = dot15d4_fcs / dot15d4_data / data_link_layer / network_layer / security_sub_layer /  enciphered
+
+            print("sendng this packet:")
+            packet.show()
             
             #compute message integrity code and fill in the pkt
             dl_mic = compute_dlmic(packet, self.__decryptor.get_network_key(), asn_to_send)
@@ -648,7 +658,7 @@ class Sniffer(WirelessHart, EventsManager):
         
         raise MissingEncryptionKey(dst)
     
-    def disconnect_device(self, dst):
+    def disconnect_device(self, dst, graph=0x1):
         """Sends a packet containing a disconnect request from the network manager"""
         
         #get the superframe and the link corresponding to this send
@@ -713,7 +723,7 @@ class Sniffer(WirelessHart, EventsManager):
                 first_src_route_segment = 0,
                 ttl = 0,
                 asn_snippet = ((asn_to_send%0x10000)-1)%256,
-                graph_id = 0x1,
+                graph_id = graph,
                 nwk_dest_addr = dst,
                 nwk_src_addr = 0xf980
             )

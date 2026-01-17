@@ -44,12 +44,17 @@ if __name__ == '__main__':
                         case "ping":
                             str = input("write destination\n")
                             dst = int(str)
-                            encrypted = sniffer.ping_request(dst)
+                            print("available graphs:")
+                            print(sniffer.graphs)
+                            str = input("write graph\n")
+                            graph = int(str)
+                            encrypted = sniffer.ping_request(dst, graph=graph)
                         case "deauth":
                             str = input("write destination\n")
                             dst = int(str)
                             str = input("write duration\n")
                             duration = int(str)
+                            print(sniffer.graphs)
                             str = input("write graph\n")
                             graph = int(str)
                             encrypted = sniffer.mass_de_authetication_packet(dst, duration,graph=graph)
