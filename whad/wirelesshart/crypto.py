@@ -279,7 +279,7 @@ class WirelessHartDecryptor:
                             id_1 = packet.nwk_src_addr
                             
                         peer = Peer(c.nickname, id_1)
-                        
+                        print("add key :"+ self.parse_key(c.key_value).hex()+"graph:"+hex(packet.graph_id))
                         match c.session_type:
                             case 0x0: #unicast
                                 if packet.nwk_dest_addr_length == 0x0 and packet.nwk_src_addr_length == 0x0 : #short adress
@@ -313,7 +313,7 @@ class WirelessHartDecryptor:
         communications = [] #list of (Peer, key)
         if packet.security_types == 0 : #session keyed
             communications.append((self.get_unicast_peer(packet.nwk_src_addr, packet.nwk_dest_addr), self.get_unicast_session_key(packet.nwk_src_addr, packet.nwk_dest_addr)))
-            communications.append((self.get_broadcast_peer(0xffff, packet.nwk_dest_addr), self.get_broadcast_session_key(0xffff, packet.nwk_dest_addr)))
+            communications.append((self.get_broadcast_peer(0xffff, packet.nwk_src_addr), self.get_broadcast_session_key(0xffff, packet.nwk_src_addr)))
             communications.append((self.get_broadcast_peer(packet.nwk_src_addr, 0xffff), self.get_broadcast_session_key(packet.nwk_src_addr, 0xffff)))
             communications.append((self.get_join_peer(packet.nwk_src_addr, packet.nwk_dest_addr), self.get_join_session_key(packet.nwk_src_addr, packet.nwk_dest_addr)))
             
@@ -334,6 +334,7 @@ class WirelessHartDecryptor:
         # one key seems to be missing, check what is not correctly decrypted here
         print("Decryption failed !!")
         print("pkt:", bytes(packet).hex())
+        print(f"tried keys:{communications}")
         #packet.show()
         #exit()
         return packet, False

@@ -71,14 +71,41 @@ class Superframes:
                     links.append((sf, l))
         return links
     
-    def get_link(self, src, neighbor, type= Link.TYPE_NORMAL, options=Link.OPTIONS_RECEIVE)-> Tuple[Superframe, Link]:
+    def get_link(self, src, neighbor,
+                type=Link.TYPE_NORMAL,
+                options=Link.OPTIONS_RECEIVE) -> Tuple[Superframe, Link]:
+
         for sf in self.get_all_superframes():
             for l in self.get_links_from_superframe(sf.id):
-                if l.src==src and l.neighbor==neighbor and l.type==type and l.options==options:
-                    return (sf, l)
-                elif l.src==neighbor and l.neighbor==src and l.type==type and l.options==options:
-                    return (sf, l)
+
+                if l.type == Link.TYPE_BROADCAST:
+                    if (
+                        ((l.src == src and l.neighbor) or (l.neighbor == src and l.src == 0xffff)) and
+                        l.options == options
+                    ):
+                        return (sf, l)
+
+                else:
+                    # sens direct
+                    if (
+                        l.src == src and
+                        l.neighbor == neighbor and
+                        l.type == type and
+                        l.options == options
+                    ):
+                        return (sf, l)
+
+                    # sens inverse (TX <-> RX)
+                    if l.src == neighbor and l.neighbor == src and l.type == type:
+                        if options == Link.OPTIONS_SHARED and l.options == Link.OPTIONS_SHARED:
+                            return (sf, l)
+                        elif options == Link.OPTIONS_TRANSMIT and l.options == Link.OPTIONS_RECEIVE:
+                            return (sf, l)
+                        elif options == Link.OPTIONS_RECEIVE and l.options == Link.OPTIONS_TRANSMIT:
+                            return (sf, l)
+
         return None
+
 
     def contains(self, frame_id):
         return self.get_frame_by_id(frame_id) is not None
@@ -117,5 +144,8 @@ class Superframes:
     def print_table(self):
         print("superframes:")
         for frame, links in self.table.items():
-            print(f"  Frame ID: {frame.id}, links: {links}")
+            print(f"  Frame ID: {frame.id}")
+            for link in links:
+                print(f"    - {link}")
+
 

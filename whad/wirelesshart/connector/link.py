@@ -47,4 +47,24 @@ class Link:
         ])
         
     def __repr__(self):
-        return f"Link(src={self.src}, neighbor={self.neighbor}, slot={self.join_slot},type={self.type}, offset={self.offset}, options={self.options})"
+        link_type = (
+            "Normal" if self.type == 0 else
+            "Discovery" if self.type == 1 else
+            "Broadcast" if self.type == 2 else
+            "Join"
+        )
+
+        option = (
+            "Shared" if self.options == 1 else
+            "Receive" if self.options == 2 else
+            "Transmit"
+        )
+
+        return (
+            f"Link(src=0x{self.src:x}, "
+            f"neighbor=0x{self.neighbor:x}, "
+            f"slot={self.join_slot}, "
+            f"type={link_type}, "
+            f"offset={self.offset}, "
+            f"options={option})"
+        )

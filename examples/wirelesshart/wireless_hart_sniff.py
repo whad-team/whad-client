@@ -3,7 +3,16 @@ from time import sleep
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
 from whad.wirelesshart.connector.sniffer import *
+import logging
 
+#logging.basicConfig(
+#    level=logging.DEBUG,   # <= IMPORTANT
+#    format="%(levelname)s:%(name)s:%(message)s"
+#)
+#
+#
+#logging.getLogger("whad.hub").setLevel(logging.DEBUG)
+#logging.getLogger("whad.protocol").setLevel(logging.DEBUG)
 
 if __name__ == '__main__':
     #logging.basicConfig(level=logging.DEBUG) 
@@ -27,6 +36,7 @@ if __name__ == '__main__':
 
             while True:
                 sleep(1)
+                sniffer.superframes.print_table()
                 str = input("write \"spoof\" to respond to ping requests, \"ping\" to send a ping request or \"deauth\" to send a mass deauthetication or \"disconnect\" to send a disconnect device request or \"jamm\" to start jamming\n")
                 try:
                     sniffer.print_decryptor()
@@ -40,7 +50,9 @@ if __name__ == '__main__':
                             dst = int(str)
                             str = input("write duration\n")
                             duration = int(str)
-                            encrypted = sniffer.mass_de_authetication_packet(dst, duration)
+                            str = input("write graph\n")
+                            graph = int(str)
+                            encrypted = sniffer.mass_de_authetication_packet(dst, duration,graph=graph)
                         case "disconnect":
                             str = input("write destination\n")
                             dst = int(str)

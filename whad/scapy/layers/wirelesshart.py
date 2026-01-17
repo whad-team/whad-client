@@ -764,6 +764,10 @@ class WirelessHart_Read_Unique_Identifier_Response(WirelessHart_Command_Payload)
         BitEnumField('device_variable_alert', 0, 1, {0 : "no", 1: "yes"}), 
         BitEnumField('maintenance_required', 0, 1, {0 : "no", 1: "yes"}), 
 
+        XShortField('manufacturer_id_code', None),
+        XShortField('private_label_distributor_code', None),
+        ByteField('Device_profile', None),
+
     ]
     
 
