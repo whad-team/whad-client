@@ -531,6 +531,9 @@ class BleCentralShell(InteractiveShell):
                 except ConnectionLostException:
                     self.error("Services discovery failed (peripheral disconnected)")
                     return
+                except AttError:
+                    self.error("ATT error, stopping discovery")
+                    return
 
             # Cache our target with its discovered services/characteristics
             self.__cache.add_profile(self.__target_bd, self.__target)
