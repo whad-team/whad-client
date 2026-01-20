@@ -750,7 +750,7 @@ class BleCentralShell(InteractiveShell):
                     self.__cache.mark_as_discovered(self.__target_bd)
 
                 # Search characteristic from its UUID
-                target_charac = self.__target.find_characteristic_by_uuid(handle)
+                target_charac = self.__target.char(handle)
                 if target_charac is not None:
                     try:
                         # Read data
@@ -841,7 +841,7 @@ class BleCentralShell(InteractiveShell):
                 self.__cache.mark_as_discovered(self.__target_bd)
 
             # Search characteristic from its UUID
-            target_charac = self.__target.find_characteristic_by_uuid(handle)
+            target_charac = self.__target.char(handle)
             if target_charac is not None:
                 try:
                     if without_response:
