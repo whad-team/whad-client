@@ -20,13 +20,13 @@ sys.path.insert(0, os.path.abspath('../../'))
 # -- Project information -----------------------------------------------------
 
 project = 'WHAD'
-copyright = '2025, Damien Cauquil, Romain Cayre'
+copyright = '2026, Damien Cauquil, Romain Cayre'
 author = 'Damien Cauquil, Romain Cayre'
 
 # The short X.Y version
 version = ''
 # The full version, including alpha/beta/rc tags
-release = '1.2.11'
+release = '1.2.12'
 
 
 # -- General configuration ---------------------------------------------------
