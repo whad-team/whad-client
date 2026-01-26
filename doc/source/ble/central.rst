@@ -197,11 +197,11 @@ from a known service's UUID is achieved by calling :py:meth:`~whad.ble.profile.d
 
 .. attention::
 
-    :py:meth:`~whad.ble.profile.device.PeripheralDevice.service` method has been introduced in version 1.3.0
+    :py:meth:`~whad.ble.profile.device.PeripheralDevice.service` method has been introduced in version 1.2.12
     to provide a simple and easy way to access a device's service, as a replacement of
     the :py:meth:`~whad.ble.profile.PeripheralDevice.get_service` method that is now deprecated.
 
-Starting from version 1.3.0, it is also possible to check if a service is present
+Starting from version 1.2.12, it is also possible to check if a service is present
 in the discovered attributes with Python's `in` operator:
 
 .. code-block:: python
@@ -309,7 +309,7 @@ or `None` if no matching characteristic has been found.
 
 .. attention::
 
-    :py:meth:`~whad.ble.profile.device.PeripheralDevice.char` method has been introduced in version 1.3.0
+    :py:meth:`~whad.ble.profile.device.PeripheralDevice.char` method has been introduced in version 1.2.12
     to provide a simple and easy way to access a device's service, as a replacement of
     the :py:meth:`~whad.ble.profile.PeripheralDevice.get_characteristic` method that is now deprecated.
 
