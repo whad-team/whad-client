@@ -1349,7 +1349,7 @@ class Hci(VirtualDevice):
         return self.__conn_max_tx_octets
 
 
-    def _1le_encryption(self, message):
+    def _on_whad_ble_encryption(self, message):
         success = self._enable_encryption(
             message.enabled,
             message.conn_handle,
