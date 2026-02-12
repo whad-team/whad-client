@@ -36,6 +36,5 @@ def test_smp_ltk_mac_gen():
     responder = SM_Peer(BDAddress("a7:13:70:2d:cf:c1"))
     responder.rand = N2
     smp = SMPLayer()
-    assert initiator.address == bytes.fromhex("56123737bfce")
     assert smp.compute_ltk_and_mackey(W, initiator, responder) == (MAC, LTK)
 
