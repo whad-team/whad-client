@@ -824,11 +824,17 @@ class BLE(Connector):
 
     def send_ctrl_pdu(self, pdu, conn_handle=0, direction=Direction.MASTER_TO_SLAVE,
                       access_address=0x8e89bed6, encrypt=None):
-        """Send control PDU
+        """Send control PDU (requires raw injection capability).
         """
-        logger.info("send control PDU to connection (handle:%d, direction: %d)", conn_handle, direction)
-        return self.send_pdu(pdu, conn_handle=conn_handle, direction=direction,
-                             access_address=access_address, encrypt=encrypt)
+        if self.support_raw_pdu():
+            logger.info("send control PDU to connection (handle:%d, direction: %d)", conn_handle, direction)
+            return self.send_pdu(pdu, conn_handle=conn_handle, direction=direction,
+                                 access_address=access_address, encrypt=encrypt)
+
+        # Cannot send Control PDU due to missing raw injection capability.
+        logger.debug("BLE::send_ctrl_pdu() called but hardware interface %s does not support raw PDU injection!",
+                     self.device.interface)
+        return False
 
     def send_data_pdu(self, data, conn_handle=0, direction=Direction.MASTER_TO_SLAVE,
                       access_address=0x8e89bed6, encrypt=None):
