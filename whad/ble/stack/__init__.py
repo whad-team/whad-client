@@ -100,7 +100,7 @@ class BleStack(Layer):
         '''Enable or disable encryption using underlying WHAD connector.
         '''
         logger.debug("%s encryption (key=%s, iv=%s)", "enabling" if enabled else "disabling", ll_key.hex(), ll_iv.hex())
-        self.__connector.set_encryption(
+        return self.__connector.set_encryption(
             conn_handle=conn_handle,
             enabled=enabled,
             ll_key=ll_key,
