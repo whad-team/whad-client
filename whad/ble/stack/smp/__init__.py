@@ -15,7 +15,7 @@ BleSMP provides these different pairing strategies:
 from struct import pack, unpack
 from random import randint
 from time import sleep
-
+from typing import Optional
 
 from scapy.layers.bluetooth import SM_Pairing_Request, SM_Pairing_Response, SM_Hdr,\
     SM_Confirm, SM_Random, SM_Failed, SM_Encryption_Information, SM_Master_Identification, \
@@ -141,7 +141,7 @@ class CryptographicMaterial:
         return json.dumps(report)
 
 
-    def __init__(self, address, authenticated=False, ltk=None, irk=None, csrk=None):
+    def __init__(self, address: BDAddress, authenticated: bool = False, ltk: Optional[LongTermKey] = None, irk=None, csrk=None):
         self.__address = address
         self.__authenticated = authenticated
 
@@ -299,7 +299,7 @@ class SM_Peer(object):
     """
 
 
-    def __init__(self, address):
+    def __init__(self, address: BDAddress):
         """Instantiate a SM_Peer.
 
         By default, peers are configured to only accept Legacy JustWorks pairing.
@@ -922,7 +922,7 @@ class SMPLayer(Layer):
         # Compare with confirm value
         return (expected_confirm == self.state.initiator.confirm)
 
-    def check_responder_legacy_confirm(self, tk, preq, pres, initiator, responder):
+    def check_responder_legacy_confirm(self, tk, preq, pres, initiator: BDAddress, responder: BDAddress):
         """Check responder peer confirm value given a TK and the corresponding random value.
 
         :param SM_Peer: Peer to check
@@ -951,6 +951,7 @@ class SMPLayer(Layer):
         return (expected_confirm == self.state.responder.confirm)
 
     def compute_exchange_value(self, mackey, initiator, responder, r, iocap):
+        logger.debug("compute_exchange_value: %s, %s", initiator.addres, responder.address)
         e = f6(
             mackey,
             initiator.rand,
@@ -966,6 +967,7 @@ class SMPLayer(Layer):
         return e
 
     def compute_ltk_and_mackey(self, shared_secret, initiator, responder):
+        logger.debug("compute_ltk_and_mackey: %s, %s", initiator.addres, responder.address)
         output = f5(
             shared_secret,
             initiator.rand,
