@@ -729,7 +729,7 @@ class BleCentralShell(InteractiveShell):
             # Perform characteristic read by handle
             if not isinstance(handle, UUID):
                 try:
-                    value = self.__target.read(handle, offset=offset)
+                    value = self.__target.read(handle, offset=offset, long=True)
 
                     if value is not None:
                         # Display result as hexdump
@@ -755,9 +755,9 @@ class BleCentralShell(InteractiveShell):
                     try:
                         # Read data
                         if offset is not None:
-                            value = target_charac.read(offset=offset)
+                            value = target_charac.read(offset=offset, long=True)
                         else:
-                            value = target_charac.read()
+                            value = target_charac.read(long=True)
 
                         # Display result as hexdump
                         hexdump(value)
