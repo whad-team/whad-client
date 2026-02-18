@@ -618,6 +618,14 @@ class PeripheralDevice(GenericProfile):
         self.__disconnect_cb = callback
 
 
+    def get_mtu(self) -> int:
+        """Retrieve the current host's connection MTU.
+
+        :return: WHAD device MTU
+        :rtype: int
+        """
+        return self.__gatt.att.get_client_mtu()
+
     def set_mtu(self, mtu: int):
         """Update connection MTU.
 
