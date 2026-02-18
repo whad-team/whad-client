@@ -964,13 +964,17 @@ class GattClient(GattLayer):
         value=b''
         offset=0
         while True:
-            # Send a ReadBlob request
+            # Send a Read request for first part, then ReadBlob request
+            # for additional parts.
             self.lock_tx()
-            self.att.read_blob_request(handle, offset)
+            if value == b'':
+                self.att.read_request(handle)
+            else:
+                self.att.read_blob_request(handle, offset)
             self.unlock_tx()
 
-            msg = self.wait_for_message(GattReadBlobResponse)
-            if isinstance(msg, GattReadBlobResponse):
+            msg = self.wait_for_message((GattReadResponse, GattReadBlobResponse))
+            if isinstance(msg, (GattReadResponse, GattReadBlobResponse)):
                 if len(msg.value) < (local_mtu - 1):
                     value += msg.value
                     break
