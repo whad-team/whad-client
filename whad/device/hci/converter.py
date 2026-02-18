@@ -133,8 +133,11 @@ class HCIConverter:
             logger.debug("l2cap does not need frag")
             return [hci_packet]
 
+        ll_packet.show()
         if ll_packet.LLID == 3:
             if LL_ENC_REQ in ll_packet:
+                # When a LL_ENC_REQ is received from BLE stack, we issue a fake LL_ENC_RESP
+                # with `skds` and `ivs` set to 0. 
                 pdu = BTLE_DATA() / BTLE_CTRL() / LL_ENC_RSP(skds=0, ivs=0)
 
                 direction = (BleDirection.SLAVE_TO_MASTER if
@@ -153,6 +156,9 @@ class HCIConverter:
 
                 self.add_pending_message(msg)
 
+                # We also issue a fake LL_START_ENC_REQ to our stack like a peripheral
+                # would do to enable encryption at the link layer. We should receive a
+                # LL_START_ENC_RSP in response.
                 pdu = BTLE_DATA() / BTLE_CTRL() / LL_START_ENC_REQ()
 
                 direction = (BleDirection.SLAVE_TO_MASTER if
