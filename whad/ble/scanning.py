@@ -381,6 +381,8 @@ class AdvertisingDevicesDB:
                     device = self.__db[str(bd_address)]
                     if not device.got_scan_rsp:
                         device.set_scan_rsp(adv_list)
+                        if (filter_addr is not None and filter_addr.lower() == str(bd_address).lower()) or updates:
+                            devices.append(device)
             except AdvDataError:
                 pass
             except AdvDataFieldListOverflow:
