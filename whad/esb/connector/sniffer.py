@@ -12,13 +12,11 @@ By default, the *Enhanced ShockBurst* sniffer sniffs packet on all channels by
 looping from channel 0 to 100 over and over and capturing frames that match
 the expected format.
 """
-from time import time
 from typing import Generator
 
 from scapy.packet import Packet
 
 from whad.device import Device
-from whad.helpers import message_filter
 from whad.exceptions import WhadDeviceDisconnected, UnsupportedCapability
 from whad.common.sniffing import EventsManager
 
@@ -59,7 +57,7 @@ class Sniffer(ESB, EventsManager):
         ack = self.__configuration.acknowledgements
         address = self.__configuration.address
 
-        super().sniff(channel=channel, show_acknowledgements=ack, address=address)
+        super().start_sniff(channel=channel, show_acknowledgements=ack, address=address)
         self.start()
 
     @property
@@ -136,7 +134,7 @@ class Sniffer(ESB, EventsManager):
             message_type = PduReceived
 
         try:
-            for message in super().sniff(message=(message_type), timeout=timeout):
+            for message in super().sniff(messages=(message_type), timeout=timeout):
                 if message is not None and issubclass(message, AbstractPacket):
                     packet = message.to_packet()
                     if packet is not None:
