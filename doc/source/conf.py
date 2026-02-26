@@ -26,7 +26,7 @@ author = 'Damien Cauquil, Romain Cayre'
 # The short X.Y version
 version = ''
 # The full version, including alpha/beta/rc tags
-release = '1.2.12'
+release = '1.2.13'
 
 
 # -- General configuration ---------------------------------------------------
