@@ -1084,7 +1084,7 @@ class BleCentralShell(InteractiveShell):
 
             # If UUID is provided
             if isinstance(handle, UUID):
-                target_charac = self.__target.find_characteristic_by_uuid(handle)
+                target_charac = self.__target.char(handle)
             elif isinstance(handle, int):
                 try:
                     target_charac = self.__target.find_object_by_handle(handle)
@@ -1195,7 +1195,7 @@ class BleCentralShell(InteractiveShell):
 
             # If UUID is provided
             if isinstance(handle, UUID):
-                target_charac = self.__target.find_characteristic_by_uuid(handle)
+                target_charac = self.__target.char(handle)
             elif isinstance(handle, int):
                 try:
                     target_charac = self.__target.find_object_by_handle(handle)
