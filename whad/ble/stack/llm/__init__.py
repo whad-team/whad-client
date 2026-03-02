@@ -97,7 +97,7 @@ class BleConnection:
         """Link layer
         """
         return self.__l2cap.get_layer("ll")
-    
+
     @property
     def att(self):
         """ATT layer
@@ -901,7 +901,13 @@ class LinkLayer(Layer):
         logger.info("[llm] Session  TK: %s", self.__llcm.ltk.hex())
         logger.info("[llm] Session  iv: %s", iv.hex())
         logger.info("[llm] Session key: %s", session_key.hex())
-        logger.info("[llm] Session Key LLCM: %s", self.__llcm.session_key.hex())
+
+        # Start encryption (STK as LTK)
+        self.send_ctrl_pdu(
+            conn_handle,
+            LL_START_ENC_RSP(),
+            encrypt=False,
+        )
 
         rand, ediv = self.state.get_rand_and_ediv(conn_handle)
 
@@ -918,13 +924,6 @@ class LinkLayer(Layer):
             logger.info('[llm] Cannot enable encryption')
         else:
             logger.info('[llm] Encryption enabled in hardware')
-
-        # Start encryption (STK as LTK)
-        self.send_ctrl_pdu(
-            conn_handle,
-            LL_START_ENC_RSP(),
-        )
-
 
     def on_start_enc_rsp(self, conn_handle: int, start_enc_rsp: LL_START_ENC_RSP):
         """Encryption start response handler
