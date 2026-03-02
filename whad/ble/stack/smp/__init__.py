@@ -951,7 +951,7 @@ class SMPLayer(Layer):
         return (expected_confirm == self.state.responder.confirm)
 
     def compute_exchange_value(self, mackey, initiator, responder, r, iocap):
-        logger.debug("compute_exchange_value: %s, %s", initiator.addres, responder.address)
+        logger.debug("compute_exchange_value: %s, %s", initiator.address, responder.address)
         e = f6(
             mackey,
             initiator.rand,
@@ -967,7 +967,7 @@ class SMPLayer(Layer):
         return e
 
     def compute_ltk_and_mackey(self, shared_secret, initiator, responder):
-        logger.debug("compute_ltk_and_mackey: %s, %s", initiator.addres, responder.address)
+        logger.debug("compute_ltk_and_mackey: %s, %s", initiator.address, responder.address)
         output = f5(
             shared_secret,
             initiator.rand,
