@@ -334,7 +334,7 @@ class Dot15d4(WhadDeviceConnector):
         else:
             return False
 
-    def send_in_slot(self, pdu, slot) -> bool:
+    def send_in_slot(self, pdu, slot, delay=0) -> bool:
         """
         Send 802.15.4 packets (in the specified slot).
 
@@ -368,7 +368,7 @@ class Dot15d4(WhadDeviceConnector):
             packet.metadata = metadata
             # Send packet
             packet = bytes(packet)
-            msg = self.hub.dot15d4.send_packet_in_slot(packet, slot)
+            msg = self.hub.dot15d4.send_packet_in_slot(packet, slot, delay)
             resp = self.send_command(msg, message_filter(CommandResult))
             return isinstance(resp, Success)
         else:

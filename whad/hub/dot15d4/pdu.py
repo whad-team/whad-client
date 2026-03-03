@@ -79,6 +79,7 @@ class SendInSlot(PbMessageWrapper):
     """Send command to program the sending of a pdu
     """
     slot = PbFieldInt('dot15d4.send_in_slot.slot')
+    wait_offset = PbFieldInt('dot15d4.send_in_slot.wait_offset')
     pdu = PbFieldBytes('dot15d4.send_in_slot.pdu')
 
 @pb_bind(Dot15d4Domain, 'pdu', 1)

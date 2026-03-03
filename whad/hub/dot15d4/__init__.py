@@ -429,17 +429,19 @@ class Dot15d4Domain(Registry):
             pdu=pdu,
             fcs=fcs
         )
-    def send_packet_in_slot(self, pdu:bytes, slot:int) -> HubMessage:
+    def send_packet_in_slot(self, pdu:bytes, slot:int, wait_offset: int) -> HubMessage:
         """Create a SendInSlot message
 
         :param pdu: PDU to send
         :type pdu: bytes
         :param slot: Slot on which the PDU has to be sent
+        :param wait_offset: wait duration to wait before sending the packet in the specified slot
         :type channel: int
         :return: instance of `SendPdu`
         """
         msg =  Dot15d4Domain.bound('send_in_slot', self.proto_version)(
             slot=slot,
+            wait_offset=wait_offset,
             pdu=pdu
         )
         
