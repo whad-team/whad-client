@@ -39,6 +39,7 @@ Once the sniffer configuration set, sniffing is quite easy:
 >>> for packet in sniffer.sniff():
         packet.show()
 """
+import logging
 
 from time import time
 from queue import Queue, Empty
@@ -52,6 +53,8 @@ from whad.exceptions import UnsupportedCapability
 
 from .base import Phy
 from ..sniffing import SnifferConfiguration
+
+logger = logging.getLogger(__name__)
 
 class Sniffer(Phy, EventsManager):
     """
@@ -77,13 +80,20 @@ class Sniffer(Phy, EventsManager):
 
         Configure the associated hardware and set the sniffer parameters.
         """
+        # Set frequency (will raise UnsupportedFrequency if provided frequency is outside
+        # hardware's supported ranges).
         self.set_frequency(self.__configuration.frequency)
-        self.set_packet_size(self.__configuration.packet_size)
 
-        # Set data rate for all modulations but LoRa
+        # Set packet size, display a warning if hardware rejects the provided value.
+        if not self.set_packet_size(self.__configuration.packet_size):
+            logger.warning("hardware rejected the provided packet size (%d) and will use its default value instead.",
+                            self.__configuration.packet_size)
+
+        # Set data rate for all modulations but LoRa.
         if not self.__configuration.lora:
             self.set_datarate(self.__configuration.datarate)
 
+        # Configure modulation.
         if self.__configuration.gfsk:
             self.set_gfsk(deviation=self.__configuration.fsk_configuration.deviation)
         elif self.__configuration.bfsk:
@@ -106,7 +116,7 @@ class Sniffer(Phy, EventsManager):
                 explicit=self.__configuration.lora_configuration.enable_explicit_mode
             )
 
-        # Set endianness for all modulations but LoRa
+        # Set endianness for all modulations but LoRa.
         if not self.__configuration.lora:
             self.set_endianness(
                 Endianness.LITTLE if
@@ -114,10 +124,10 @@ class Sniffer(Phy, EventsManager):
                 Endianness.BIG
             )
 
-        # Set synchronization word
+        # Set synchronization word.
         self.set_sync_word(self.__configuration.sync_word)
 
-        # Put WHAD interface in sniffing mode
+        # Put WHAD interface in sniffing mode.
         self.sniff_phy()
 
     @property
