@@ -57,12 +57,11 @@ a signal. The **PHY** domain needs to be specified, along with additional option
 Specific PHY options
 ^^^^^^^^^^^^^^^^^^^^
 
-* ``--frequency`` (``-f``): specifies the target frequency in Hz. This frequency
-                            must be in the device' supported frequencies range.
+* ``--frequency`` (``-f``): specifies the target frequency in Hz. This frequency must be in the device's supported frequencies range.
 * ``--little-endian`` (``-le``): will interpret bytes as little-endian (LSB first, default is *big-endian*).
 * ``--datarate`` (``-d``): set the data rate in number of bits per second (*bps*).
 * ``--packet-size`` (``-s``): set the maximum packet (or reception buffer) size in bytes.
-* ``--sync-word`` (``-w``): set a synchronization word (hex value expected)
+* ``--sync-word`` (``-w``): set a synchronization word from its hexadecimal representation in network byte order (e.g. ``-w 8e89bed6``)
 * ``--ask`` (``-ask``): select ASK (Amplitude Shift Keying) modulation
 * ``--gfsk`` (``-gfsk``): select GFSK (Gaussian Frequency Shift Keying) modulation
 * ``--bfsk`` (``-bfsk``): select BFSK (Binary Frequency Shift Keying) modulation
