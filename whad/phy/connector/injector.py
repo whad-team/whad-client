@@ -1,10 +1,14 @@
 """PHY Injector connector
 """
+import logging
+
 from whad.phy.connector import Phy
 from whad.hub.phy import Modulation as PhyModulation, Endianness as PhyEndianness
 from whad.phy.injecting import InjectionConfiguration
 from whad.scapy.layers.phy import Phy_Packet
 from whad.exceptions import UnsupportedCapability
+
+logger = logging.getLogger(__name__)
 
 # TODO: every sniffer is broken (sniff() method does not catch packets, we
 #       have to catch them in on_packet() and put them in a queue)
@@ -39,7 +43,10 @@ class Injector(Phy):
         if self.__configuration.frequency is not None:
             self.set_frequency(self.__configuration.frequency)
         if self.__configuration.packet_size is not None:
-            self.set_packet_size(self.__configuration.packet_size)
+            if not self.set_packet_size(self.__configuration.packet_size):
+                logger.warning(("[WARNING] Hardware rejected the specified packet size (%d), "
+                                "will use its maximum packet size instead."),
+                               self.__configuration.packet_size)
 
         # Set data rate for all modulations but LoRa
         if not self.__configuration.lora:

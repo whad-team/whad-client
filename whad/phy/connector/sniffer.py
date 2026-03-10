@@ -86,7 +86,7 @@ class Sniffer(Phy, EventsManager):
 
         # Set packet size, display a warning if hardware rejects the provided value.
         if not self.set_packet_size(self.__configuration.packet_size):
-            logger.warning("hardware rejected the provided packet size (%d) and will use its default value instead.",
+            logger.warning("[WARNING] Hardware rejected the provided packet size (%d) and will use its maximum packet size instead.",
                             self.__configuration.packet_size)
 
         # Set data rate for all modulations but LoRa.
