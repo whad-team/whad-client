@@ -120,7 +120,7 @@ def profile_export(app, command_args: list, device, device_metadata: dict):
 @command('profile')
 def profile_handler(app, command_args):
     """discover services and characteristics
-    
+
     <ansicyan><b>profile</b> <i>[JSON_PROFILE]</i></ansicyan>
 
     This command connects to a target device, discover its services and characteristics,
@@ -138,7 +138,7 @@ def profile_handler(app, command_args):
         scanner.start()
 
         device = None
-        for scanned_device in scanner.discover_devices(timeout=30.0):
+        for scanned_device in scanner.discover_devices(timeout=30.0, updates=True):
             if scanned_device.address.lower() == app.args.bdaddr.lower():
                 device = scanned_device
                 if device.got_scan_rsp:

@@ -179,7 +179,10 @@ class ClientCharacteristicConfig(Descriptor):
         handle and value, and tie it to a specific characteristic.
         """
         # Create our CCCD object
-        v = value[0]
+        if len(value) >= 1:
+            v = value[0]
+        else:
+            v = 0x00
         cccd = ClientCharacteristicConfig(handle,(v & 0x0001) != 0, (v & 0x0002) != 0, characteristic)
         # Set its value
         cccd.value = value
