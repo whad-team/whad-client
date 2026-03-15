@@ -12,11 +12,7 @@ testpaths = [
 name = "whad"
 
 # Attention: the following version number must match the one in whad/version.py !
-<<<<<<< HEAD
 version = "1.3.0"
-=======
-version = "1.2.12"
->>>>>>> cc79c8f9 (Version bump.)
 
 authors = [
     { name="Damien CAUQUIL" },
