@@ -326,6 +326,14 @@ class CommandLineApp(ArgumentParser):
                 help='specifies the WHAD interface to use',
             )
 
+        self.add_argument(
+            '--disable-chaining',
+            dest='disable_chaining',
+            action='store_true',
+            default=False,
+            help='Disable WHAD tool chaining'
+        )
+
         # Add our default option --no-colorfself
         self.add_argument(
             '--no-color',
@@ -602,6 +610,10 @@ class CommandLineApp(ArgumentParser):
 
         :return bool: True if stdout is piped, False otherwise
         """
+        if self.__args.disable_chaining:
+            # we disabled WHAD tool chaining feature
+            return False
+
         if not sys.stdout.isatty():
             # If we are on a Linux system, check if we are redirected to
             # /dev/null, in this case we consider we are not *really* piped
