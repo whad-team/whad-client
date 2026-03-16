@@ -522,10 +522,8 @@ class ANT(WhadDeviceConnector):
 
     def on_pdu(self, packet):
         """
-        Normal PDU processing (???).
+        Normal PDU processing.
         """
-        print(packet.metadata)
-        packet.show()
         # Enqueue PDU if in synchronous mode
         if self.is_synchronous():
             self.add_pending_packet(packet)

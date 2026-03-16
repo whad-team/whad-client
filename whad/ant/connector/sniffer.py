@@ -104,9 +104,11 @@ class Sniffer(ANT, EventsManager):
         self._enable_sniffing()
 
     def process_packet(self, packet):
+
         if ANT_FS_Link_Command_Packet in packet:
             self.channel = packet.frequency
             print("[i] Hopping to channel "+str(packet.frequency))
+            
         return packet
 
     def sniff(self, timeout: float = None) -> Generator[Packet, None, None]:
