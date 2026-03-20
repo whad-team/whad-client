@@ -19,7 +19,7 @@ from whad.scapy.layers import *
 from scapy.themes import BrightTheme
 from scapy.config import conf
 
-from whad.cli.app import CommandLineApp, run_app
+from whad.cli.app import CommandLineDualOutputApp, run_app
 from whad.device.unix import UnixSocketServer, UnixConnector
 from whad.device import Bridge
 from whad.hub import ProtocolHub
@@ -79,7 +79,7 @@ class WhadFilterPipe(Bridge):
             super().on_inbound(message)
 
 
-class WhadFilterApp(CommandLineApp):
+class WhadFilterApp(CommandLineDualOutputApp):
     """wfilter CLI application class.
     """
 
@@ -90,8 +90,8 @@ class WhadFilterApp(CommandLineApp):
             description='WHAD filter tool',
             interface=True,
             commands=False,
-            input=CommandLineApp.INPUT_WHAD,
-            output=CommandLineApp.OUTPUT_WHAD
+            input=CommandLineDualOutputApp.INPUT_WHAD,
+            output=CommandLineDualOutputApp.OUTPUT_WHAD
         )
 
         self.add_argument(
