@@ -18,7 +18,7 @@ Usage
 Command-line options
 ^^^^^^^^^^^^^^^^^^^^
 
-**wplay** supports the following options:
+**wfilter** supports the following options:
 
 * ``--down``: process downstream packets
 * ``--up``: process upstream packets
@@ -26,6 +26,7 @@ Command-line options
 * ``--invert`` (``-e``): invert filter
 * ``--forward`` (``-f``): forward packets that do not match the specified filter (dropped by default)
 * ``--load`` (``-l``): load specified Python module containing extra Scapy layers definitions
+* ``--force-stdout``: disable tool chaining and print packets to standard output
 
 .. include:: debug-options.rst
 
