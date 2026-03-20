@@ -26,6 +26,7 @@ Command-line options
 * ``--output`` (``-o``): specifies a target PCAP file in which all captured data will be saved
 * ``--wireshark`` (``-w``): spawns a wireshark instance that will monitor packets in real-time
 * ``--flush``: enable wireshark monitoring
+* ``--force-stdout``: disable tool chaining and print packets to standard output
 
 .. include:: debug-options.rst
 
