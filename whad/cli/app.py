@@ -661,6 +661,39 @@ class CommandLineApp(ArgumentParser):
         except Exception as err:
             logger.error('[!] an unknown error occurred: %s',err)
 
+class CommandLineDualOutputApp(CommandLineApp):
+    """
+    Command-line application that can send data to standard output as well
+    as to other chained WHAD command-line tools.
+
+    By default, this class behaves as a `CommandLineApp` application and will
+    try to determine by itself if its standard output is piped to another application
+    or prints to the standard output.
+
+    This behavior can be overriden by using a specific option, `--stdout`, that forces
+    the application to send its output to the standard output instead of a chained tool.
+    """
+    def __init__(self, description: str = None, commands: bool=True, interface: bool=True,
+                 input: int = CommandLineApp.INPUT_WHAD,
+                 output: int = CommandLineApp.OUTPUT_WHAD, **kwargs):
+        # Initialize with parent "constructor".
+        super().__init__(description=description, commands=commands, interface=interface,
+                         input=input, output=output, **kwargs)
+
+        # Add our default option --stdout
+        self.add_argument(
+            '--stdout',
+            dest='stdout_forced',
+            action='store_true',
+            help='disable tool chaining and force application to print to standard outut'
+        )
+
+    def is_stdout_piped(self) -> bool:
+        """Override CommandLineApp's default `is_stdout_piped()` method to force the app
+        to consider its output not piped, if requested by the user."""
+        if self.args.stdout_forced:
+            return False
+        return super().is_stdout_piped()
 
 class CommandLineSource(CommandLineApp):
     """
