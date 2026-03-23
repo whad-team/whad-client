@@ -670,7 +670,7 @@ class CommandLineDualOutputApp(CommandLineApp):
     try to determine by itself if its standard output is piped to another application
     or prints to the standard output.
 
-    This behavior can be overriden by using a specific option, `--stdout`, that forces
+    This behavior can be overriden by using a specific option, `--force-stdout`, that forces
     the application to send its output to the standard output instead of a chained tool.
     """
     def __init__(self, description: str = None, commands: bool=True, interface: bool=True,
@@ -682,7 +682,7 @@ class CommandLineDualOutputApp(CommandLineApp):
 
         # Add our default option --stdout
         self.add_argument(
-            '--stdout',
+            '--force-stdout',
             dest='stdout_forced',
             action='store_true',
             help='disable tool chaining and force application to print to standard outut'
