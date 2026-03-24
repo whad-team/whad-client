@@ -14,6 +14,42 @@ from whad.hub.message import HubMessage, pb_bind
 from whad.hub import ProtocolHub
 from whad.hub.metadata import Metadata
 
+def ble_channel_to_rf_channel(channel):
+    '''
+    Convert BLE channel to RF channel used by Wireshark.
+    '''
+    if channel == 37:
+        freq_offset = 2
+    elif channel == 38:
+        freq_offset = 26
+    elif channel == 39:
+        freq_offset = 80
+    elif channel < 11:
+        freq_offset = 2 * (channel + 2)
+    else:
+        freq_offset = 2 * (channel + 3)
+
+    return (freq_offset - 2) // 2
+
+
+def rf_channel_to_ble_channel(rf_channel):
+    '''
+    Convert RF channel (used by Wireshark) to BLE channel.
+    '''
+    freq_offset = 2 + (rf_channel * 2)
+    if freq_offset == 2:
+        channel = 37
+    elif freq_offset == 26:
+        channel = 38
+    elif freq_offset == 80:
+        channel = 39
+    elif freq_offset <= 24:
+        channel = int((freq_offset / 2) - 2)
+    else:
+        channel = int((freq_offset / 2) - 3)
+
+    return channel
+
 class Commands:
     """BLE Commands
     """
@@ -86,7 +122,7 @@ class BLEMetadata(Metadata):
         else:
             direction = BleDirection.UNKNOWN
 
-        channel = header.rf_channel
+        channel = rf_channel_to_ble_channel(header.rf_channel)
         is_crc_valid = header.crc_valid == 1
         rssi = header.signal
 
@@ -121,7 +157,7 @@ class BLEMetadata(Metadata):
             crc_checked = 1
             crc_valid = self.is_crc_valid
         if self.channel is not None:
-            rf_channel = self.channel
+            rf_channel = ble_channel_to_rf_channel(self.channel)
 
         header = BTLE_RF(
             rf_channel = rf_channel,
