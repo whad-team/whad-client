@@ -239,15 +239,20 @@ class PeripheralCharacteristic(Characteristic, RemoteAttribute):
             return Attribute.value.fget(self.value_attr)
         return b''
 
-    def read(self, offset: int = 0) -> bytes:
+    def read(self, offset: int = 0, long: bool = False) -> bytes:
         """Read characteristic value.
 
         :param offset: If specified, start reading at this offset.
         :type  offset: int
+        :param long: If enabled, perform a long read.
+        :ttype long: bool
         :return: Content of the characterstic's value
         :rtype:  bytes
         """
-        return super().read(offset=offset)
+        if long:
+            return super().read_long()
+        else:
+            return super().read(offset=offset)
 
     def write(self, value: bytes, without_response: bool = False) -> bool:
         """Set characteristic value
