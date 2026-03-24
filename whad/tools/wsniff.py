@@ -10,7 +10,7 @@ from argparse import ArgumentParser
 from scapy.config import conf
 from scapy.all import BrightTheme
 
-from whad.cli.app import CommandLineApp, run_app
+from whad.cli.app import CommandLineDualOutputApp, run_app
 from whad.cli.ui import error, warning, display_packet
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 from whad.common.monitors import WiresharkMonitor, PcapWriterMonitor
@@ -64,7 +64,7 @@ class WhadDomainSubParser(ArgumentParser):
         sys.exit(1)
 
 
-class WhadSniffApp(CommandLineApp):
+class WhadSniffApp(CommandLineDualOutputApp):
     """Main WHAD sniffing application class.
     """
 
