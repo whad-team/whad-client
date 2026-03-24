@@ -31,6 +31,7 @@ Command-line options
 * ``--no-metadata``: hide packets metadata
 * ``--format``: specify the output format (`raw`, `hexdump`, `show`, `repr`)
 * ``--output`` (``-o``): specifies a target PCAP file in which all captured data will be saved
+* ``--force-stdout``: disable tool chaining and print packet to standard output
 
 The ``--format`` option tells ``wsniff`` how to display data. By default, captured data is
 shown as a series of *Scapy* packets containing raw data. ``raw`` format will display the captured
