@@ -917,7 +917,7 @@ class BLE(Connector):
 
     def send_ctrl_pdu(self, pdu, conn_handle=0, direction=Direction.MASTER_TO_SLAVE,
                       access_address=0x8e89bed6, encrypt=None):
-        """Send control PDU
+        """Send control PDU (requires raw injection capability).
         """
         logger.info("send control PDU to connection (handle:%d, direction: %d)", conn_handle, direction)
         return self.send_pdu(pdu, conn_handle=conn_handle, direction=direction,
@@ -943,7 +943,10 @@ class BLE(Connector):
                 # Sanity check (issue #183): if there is a BTLE_CTRL layer in this
                 # PDU and we don't support raw PDU, issue an error and raise
                 # an UnsupportedCapability exception.
-                if BTLE_CTRL in pdu:
+                #
+                # If we are using an HCI adapter, control PDUs are allowed because
+                # we need this to handle pairing and bonding.
+                if BTLE_CTRL in pdu and not self.device.interface.startswith("hci"):
                     logger.error((
                         "WHAD interface %s cannot send BLE control PDUs, please "
                         "use another interface that supports sending raw PDUs."

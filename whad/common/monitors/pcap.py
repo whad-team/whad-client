@@ -2,6 +2,7 @@ from whad.common.monitors import WhadMonitor
 from scapy.all import conf
 from scapy.layers.bluetooth4LE import *
 from scapy.utils import PcapWriter,PcapReader
+from scapy.error import Scapy_Exception
 from os.path import exists
 from whad.common.pcap import patch_pcap_metadata, extract_pcap_metadata
 from time import time
@@ -63,7 +64,7 @@ class PcapWriterMonitor(WhadMonitor):
                 try:
                     # We collect the first packet timestamp to use it as reference time
                     self._start_time = PcapReader(self._pcap_file).read_packet().time * 1000000
-                except EOFError:
+                except (EOFError, Scapy_Exception):
                     # Pcap is empty, remove it and open a new one
                     remove(self._pcap_file)
                     existing_pcap_file = False

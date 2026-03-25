@@ -632,14 +632,12 @@ class GATTServerDiscovery(TrafficAnalyzer):
                     descriptor_obj = None
                     if descriptor.uuid  == UUID(0x2901):
                         descriptor_obj = CharacteristicDescriptor(
-                                selected_characteristic,
-                                handle=descriptor.handle,
-                                uuid=descriptor.uuid
+                                descriptor.uuid,
+                                handle=descriptor.handle
                         )
                     elif descriptor.uuid == UUID(0x2902):
                         descriptor_obj = ClientCharacteristicConfig(
-                                selected_characteristic,
-                                handle=descriptor.handle
+                                descriptor.handle
                         )
                     if descriptor_obj is not None:
                         selected_characteristic.add_descriptor(descriptor_obj)

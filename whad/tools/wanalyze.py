@@ -17,7 +17,7 @@ from scapy.themes import BrightTheme
 
 from whad.common.analyzer import InvalidParameter
 from whad.scapy.layers import *
-from whad.cli.app import CommandLineApp, run_app
+from whad.cli.app import CommandLineDualOutputApp, run_app
 from whad.device.unix import UnixConnector, UnixSocketServer
 from whad.device import Bridge
 from whad.hub import ProtocolHub
@@ -81,7 +81,7 @@ def display_analyzers(analyzers: dict):
 
         print()
 
-class WhadAnalyzeApp(CommandLineApp):
+class WhadAnalyzeApp(CommandLineDualOutputApp):
     """
     Main `wanalyze` CLI application class.
     """
@@ -93,8 +93,8 @@ class WhadAnalyzeApp(CommandLineApp):
             description='WHAD analyze tool',
             interface=False,
             commands=False,
-            input=CommandLineApp.INPUT_WHAD,
-            output=CommandLineApp.OUTPUT_STANDARD
+            input=CommandLineDualOutputApp.INPUT_WHAD,
+            output=CommandLineDualOutputApp.OUTPUT_STANDARD
         )
 
         self.add_argument(

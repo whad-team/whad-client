@@ -253,7 +253,7 @@ using this profile:
     my_profile = MyPeripheral()
 
     # Create a periphal device based on this profile
-    periph = Peripheral(Device.create("hci0"), profile=my_profile)
+    periph = Peripheral(Device.create('hci0'), profile=my_profile)
 
     # Enable peripheral mode with advertisement data:
     # * default flags (general discovery mode, connectable, BR/EDR not supported)
