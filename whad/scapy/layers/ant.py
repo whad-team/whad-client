@@ -3,6 +3,9 @@ from scapy.fields import StrFixedLenField, ByteField, ByteEnumField, \
  	BitField, BitEnumField,LEX3BytesField, LEShortField, LEIntField, SignedShortField, \
 	SignedByteField, ShortField, LEShortEnumField, XLEShortField, ConditionalField
 from struct import pack
+from scapy.config import conf
+
+USER_DLT = 150
 
 ANT_MANUFACTURERS_ID = {
 	"Garmin": 1,
@@ -1283,3 +1286,6 @@ bind_layers(ANT_FS_Command_Or_Response_Packet,ANT_FS_Download_Request_Response_P
 bind_layers(ANT_FS_Command_Or_Response_Packet,ANT_FS_Upload_Request_Response_Packet, cmd_or_resp_type=0x8a)
 bind_layers(ANT_FS_Command_Or_Response_Packet,ANT_FS_Erase_Response_Packet, cmd_or_resp_type=0x8b)
 bind_layers(ANT_FS_Command_Or_Response_Packet,ANT_FS_Upload_Data_Response_Packet, cmd_or_resp_type=0x8c)
+
+
+conf.l2types.register(USER_DLT, ANT_Hdr)

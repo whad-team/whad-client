@@ -1000,7 +1000,7 @@ class Device:
         return 0
 
 
-    def send_discover_info_query(self, proto_version=0x0100):
+    def send_discover_info_query(self, proto_version=0x0300):
         """
         Sends a DeviceInfoQuery message and awaits for a DeviceInfoResp
         answer.

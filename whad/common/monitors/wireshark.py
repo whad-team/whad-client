@@ -9,6 +9,7 @@ import whad
 from shutil import which
 from os import mkfifo, unlink
 from os.path import dirname, realpath, exists
+from scapy.config import conf
 from time import sleep
 
 class WiresharkMonitor(PcapWriterMonitor):
@@ -31,6 +32,8 @@ class WiresharkMonitor(PcapWriterMonitor):
 
     def __init__(self, monitor_reception=True, monitor_transmission=True):
         self._wireshark_process = None
+
+        self._user_dlt = None
         # Checks the presence of wireshark
         self._wireshark_path = which("wireshark")
         if self._wireshark_path is None:
@@ -51,6 +54,11 @@ class WiresharkMonitor(PcapWriterMonitor):
         """
         if connector.domain in ("esb", "unifying"):
             self.dissector = WiresharkMonitor.get_dissector("esb")
+            self._user_dlt = (148 if connector.domain == "esb" else 149)
+        elif connector.domain in ("ant"):
+            self._user_dlt = 150
+            self.dissector = WiresharkMonitor.get_dissector("ant")
+
         return super().attach(connector)
 
     def setup(self):
@@ -64,7 +72,7 @@ class WiresharkMonitor(PcapWriterMonitor):
             with open(dissector, "r") as f:
                 conf_line = [line for line in f.readlines() if "Proto(" in line][0]
                 dissector_name = conf_line.split("Proto(")[1].split(",")[0].replace("\"", "")
-            self._wireshark_process = Popen([self._wireshark_path,"-X","lua_script:"+dissector,"-o","uat:user_dlts:\"User 1 (DLT=148)\",\""+dissector_name+"\",\"\",\"\",\"\",\"\"", "-k", "-i", fifo], stderr=DEVNULL, stdout=DEVNULL)
+            self._wireshark_process = Popen([self._wireshark_path,"-X","lua_script:"+dissector,"-o","uat:user_dlts:\"User "+str(self._user_dlt - 147)+" (DLT="+str(self._user_dlt)+")\",\""+dissector_name+"\",\"\",\"\",\"\",\"\"", "-k", "-i", fifo], stderr=DEVNULL, stdout=DEVNULL)
 
     def is_terminated(self) -> bool:
         """Check if wireshark process has terminated.

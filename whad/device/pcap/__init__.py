@@ -9,7 +9,7 @@ import logging
 
 from os.path import exists
 from time import sleep
-from struct import unpack
+from struct import unpack,pack
 
 from scapy.layers.bluetooth4LE import BTLE
 from scapy.layers.dot15d4 import Dot15d4
@@ -23,6 +23,7 @@ from whad.scapy.layers.phy import Phy_Packet
 from whad.hub.dot15d4 import Dot15d4Metadata
 from whad.hub.ble import BLEMetadata
 from whad.hub.esb import ESBMetadata
+from whad.hub.ant import ANTMetadata
 from whad.hub.phy import PhyMetadata, Modulation, Endianness
 from whad.hub.unifying import UnifyingMetadata
 from whad.hub.discovery import Domain
@@ -159,8 +160,10 @@ class Pcap(VirtualDevice):
                 # End of PCAP reached, we are no more open and notify the
                 # calling thread that we are now disconnected.
                 logger.debug("[PCAPDevice] EOF reached")
-                self.__opened = False
                 raise WhadDeviceDisconnected() from eof
+                super().close()
+
+                self.__opened = False
 
     @property
     def opened(self) -> bool:
@@ -178,6 +181,8 @@ class Pcap(VirtualDevice):
             metadata = ESBMetadata.convert_from_header(pkt)
         elif self.__domain == Domain.LogitechUnifying:
             metadata = UnifyingMetadata.convert_from_header(pkt)
+        elif self.__domain == Domain.ANT:
+            metadata = ANTMetadata.convert_from_header(pkt)
         elif self.__domain == Domain.Phy:
             metadata = PhyMetadata.convert_from_header(pkt)
 
@@ -221,6 +226,12 @@ class Pcap(VirtualDevice):
             self.__last_timestamp = metadata.timestamp
             msg = self.__to_whad_unifying_raw_pdu(pkt, metadata)
 
+        elif self.__domain == Domain.ANT:
+            metadata = self._generate_metadata(pkt)
+            self._interframe_delay(metadata.timestamp)
+            self.__last_timestamp = metadata.timestamp
+            msg = self.__to_whad_ant_raw_pdu(pkt, metadata)
+
         elif self.__domain == Domain.Phy:
             metadata = self._generate_metadata(pkt)
             self._interframe_delay(metadata.timestamp)
@@ -237,7 +248,6 @@ class Pcap(VirtualDevice):
                 len(raw_msg) & 0xff,
                 (len(raw_msg) >> 8) & 0xff
             ]
-
             # Build the final payload
             return bytes(header) + raw_msg
         else:
@@ -265,6 +275,18 @@ class Pcap(VirtualDevice):
             metadata.timestamp,
             metadata.is_crc_valid,
             metadata.address
+        )
+
+    def __to_whad_ant_raw_pdu(self, packet, metadata):
+        # Create a RawPduReceived message
+        return self.hub.ant.create_raw_pdu_received(
+            0,
+            0,
+            bytes(packet)[:-2],
+            unpack('H', bytes(packet)[-2:])[0],
+            0,
+            metadata.timestamp,
+            metadata.is_crc_valid
         )
 
     def __to_whad_esb_raw_pdu(self, packet, metadata):
@@ -328,6 +350,18 @@ class Pcap(VirtualDevice):
 
     def _on_whad_ble_start(self, message): # pylint: disable=W0613
         self.__started = True
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+    # Virtual device whad message callbacks
+    def _on_whad_ant_stop(self, message): # pylint: disable=W0613
+        self.__started = False
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+    def _on_whad_ant_start(self, message): # pylint: disable=W0613
+        self.__started = True
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+    def _on_whad_ant_sniff(self, message): # pylint: disable=W0613
         self._send_whad_command_result(CommandResult.SUCCESS)
 
     def _on_whad_ble_sniff_adv(self, message): # pylint: disable=W0613

@@ -191,7 +191,7 @@ class WhadSniffApp(CommandLineDualOutputApp):
                             'metadata':self.args.metadata,
                             'domain': self.args.domain
                         }))
-
+                        
                         # Wait for device to time out.
                         while not unix_server.device.opened:
                             if unix_server.device.timedout:
