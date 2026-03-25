@@ -557,12 +557,12 @@ class UUID:
             self.packed = uuid.decode("hex")[::-1]
             self.type = UUID.TYPE_128
         # binary
-        elif len(uuid) == 2:
+        elif len(uuid) == 2 and isinstance(uuid, bytes):
             v = unpack('<H', uuid)[0]
             self.uuid = f"{v:04X}"
             self.packed = uuid
             self.type = UUID.TYPE_16
-        elif len(uuid) == 16:
+        elif len(uuid) == 16 and isinstance(uuid, bytes):
             r = uuid[::-1]
             self.uuid = "-".join(map(lambda x: x.hex(),
                                      (r[0:4], r[4:6], r[6:8],r[8:10], r[10:])))
