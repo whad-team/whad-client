@@ -33,6 +33,7 @@ class Domain(StrEnum):
     BLE = 'ble'
     DOT15D4 = 'dot15d4'
     ESB = 'esb'
+    ANT = 'ant'
     PHY = 'phy'
     RF4CE = 'rf4ce'
     UNIFYING = 'unifying'

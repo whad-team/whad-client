@@ -9,6 +9,7 @@ from whad.hub.ble import Commands as BleCommands
 from whad.hub.dot15d4 import Commands as Dot15d4Commands
 from whad.hub.esb import Commands as EsbCommands
 from whad.hub.unifying import Commands as UnifyingCommands
+from whad.hub.ant import Commands as AntCommands
 from whad.hub.phy import Commands as PhyCommands
 
 # Bluetooth LE
@@ -24,6 +25,9 @@ DLT_IEEE802_15_4_TAP            = 283
 # WHAD ESB
 DLT_RESERVED_02                 = 148
 DLT_RESERVED_03                 = 149
+
+# WHAD ANT
+DLT_RESERVED_04                 = 150
 
 # WHAD PHY
 DLT_RESERVED_06                 = 152
@@ -144,6 +148,21 @@ CAPABILITIES = {
         }
     ),
 
+    DLT_RESERVED_04 : (
+        {
+            Domain.ANT : (
+                (Capability.Sniff),
+                [AntCommands.Sniff, AntCommands.Start, AntCommands.Stop]
+            ),
+        },
+        {
+            Domain.ANT : (
+                (Capability.Inject),
+                [AntCommands.Send,AntCommands.Start, AntCommands.Stop]
+            ),
+        }
+    ),
+    
     # WHAD PHY
     DLT_RESERVED_06 : (
         {
