@@ -1142,6 +1142,7 @@ class ANT_FS_Download_Request_Response_Packet(Packet):
 											4: "ANTFS_EINVAL",
 											5: "ANTFS_ECRC",
 		}),
+		ByteField("reserved", None), 
 		LEIntField("remaining", None)
 	]
 
