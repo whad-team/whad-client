@@ -161,8 +161,6 @@ class Pcap(VirtualDevice):
                 # calling thread that we are now disconnected.
                 logger.debug("[PCAPDevice] EOF reached")
                 raise WhadDeviceDisconnected() from eof
-                super().close()
-
                 self.__opened = False
 
     @property
