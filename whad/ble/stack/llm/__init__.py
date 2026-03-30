@@ -733,31 +733,8 @@ class LinkLayer(Layer):
                 enc_rsp.ivs
             )
 
-            # Compute session key
-            master_skd = pack(">Q", skdm)
-            master_iv = pack("<L", ivm)
-            slave_skd = pack(">Q", enc_rsp.skds)
-            slave_iv = pack("<L", enc_rsp.ivs)
-
-            # Generate session key diversifier
-            skd = slave_skd + master_skd
-
-            # Generate initialization vector
-            iv = master_iv + slave_iv
-
-            # Generate session key
-            session_key = e(encryption_key, skd)
-
-            logger.info("[llm] master  skd: %s", master_skd.hex())
-            logger.info("[llm] master   iv: %s", master_iv.hex())
-            logger.info("[llm] slave   skd: %s", slave_skd.hex())
-            logger.info("[llm] slave    iv: %s", slave_iv.hex())
-            logger.info("[llm] Session  TK: %s", encryption_key.hex())
-            logger.info("[llm] Session  iv: %s", iv.hex())
-            logger.info("[llm] Exp. Ses iv: %s", self.__llcm.iv.hex())
-            logger.info("[llm] Session key: %s", session_key.hex())
-
-
+            logger.debug("[llm] crypto material saved, waiting for an LL_START_ENC_REQ")
+            """
             # Notify encryption enabled
             if not self.get_layer('phy').set_encryption(
                 conn_handle=conn_handle,
@@ -771,7 +748,7 @@ class LinkLayer(Layer):
                 logger.info('[llm] Cannot enable encryption')
             else:
                 logger.info('[llm] Encryption enabled in hardware')
-
+            """
         else:
             self.send_ctrl_pdu(
                 conn_handle,
@@ -901,12 +878,52 @@ class LinkLayer(Layer):
         :param start_enc_req: Start encryption request PDU
         :type start_enc_req: LL_START_ENC_REQ
         """
+        logger.debug("[llm] Received LL_START_ENC_REQ")
+        # Compute session key
+        #master_skd = pack(">Q", self.__llcm.master_skd)
+        #master_iv = pack("<L", self.__llcm.mast)
+        #slave_skd = pack(">Q", enc_rsp.skds)
+        #slave_iv = pack("<L", enc_rsp.ivs)
+
+        # Generate session key diversifier
+        skd = self.__llcm.slave_skd + self.__llcm.master_skd
+
+        # Generate initialization vector
+        iv = self.__llcm.master_iv + self.__llcm.slave_iv
+
+        # Generate session key
+        session_key = e(self.__llcm.ltk, skd)
+
+        logger.info("[llm] master  skd: %s", self.__llcm.master_skd.hex())
+        logger.info("[llm] master   iv: %s", self.__llcm.master_iv.hex())
+        logger.info("[llm] slave   skd: %s", self.__llcm.slave_skd.hex())
+        logger.info("[llm] slave    iv: %s", self.__llcm.slave_iv.hex())
+        logger.info("[llm] Session  TK: %s", self.__llcm.ltk.hex())
+        logger.info("[llm] Session  iv: %s", iv.hex())
+        logger.info("[llm] Session key: %s", session_key.hex())
 
         # Start encryption (STK as LTK)
         self.send_ctrl_pdu(
             conn_handle,
-            LL_START_ENC_RSP()
+            LL_START_ENC_RSP(),
+            encrypt=False,
         )
+
+        rand, ediv = self.state.get_rand_and_ediv(conn_handle)
+
+        # Notify encryption enabled
+        if not self.get_layer('phy').set_encryption(
+            conn_handle=conn_handle,
+            enabled=True,
+            ll_key=session_key,
+            ll_iv=iv,
+            key=self.__llcm.ltk,
+            rand=rand,
+            ediv=ediv
+        ):
+            logger.info('[llm] Cannot enable encryption')
+        else:
+            logger.info('[llm] Encryption enabled in hardware')
 
     def on_start_enc_rsp(self, conn_handle: int, start_enc_rsp: LL_START_ENC_RSP):
         """Encryption start response handler
