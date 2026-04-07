@@ -1,8 +1,88 @@
 from whad.common.analyzer import TrafficAnalyzer
-from whad.scapy.layers.ant import ANT_FS_Beacon_Packet, ANT_FS_Download_Request_Command_Packet, ANT_FS_Download_Request_Response_Packet
+from whad.scapy.layers.ant import ANT_FS_Beacon_Packet, ANT_FS_Download_Request_Command_Packet, \
+    ANT_FS_Download_Request_Response_Packet, ANT_FS_Auth_Command_Packet, ANT_FS_Auth_Response_Packet, ANT_FS_Beacon_Auth_Packet
 from whad.ant.converters.directory import Directory
 from struct import unpack
 
+class Authentication(TrafficAnalyzer):
+    def __init__(self):
+        super().__init__()
+    
+    @property
+    def output(self):
+        out = {
+            "method": self.method,
+            "response": self.response, 
+            "host_serial":self.host_serial, 
+            "client_serial":self.client_serial, 
+            "host_auth":self.host_auth, 
+            "client_auth":self.client_auth
+        }
+        return out
+
+    def reset(self):
+        super().reset()
+        self.method = None
+        self.response = None
+        self.host_serial = None
+        self.client_serial = None
+        self.host_auth = None
+        self.client_auth = None
+        self.remaining_host_string_length = 0
+        self.remaining_client_string_length = 0
+
+    def process_packet(self, packet):
+
+        if ANT_FS_Auth_Command_Packet in packet:
+            self.trigger()
+            self.mark_packet(packet)
+            if packet.auth_type == 0:
+                self.method = "passthru"
+            elif packet.auth_type == 1:
+                self.method = "request_serial"
+            elif packet.auth_type == 2:
+                self.method = "request_pairing"
+            elif packet.auth_type == 3:
+                self.method = "request_passkey"
+            self.host_serial = packet.host_serial
+            self.remaining_host_string_length = packet.auth_string_length
+            self.host_auth = b""
+
+        elif ANT_FS_Auth_Response_Packet in packet:
+            self.mark_packet(packet)
+            self.response = 'accept' if packet.response == 1 else 'reject'
+            self.client_serial = packet.client_serial
+            self.remaining_client_string_length = packet.auth_string_length
+            self.client_auth = b""
+            if self.remaining_host_string_length == 0 and self.remaining_client_string_length == 0:
+                self.complete()
+
+        elif ANT_FS_Beacon_Auth_Packet not in packet and packet.broadcast == 1 and self.remaining_host_string_length > 0:
+            self.mark_packet(packet)
+
+            if self.remaining_host_string_length > 8:
+                payload = bytes(packet)[7:-2]
+            else:
+                payload = bytes(packet)[7:7+self.remaining_host_string_length]
+
+            self.host_auth += payload
+            self.remaining_host_string_length -= len(payload)
+
+
+
+        elif ANT_FS_Beacon_Auth_Packet not in packet and packet.broadcast == 1 and self.remaining_client_string_length > 0:
+            self.mark_packet(packet)
+            if self.remaining_client_string_length > 8:
+                payload = bytes(packet)[7:-2]
+            else:
+                payload = bytes(packet)[7:7+self.remaining_client_string_length]
+
+            self.client_auth += payload
+            self.remaining_client_string_length -= len(payload)
+
+            if self.remaining_host_string_length == 0 and self.remaining_client_string_length == 0:
+                self.complete()
+                
 class Download(TrafficAnalyzer):
     def __init__(self):
         super().__init__()
@@ -98,5 +178,5 @@ class Download(TrafficAnalyzer):
 
 analyzers = {
     "download" : Download,
-    
+    "authentication" : Authentication
 }
