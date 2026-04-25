@@ -134,20 +134,19 @@ def is_access_address_valid(aa):
         return True
     bb = aa
     for i in range(0,26):
-        if (bb & 0x3F) == 0 or (bb & 0x3F) == 0x3F:
+        if (bb & 0x7F) == 0 or (bb & 0x7F) == 0x7F:
             return False
         bb >>= 1
     bb = aa
     t = 0
     a = (bb & 0x80000000)>>31
-    for i in range(30,0,-1):
+    for i in range(30,25,-1):
         if (bb & (1<<i)) >> i != a:
             a = (bb & (1<<i))>>i
             t += 1
-            if t>24:
-                return False
-        if (i<26) and (t<2):
-            return False
+
+    if t<2:
+        return False
     return True
 
 
