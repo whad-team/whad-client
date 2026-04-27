@@ -360,28 +360,29 @@ class Sniffer(BLE, EventsManager):
                         break
 
             elif self.__configuration.active_connection is not None:
-                message = self.wait_for_message(keep=message_filter(Synchronized),
-                                                timeout=0.1)
+                for message in super().sniff(messages=(Synchronized), timeout=timeout):
+                    if message is not None:
+                        if message.hop_increment > 0:
+                            if self.support_raw_pdu():
+                                message_type = BleRawPduReceived
+                            elif self.__synchronized:
+                                message_type = BlePduReceived
+                            else:
+                                message_type = BleAdvPduReceived
 
-                if message is not None:
-                    if message.hop_increment > 0:
-                        if self.support_raw_pdu():
-                            message_type = BleRawPduReceived
-                        elif self.__synchronized:
-                            message_type = BlePduReceived
-                        else:
-                            message_type = BleAdvPduReceived
+                            for message in super().sniff(messages=(message_type), timeout=timeout):
+                                if message is not None:
+                                    packet = message.to_packet()
+                                    if packet is not None:
+                                        self.monitor_packet_rx(packet)
+                                        yield packet
 
-                        for message in super().sniff(messages=(message_type), timeout=timeout):
-                            if message is not None:
-                                packet = message.to_packet()
-                                if packet is not None:
-                                    self.monitor_packet_rx(packet)
-                                    yield packet
-
-                            # Enforce timeout
-                            if timeout is not None and (time() - start) > timeout:
-                                break
+                                # Enforce timeout
+                                if timeout is not None and (time() - start) > timeout:
+                                    break
+                    # Enforce timeout
+                    if timeout is not None and (time() - start) > timeout:
+                        break
 
             else:
                 if self.support_raw_pdu():

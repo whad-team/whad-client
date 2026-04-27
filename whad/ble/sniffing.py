@@ -16,7 +16,7 @@ class SynchronizedConnection:
     crc_init : int = None
     hop_interval : int = None
     hop_increment : int = None
-    channel_map : ChannelMap = None
+    channel_map : ChannelMap = ChannelMap([])
 
 class ConnectionConfiguration(SynchronizedConnection):
     """
