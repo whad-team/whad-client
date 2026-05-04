@@ -35,6 +35,13 @@ RouterMode = 8
 Start = 9
 Stop = 10
 ManInTheMiddle = 11
+ConfigureTSCH = 12
+SendInSlot = 13
+AddLink = 14
+DeleteLink = 15
+UpdateSuperframe = 16
+DeleteSuperframe = 17
+SetChannelMap = 18
 REACTIVE_JAMMER = 0
 CORRECTOR = 1
 SHORT = 0
@@ -57,6 +64,14 @@ _JAMMED = DESCRIPTOR.message_types_by_name['Jammed']
 _ENERGYDETECTIONSAMPLE = DESCRIPTOR.message_types_by_name['EnergyDetectionSample']
 _RAWPDURECEIVED = DESCRIPTOR.message_types_by_name['RawPduReceived']
 _PDURECEIVED = DESCRIPTOR.message_types_by_name['PduReceived']
+_SENDINSLOTCMD = DESCRIPTOR.message_types_by_name['SendInSlotCmd']
+_CONFIGURETSCHCMD = DESCRIPTOR.message_types_by_name['ConfigureTSCHCmd']
+_ADDLINKCMD = DESCRIPTOR.message_types_by_name['AddLinkCmd']
+_DELETELINKCMD = DESCRIPTOR.message_types_by_name['DeleteLinkCmd']
+_UPDATESUPERFRAMECMD = DESCRIPTOR.message_types_by_name['UpdateSuperframeCmd']
+_DELETESUPERFRAMECMD = DESCRIPTOR.message_types_by_name['DeleteSuperframeCmd']
+_SETCHANNELMAPCMD = DESCRIPTOR.message_types_by_name['SetChannelMapCmd']
+_DISCOVEREDCOMMUNICATION = DESCRIPTOR.message_types_by_name['DiscoveredCommunication']
 _MESSAGE = DESCRIPTOR.message_types_by_name['Message']
 SetNodeAddressCmd = _reflection.GeneratedProtocolMessageType('SetNodeAddressCmd', (_message.Message,), {
   'DESCRIPTOR' : _SETNODEADDRESSCMD,
@@ -170,6 +185,62 @@ PduReceived = _reflection.GeneratedProtocolMessageType('PduReceived', (_message.
   })
 _sym_db.RegisterMessage(PduReceived)
 
+SendInSlotCmd = _reflection.GeneratedProtocolMessageType('SendInSlotCmd', (_message.Message,), {
+  'DESCRIPTOR' : _SENDINSLOTCMD,
+  '__module__' : 'whad.protocol.dot15d4.dot15d4_pb2'
+  # @@protoc_insertion_point(class_scope:dot15d4.SendInSlotCmd)
+  })
+_sym_db.RegisterMessage(SendInSlotCmd)
+
+ConfigureTSCHCmd = _reflection.GeneratedProtocolMessageType('ConfigureTSCHCmd', (_message.Message,), {
+  'DESCRIPTOR' : _CONFIGURETSCHCMD,
+  '__module__' : 'whad.protocol.dot15d4.dot15d4_pb2'
+  # @@protoc_insertion_point(class_scope:dot15d4.ConfigureTSCHCmd)
+  })
+_sym_db.RegisterMessage(ConfigureTSCHCmd)
+
+AddLinkCmd = _reflection.GeneratedProtocolMessageType('AddLinkCmd', (_message.Message,), {
+  'DESCRIPTOR' : _ADDLINKCMD,
+  '__module__' : 'whad.protocol.dot15d4.dot15d4_pb2'
+  # @@protoc_insertion_point(class_scope:dot15d4.AddLinkCmd)
+  })
+_sym_db.RegisterMessage(AddLinkCmd)
+
+DeleteLinkCmd = _reflection.GeneratedProtocolMessageType('DeleteLinkCmd', (_message.Message,), {
+  'DESCRIPTOR' : _DELETELINKCMD,
+  '__module__' : 'whad.protocol.dot15d4.dot15d4_pb2'
+  # @@protoc_insertion_point(class_scope:dot15d4.DeleteLinkCmd)
+  })
+_sym_db.RegisterMessage(DeleteLinkCmd)
+
+UpdateSuperframeCmd = _reflection.GeneratedProtocolMessageType('UpdateSuperframeCmd', (_message.Message,), {
+  'DESCRIPTOR' : _UPDATESUPERFRAMECMD,
+  '__module__' : 'whad.protocol.dot15d4.dot15d4_pb2'
+  # @@protoc_insertion_point(class_scope:dot15d4.UpdateSuperframeCmd)
+  })
+_sym_db.RegisterMessage(UpdateSuperframeCmd)
+
+DeleteSuperframeCmd = _reflection.GeneratedProtocolMessageType('DeleteSuperframeCmd', (_message.Message,), {
+  'DESCRIPTOR' : _DELETESUPERFRAMECMD,
+  '__module__' : 'whad.protocol.dot15d4.dot15d4_pb2'
+  # @@protoc_insertion_point(class_scope:dot15d4.DeleteSuperframeCmd)
+  })
+_sym_db.RegisterMessage(DeleteSuperframeCmd)
+
+SetChannelMapCmd = _reflection.GeneratedProtocolMessageType('SetChannelMapCmd', (_message.Message,), {
+  'DESCRIPTOR' : _SETCHANNELMAPCMD,
+  '__module__' : 'whad.protocol.dot15d4.dot15d4_pb2'
+  # @@protoc_insertion_point(class_scope:dot15d4.SetChannelMapCmd)
+  })
+_sym_db.RegisterMessage(SetChannelMapCmd)
+
+DiscoveredCommunication = _reflection.GeneratedProtocolMessageType('DiscoveredCommunication', (_message.Message,), {
+  'DESCRIPTOR' : _DISCOVEREDCOMMUNICATION,
+  '__module__' : 'whad.protocol.dot15d4.dot15d4_pb2'
+  # @@protoc_insertion_point(class_scope:dot15d4.DiscoveredCommunication)
+  })
+_sym_db.RegisterMessage(DiscoveredCommunication)
+
 Message = _reflection.GeneratedProtocolMessageType('Message', (_message.Message,), {
   'DESCRIPTOR' : _MESSAGE,
   '__module__' : 'whad.protocol.dot15d4.dot15d4_pb2'
@@ -180,12 +251,12 @@ _sym_db.RegisterMessage(Message)
 if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
-  _DOT15D4COMMAND._serialized_start=1647
-  _DOT15D4COMMAND._serialized_end=1844
-  _DOT15D4MITMROLE._serialized_start=1846
-  _DOT15D4MITMROLE._serialized_end=1899
-  _ADDRESSTYPE._serialized_start=1901
-  _ADDRESSTYPE._serialized_end=1939
+  _DOT15D4COMMAND._serialized_start=3211
+  _DOT15D4COMMAND._serialized_end=3535
+  _DOT15D4MITMROLE._serialized_start=3537
+  _DOT15D4MITMROLE._serialized_end=3590
+  _ADDRESSTYPE._serialized_start=3592
+  _ADDRESSTYPE._serialized_end=3630
   _SETNODEADDRESSCMD._serialized_start=48
   _SETNODEADDRESSCMD._serialized_end=128
   _SNIFFCMD._serialized_start=130
@@ -215,9 +286,25 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _ENERGYDETECTIONSAMPLE._serialized_start=534
   _ENERGYDETECTIONSAMPLE._serialized_end=592
   _RAWPDURECEIVED._serialized_start=595
-  _RAWPDURECEIVED._serialized_end=790
-  _PDURECEIVED._serialized_start=793
-  _PDURECEIVED._serialized_end=972
-  _MESSAGE._serialized_start=975
-  _MESSAGE._serialized_end=1644
+  _RAWPDURECEIVED._serialized_end=1090
+  _PDURECEIVED._serialized_start=1093
+  _PDURECEIVED._serialized_end=1572
+  _SENDINSLOTCMD._serialized_start=1574
+  _SENDINSLOTCMD._serialized_end=1616
+  _CONFIGURETSCHCMD._serialized_start=1618
+  _CONFIGURETSCHCMD._serialized_end=1653
+  _ADDLINKCMD._serialized_start=1656
+  _ADDLINKCMD._serialized_end=1788
+  _DELETELINKCMD._serialized_start=1790
+  _DELETELINKCMD._serialized_end=1862
+  _UPDATESUPERFRAMECMD._serialized_start=1864
+  _UPDATESUPERFRAMECMD._serialized_end=1974
+  _DELETESUPERFRAMECMD._serialized_start=1976
+  _DELETESUPERFRAMECMD._serialized_end=2020
+  _SETCHANNELMAPCMD._serialized_start=2022
+  _SETCHANNELMAPCMD._serialized_end=2061
+  _DISCOVEREDCOMMUNICATION._serialized_start=2063
+  _DISCOVEREDCOMMUNICATION._serialized_end=2131
+  _MESSAGE._serialized_start=2134
+  _MESSAGE._serialized_end=3208
 # @@protoc_insertion_point(module_scope)

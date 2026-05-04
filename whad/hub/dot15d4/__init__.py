@@ -20,19 +20,26 @@ from whad.hub import ProtocolHub
 class Commands:
     """Dot15d4 commands
     """
-    SetNodeAddress = 0x00
-    Sniff = 0x01
-    Jam = 0x02
-    EnergyDetection = 0x03
-    Send = 0x04
-    SendRaw = 0x05
-    EndDeviceMode = 0x06
-    CoordinatorMode = 0x07
-    RouterMode = 0x08
-    Start = 0x09
-    Stop = 0x0a
-    ManInTheMiddle = 0x0b
-
+    SetNodeAddress          = 0x00
+    Sniff                   = 0x01
+    Jam                     = 0x02
+    EnergyDetection         = 0x03
+    Send                    = 0x04
+    SendRaw                 = 0x05
+    EndDeviceMode           = 0x06
+    CoordinatorMode         = 0x07
+    RouterMode              = 0x08
+    Start                   = 0x09
+    Stop                    = 0x0a
+    ManInTheMiddle          = 0x0b
+    ConfigureTSCH           = 0x0c
+    SendInSlot              = 0x0d
+    AddLink                 = 0x0e
+    DeleteLink              = 0x0f
+    UpdateSuperframe        = 0x10
+    DeleteSuperframe        = 0x11
+    SetChannelMap           = 0x12
+    
 class MitmRole:
     """Dot15d4 Mitm role
     """
@@ -100,6 +107,13 @@ class Dot15d4Metadata(Metadata):
     lqi : int = None
     timestamp : int = None
 
+    asn : int = None
+    start_of_slot_timestamp : int = None
+    time_slot : int = None
+    base_channel_frequency : int = None
+    number_of_channels : int = None
+    channel_spacing : int = None
+
     def convert_to_header(self) -> Dot15d4TAP_Hdr:
         """Convert stored metadata into a Scapy Dot15d4TAP_Hdr instance.
 
@@ -119,6 +133,17 @@ class Dot15d4Metadata(Metadata):
                                                                           channel_page=0))
             channel_frequency = channel_to_frequency(self.channel) * 1000
             tlv.append(Dot15d4TAP_TLV_Hdr()/Dot15d4TAP_Channel_Center_Frequency(channel_frequency=channel_frequency))
+
+        if self.asn is not None:
+            tlv.append(Dot15d4TAP_TLV_Hdr()/Dot15d4TAP_Absolute_Slot_Number(absolute_slot_number=self.asn))
+        if self.start_of_slot_timestamp is not None:
+            tlv.append(Dot15d4TAP_TLV_Hdr()/Dot15d4TAP_Start_Of_Slot_Timestamp(timestamp=self.start_of_slot_timestamp))
+        if self.time_slot is not None:
+            tlv.append(Dot15d4TAP_TLV_Hdr()/Dot15d4TAP_Timeslot_Length(timeslot_length=self.time_slot))
+        if self.base_channel_frequency is not None and self.number_of_channels is not None and self.channel_spacing is not None:
+            tlv.append(Dot15d4TAP_TLV_Hdr()/Dot15d4TAP_Channel_Plan(base_channel_frequency=self.base_channel_frequency, 
+                                                                    number_of_channels=self.number_of_channels, 
+                                                                    channel_spacing=self.channel_spacing))
         return Dot15d4TAP_Hdr(data=tlv), timestamp
 
     @classmethod
@@ -130,6 +155,12 @@ class Dot15d4Metadata(Metadata):
         lqi = 200
         channel = 15
 
+        asn : int = None
+        start_of_slot_timestamp = None
+        time_slot  = None
+        base_channel_frequency = None
+        number_of_channels = None
+        channel_spacing = None
         # Packets from PCAP with DLT 283 (IEEE 802.15.4 TAP)
         # Other DLTs don't have any metadata about RSSI, LQI or channel.
         if Dot15d4TAP_Hdr in pkt:
@@ -140,6 +171,16 @@ class Dot15d4Metadata(Metadata):
                     lqi = layer.lqi
                 elif Dot15d4TAP_Channel_Assignment in layer:
                     channel = layer.channel_number
+                elif Dot15d4TAP_Absolute_Slot_Number in layer:
+                    asn = layer.absolute_slot_number
+                elif Dot15d4TAP_Start_Of_Slot_Timestamp in layer:
+                    start_of_slot_timestamp = layer.timestamp
+                elif Dot15d4TAP_Timeslot_Length in layer:
+                    time_slot = layer.timeslot_length
+                elif Dot15d4TAP_Channel_Plan in layer:
+                    base_channel_frequency =int(layer.base_channel_frequency)
+                    number_of_channels = int(layer.number_of_channels)
+                    channel_spacing = int(layer.number_of_channels)
                 else:
                     pass
 
@@ -147,7 +188,13 @@ class Dot15d4Metadata(Metadata):
             rssi = int(rssi),
             lqi = lqi,
             channel = channel,
-            timestamp = int(100000 * pkt.time)
+            timestamp = int(100000 * pkt.time), 
+            asn = int(asn), 
+            start_of_slot_timestamp = start_of_slot_timestamp,
+            time_slot = time_slot, 
+            base_channel_frequency = base_channel_frequency, 
+            number_of_channels = number_of_channels, 
+            channel_spacing = channel_spacing
         )
 
 def generate_dot15d4_metadata(message: HubMessage) -> Dot15d4Metadata:
@@ -164,7 +211,18 @@ def generate_dot15d4_metadata(message: HubMessage) -> Dot15d4Metadata:
         metadata.timestamp = message.timestamp
     if message.fcs_validity is not None:
         metadata.is_fcs_valid = message.fcs_validity
-
+    if message.asn is not None:
+        metadata.asn = message.asn
+    if message.time_slot is not None:
+        metadata.time_slot = message.time_slot
+    if message.start_of_slot_timestamp is not None:
+        metadata.start_of_slot_timestamp = message.start_of_slot_timestamp
+    if message.base_channel_frequency is not None:
+        metadata.base_channel_frequency = message.base_channel_frequency
+    if message.channel_spacing is not None:
+        metadata.channel_spacing = message.channel_spacing
+    if message.number_of_channels is not None:
+        metadata.number_of_channels = message.number_of_channels
     return metadata
 
 @pb_bind(ProtocolHub, name="dot15d4", version=1)
@@ -463,6 +521,136 @@ class Dot15d4Domain(Registry):
         # Return the generated message
         return msg
 
+@pb_bind(ProtocolHub, name="wirelesshart", version=3)
+class WirelessHartDomain(Dot15d4Domain):
+    NAME = 'wirelesshart'
+    VERSIONS = {}
+
+    def __init__(self, version: int):
+        """Initializes a Wireless Hart domain instance
+        """
+        super().__init__(version)
+        conf.dot15d4_protocol = "wirelesshart"
+
+    
+    def create_raw_pdu_received(self, channel: int, pdu: bytes, fcs: int, rssi: int = None, \
+                             timestamp: int = None, fcs_validity: bool = None, \
+                             lqi: int = None, asn: int = None, start_of_slot_timestamp : int = None, \
+                             time_slot: int = None, base_channel_frequency : int = None, \
+                             number_of_channels : int = None, channel_spacing : int = None):
+        """Create a received PDU notification message.
+
+        :param channel: Channel on which the PDU has been received
+        :type channel: int
+        :param pdu: Received PDU
+        :type pdu: bytes
+        :param fcs: Frame Check Sequence
+        :type fcs: int
+        :param rssi: Received signal strength indicator
+        :type rssi: int, optional
+        :param timestamp: Timestamp at which the PDU has been received
+        :type timestamp: int, optional
+        :param fcs_validity: Specify if the FCS field is valid or not
+        :type fcs_validity: bool, optional
+        :param lqi: Link Quality indicator
+        :type lqi: int, optional
+        :param asn: Absolute Slot Number
+        :type asn: int, optional
+        :param start_of_slot_timestamp: Timestamp of the slot start
+        :type start_of_slot_timestamp: int, optional
+        :param time_slot: Duration of a time slot (in us)
+        :type time_slot: int, optional
+        :param base_channel_frequency: Base channel frequency of the Channel Map
+        :type base_channel_frequency: int, optional
+        :param number_of_channels: Number of channels in the Channel Map
+        :type number_of_channels: int, optional
+        :param channel_spacing: Channel spacing, in Hz
+        :type channel_spacing: int, optional
+        :return: instance of `RawPduReceived`
+        """
+        # Create our RawPduReceived message with mandatory fields
+        msg = Dot15d4Domain.bound('raw_pdu', self.proto_version)(
+            channel=channel,
+            pdu=pdu,
+            fcs=fcs
+        )
+
+        # Add optional fields if they are provided
+        if rssi is not None:
+            msg.rssi = rssi
+        if timestamp is not None:
+            msg.timestamp = timestamp
+        if fcs_validity is not None:
+            msg.fcs_validity = fcs_validity
+        if lqi is not None:
+            msg.lqi = lqi
+        if asn is not None:
+            msg.asn = asn
+        if start_of_slot_timestamp is not None:
+            msg.start_of_slot_timestamp = start_of_slot_timestamp
+        if time_slot is not None:
+            msg.time_slot = time_slot
+        if base_channel_frequency is not None:
+            msg.base_channel_frequency = base_channel_frequency
+        if number_of_channels is not None:
+            msg.number_of_channels = number_of_channels
+        if channel_spacing is not None:
+            msg.channel_spacing = channel_spacing
+        # Return the generated message
+        return msg
+
+    def create_pdu_received(self, channel: int, pdu: bytes, rssi: int = None, \
+                             timestamp: int = None, fcs_validity: bool = None, \
+                             lqi: int = None, asn: int = None, start_of_slot_timestamp : int = None, \
+                             time_slot: int = None, base_channel_frequency : int = None, \
+                             number_of_channels : int = None, channel_spacing : int = None):
+        """Create a received PDU notification message.
+
+        :param channel: Channel on which the PDU has been received
+        :type channel: int
+        :param pdu: Received PDU
+        :type pdu: bytes
+        :param rssi: Received signal strength indicator
+        :type rssi: int, optional
+        :param timestamp: Timestamp at which the PDU has been received
+        :type timestamp: int, optional
+        :param fcs_validity: Specify if the FCS field is valid or not
+        :type fcs_validity: bool, optional
+        :param lqi: Link Quality indicator
+        :type lqi: int, optional
+        :return: instance of `RawPduReceived`
+        """
+        # Create our PduReceived message with mandatory fields
+        msg = Dot15d4Domain.bound('pdu', self.proto_version)(
+            channel=channel,
+            pdu=pdu,
+        )
+
+        # Add optional fields if they are provided
+        if rssi is not None:
+            msg.rssi = rssi
+        if timestamp is not None:
+            msg.timestamp = timestamp
+        if fcs_validity is not None:
+            msg.fcs_validity = fcs_validity
+        if lqi is not None:
+            msg.lqi = lqi
+        if asn is not None:
+            msg.asn = asn
+        if start_of_slot_timestamp is not None:
+            msg.start_of_slot_timestamp = start_of_slot_timestamp
+        if time_slot is not None:
+            msg.time_slot = time_slot
+        if base_channel_frequency is not None:
+            msg.base_channel_frequency = base_channel_frequency
+        if number_of_channels is not None:
+            msg.number_of_channels = number_of_channels
+        if channel_spacing is not None:
+            msg.channel_spacing = channel_spacing
+
+        # Return the generated message
+        return msg
+    
 @pb_bind(ProtocolHub, name="rf4ce", version=1)
 class RF4CEDomain(Dot15d4Domain):
     NAME = 'rf4ce'
