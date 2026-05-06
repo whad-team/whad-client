@@ -7,19 +7,22 @@ from time import sleep, time
 from scapy.packet import Packet
 from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE
 
-from whad.hub.ble import AccessAddressDiscovered, Synchronized, BleRawPduReceived, \
-    BlePduReceived, BleAdvPduReceived
+from whad.common.analyzer import InvalidParameter
+from whad.device.device import Disconnected
+from whad.hub.ble import AccessAddressDiscovered, Synchronized, Desynchronized, \
+    BlePduReceived, BleAdvPduReceived, BleRawPduReceived
 
 from whad.exceptions import WhadDeviceDisconnected, UnsupportedCapability, WhadDeviceNotReady
 from whad.helpers import message_filter
 from whad.common.sniffing import EventsManager
 
 from .base import BLE
+from whad.hub.ble.chanmap import ChannelMap
 from .injector import Injector
 from .hijacker import Hijacker
 from ..exceptions import MissingCryptographicMaterial
 from ..sniffing import SynchronizedConnection, SnifferConfiguration, AccessAddress, \
-    SynchronizationEvent, DesynchronizationEvent, KeyExtractedEvent
+    SynchronizationProgressEvent, SynchronizationEvent, KeyExtractedEvent
 from ..crypto import EncryptedSessionInitialization, LinkLayerDecryptor, \
     LegacyPairingCracking
 
@@ -114,6 +117,44 @@ class Sniffer(BLE, EventsManager):
             return None
         return self.__connection.channel_map
 
+    def on_crc_init_found(self, crc_init: int):
+        """Send an event to notify the recovered CRC initial value."""
+        logger.info("CRC seed has successfully been recovered (0x%06x)", crc_init)
+        event = SynchronizationProgressEvent(20.0,SynchronizationProgressEvent.CRC_INIT, crc_init)
+        self.trigger_event(event)
+
+    def on_channel_map_found(self, channel_map: int):
+        logger.info("Channel map has successfully been recovered (%s)", channel_map)
+        self.trigger_event(
+            SynchronizationProgressEvent(
+                40.0,
+                SynchronizationProgressEvent.CHANNEL_MAP,
+                channel_map
+            )
+        )
+
+    def on_hop_interval_found(self, interval: int):
+        logger.info("Hop interval has successfully been guessed (%d)", interval)
+        self.trigger_event(
+            SynchronizationProgressEvent(
+                60.0,
+                SynchronizationProgressEvent.HOP_INTERVAL,
+                interval
+            )
+        )
+
+    def on_hop_increment_found(self, increment: int):
+        """Send a progress notification (hop increment found)."""
+        logger.info("Hop increment has successfully been guessed (%d)", increment)
+        self.trigger_event(
+            SynchronizationProgressEvent(
+                60.0,
+                SynchronizationProgressEvent.HOP_INCREMENT,
+                increment
+            )
+        )
+
+
     def on_synchronized(self, access_address=None, crc_init=None, hop_increment=None,
                         hop_interval=None, channel_map=None):
         """Synchronization callback
@@ -155,10 +196,18 @@ class Sniffer(BLE, EventsManager):
             self.discover_access_addresses()
 
         elif self.__configuration.active_connection is not None:
+            # Parse channel map from hex int
+            if self.__configuration.active_connection.channel_map is not None:
+                if self.__configuration.active_connection.channel_map.lower().startswith('0x'):
+                    chmap = ChannelMap.from_int(int(self.__configuration.active_connection.channel_map, 16))
+                else:
+                    raise InvalidParameter('chm', self.__configuration.active_connection.channel_map)
+            else:
+                chmap = ChannelMap([])
 
             access_address = self.__configuration.active_connection.access_address
             crc_init = self.__configuration.active_connection.crc_init
-            channel_map = self.__configuration.active_connection.channel_map
+            channel_map = chmap
             hop_interval = self.__configuration.active_connection.hop_interval
             hop_increment = self.__configuration.active_connection.hop_increment
             self.sniff_active_connection(access_address, crc_init, channel_map,
@@ -360,26 +409,57 @@ class Sniffer(BLE, EventsManager):
                         break
 
             elif self.__configuration.active_connection is not None:
-                for message in super().sniff(messages=(Synchronized), timeout=timeout):
+                synced = False
+                for message in super().sniff(messages=(Synchronized, Desynchronized, Disconnected), timeout=timeout):
                     if message is not None:
-                        if message.hop_increment > 0:
-                            if self.support_raw_pdu():
-                                message_type = BleRawPduReceived
-                            elif self.__synchronized:
-                                message_type = BlePduReceived
-                            else:
-                                message_type = BleAdvPduReceived
+                        if isinstance(message, Synchronized):
+                            if message.hop_increment > 0:
+                                # We are in synchronous mode so we need to call `on_synchronized()`
+                                # to notify the successful synchronization.
+                                if self.__configuration.active_connection.hop_increment is None:
+                                    self.on_hop_increment_found(message.hop_increment)
+                                self.on_synchronized(message.access_address, message.crc_init,
+                                                     message.hop_increment, message.hop_interval,
+                                                     ChannelMap.from_bytes(message.channel_map))
+                                # Exit this for loop and continue with packet sniffing.
+                                synced = True
+                                break
+                            elif message.hop_interval > 0:
+                                # Hop interval has just been found, notify
+                                self.on_hop_interval_found(message.hop_interval)
+                            elif message.channel_map != b'\xff\xff\xff\xff\xff':
+                                # Channel map has been recovered, notify
+                                self.on_channel_map_found(message.channel_map)
+                            elif message.crc_init > 0:
+                                # CRC seed has been found
+                                self.on_crc_init_found(message.crc_init)
+                        else:
+                            logger.info("Desynchronized during connection synchronization, aborting.")
+                            return
 
-                            for message in super().sniff(messages=(message_type), timeout=timeout):
-                                if message is not None:
-                                    packet = message.to_packet()
-                                    if packet is not None:
-                                        self.monitor_packet_rx(packet)
-                                        yield packet
+                    # Enforce timeout
+                    if timeout is not None and (time() - start) > timeout:
+                        break
 
-                                # Enforce timeout
-                                if timeout is not None and (time() - start) > timeout:
-                                    break
+                # Stop here if not synced with the connection.
+                if not synced:
+                    return
+
+                # Sniff packets depending on hardware capabilities.
+                if self.support_raw_pdu():
+                    message_type = BleRawPduReceived
+                elif self.__synchronized:
+                    message_type = BlePduReceived
+                else:
+                    message_type = BleAdvPduReceived
+
+                for message in super().sniff(messages=(message_type), timeout=timeout):
+                    if message is not None:
+                        packet = message.to_packet()
+                        if packet is not None:
+                            self.monitor_packet_rx(packet)
+                            yield packet
+
                     # Enforce timeout
                     if timeout is not None and (time() - start) > timeout:
                         break

@@ -16,7 +16,7 @@ class SynchronizedConnection:
     crc_init : int = None
     hop_interval : int = None
     hop_increment : int = None
-    channel_map : ChannelMap = ChannelMap([])
+    channel_map : str = None
 
 class ConnectionConfiguration(SynchronizedConnection):
     """
@@ -28,6 +28,62 @@ class ConnectionConfiguration(SynchronizedConnection):
     :param hop_increment: indicate Hop Increment of the targeted connection (inc)
     :param channel_map: indicate Channel Map of the targeted connection (chm)
     """
+
+class SynchronizationProgressEvent(SniffingEvent):
+    """Event used to notify about some progress while synchronizing
+    with an active connection.
+
+    This notification shall be used to notify the user about some key
+    parameters recovered and the global status of the synchronization
+    process.
+    """
+
+    CRC_INIT = 0
+    CHANNEL_MAP = 1
+    HOP_INTERVAL = 2
+    HOP_INCREMENT = 3
+
+    PARAMETERS = [
+        "CRC_INIT",
+        "CHANNEL_MAP",
+        "HOP_INTERVAL",
+        "HOP_INCREMENT",
+    ]
+
+    def __init__(self, progress: float, parameter: int, value: int | bytes):
+        """Create a Synchronization progress event.
+
+        :param event_type: Specifies the event type, must be one of [NOTIFY_CRC_INIT, NOTIFY_CHANNEL_MAP,
+                           NOTIFY_HOP_INTERVAL, NOTIFY_HOP_INCREMENT]
+        :type  event_type: int
+        :param message: Message to display
+        :type message: str
+        :param parameter_value: connection parameter value (parameter is specified by `event_type`).
+        :type parameter_value: int, optional
+        """
+        super().__init__("Synchronization progress notification")
+        assert parameter in (self.CRC_INIT, self.CHANNEL_MAP, self.HOP_INTERVAL,
+                              self.HOP_INCREMENT)
+        self.__parameter = parameter
+        self.__progress = progress
+        self.__value = value
+
+    @property
+    def parameter(self) -> int:
+        return self.__parameter
+
+    @property
+    def value(self) -> (int | bytes):
+        return self.__value
+
+    @property
+    def message(self) -> str:
+        """Readable representation of this event"""
+        return (
+            f"parameter='{self.PARAMETERS[self.__parameter]}', "
+            f"value={self.__value}, "
+            f"progress={self.__progress}"
+        )
 
 class SynchronizationEvent(SniffingEvent):
     """Synchronization event

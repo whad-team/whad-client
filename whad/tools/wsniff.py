@@ -10,6 +10,9 @@ from argparse import ArgumentParser
 from scapy.config import conf
 from scapy.all import BrightTheme
 
+from prompt_toolkit import print_formatted_text, HTML
+
+from whad.ble.sniffing import SynchronizationEvent, SynchronizationProgressEvent, SniffingEvent
 from whad.cli.app import CommandLineDualOutputApp, run_app
 from whad.cli.ui import error, warning, display_packet
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
@@ -22,6 +25,23 @@ from whad.phy.exceptions import UnsupportedFrequency
 
 logger = logging.getLogger(__name__)
 
+def ble_chanmap_value(channel_map: bytes) -> int:
+    """Convert BLE channel map to its integer value."""
+    return int.from_bytes(channel_map, 'little')
+
+def display_event(event: SniffingEvent):
+    """Display sniffing event (only used for active connection sync for now)."""
+    if isinstance(event, SynchronizationProgressEvent):
+        if event.parameter == SynchronizationProgressEvent.CRC_INIT:
+            print_formatted_text(HTML(f"<b>&gt;&gt; CRC seed value recovered:</b> 0x{event.value:06x}"))
+        elif event.parameter == SynchronizationProgressEvent.CHANNEL_MAP:
+            print_formatted_text(HTML(f"<b>&gt;&gt; Channel map recovered:</b> 0x{ble_chanmap_value(event.value):010x}"))
+        elif event.parameter == SynchronizationProgressEvent.HOP_INTERVAL:
+            print_formatted_text(HTML(f"<b>&gt;&gt; Hop interval recovered:</b> {event.value} ({event.value*1.25}ms)"))
+        elif event.parameter == SynchronizationProgressEvent.HOP_INCREMENT:
+            print_formatted_text(HTML(f"<b>&gt;&gt; Hop increment recovered:</b> ({event.value})"))
+    elif isinstance(event, SynchronizationEvent):
+        print_formatted_text(HTML("<b>&gt;&gt; Hardware synchronized, now capturing packets...</b>"))
 
 class WhadSniffOutputPipe(Bridge):
     """Whad sniff output pipe
@@ -127,12 +147,10 @@ class WhadSniffApp(CommandLineDualOutputApp):
         self.build_subparsers(subparsers)
 
 
-
     def pre_run(self):
         """Pre-run operations: configure scapy theme.
         """
         super().pre_run()
-
         # If no color is not selected, configure scapy color theme
         if not self.args.nocolor:
             conf.color_theme = BrightTheme()
@@ -146,18 +164,17 @@ class WhadSniffApp(CommandLineDualOutputApp):
         self.pre_run()
 
         try:
-
             # We need to have an interface specified
             if self.interface is not None:
                 # We need to have a domain specified
                 if self.args.domain is not None:
                     # Parse the arguments to populate a sniffer configuration
                     configuration = build_configuration_from_args(self.environment, self.args)
-
                     # Generate a sniffer based on the selected domain
                     sniffer = self.environment[self.args.domain]["sniffer_class"](self.interface)
+
                     # Add an event listener to display incoming events
-                    # sniffer.add_event_listener(display_event)
+                    sniffer.add_event_listener(display_event)
 
                     sniffer.configuration = configuration
                     try:
@@ -200,7 +217,7 @@ class WhadSniffApp(CommandLineDualOutputApp):
                         # Create our packet bridge
                         logger.info("[wsniff] Starting our output pipe")
                         bridge = WhadSniffOutputPipe(sniffer, unix_server)
-                        
+
                         # Start the sniffer
                         sniffer.start()
 
