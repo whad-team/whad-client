@@ -74,11 +74,7 @@ class SynchronizationProgressEvent(SniffingEvent):
         return self.__parameter
 
     @property
-<<<<<<< HEAD
     def value(self) -> Union[int, bytes]:
-=======
-    def value(self) -> (int | bytes):
->>>>>>> a757d5db (Improved wsniff connection synchronization output.)
         return self.__value
 
     @property
