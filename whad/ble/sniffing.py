@@ -2,6 +2,7 @@
 sniffing.
 """
 from dataclasses import dataclass, field
+from typing import Union
 
 from whad.ble.exceptions import InvalidAccessAddressException
 from whad.ble.utils.phy import is_access_address_valid
@@ -50,7 +51,7 @@ class SynchronizationProgressEvent(SniffingEvent):
         "HOP_INCREMENT",
     ]
 
-    def __init__(self, progress: float, parameter: int, value: int | bytes):
+    def __init__(self, progress: float, parameter: int, value: Union[int, bytes]):
         """Create a Synchronization progress event.
 
         :param event_type: Specifies the event type, must be one of [NOTIFY_CRC_INIT, NOTIFY_CHANNEL_MAP,
@@ -73,7 +74,7 @@ class SynchronizationProgressEvent(SniffingEvent):
         return self.__parameter
 
     @property
-    def value(self) -> (int | bytes):
+    def value(self) -> Union[int, bytes]:
         return self.__value
 
     @property
