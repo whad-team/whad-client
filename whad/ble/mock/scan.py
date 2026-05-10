@@ -174,7 +174,7 @@ class DeviceScan(MockDevice):
                     adv_type, adv_data = advertiser.get_adv_data()
 
                     # Generate notification message
-                    report = BleAdvPduReceived(
+                    report = BleAdvPduReceived.build(ProtocolHub.LAST_VERSION,
                         adv_type=adv_type,
                         rssi=randint(-80, -30),
                         bd_address=advertiser.address.value,
@@ -185,7 +185,7 @@ class DeviceScan(MockDevice):
                 # Generate an advertising notification
                 adv_type, adv_data = advertiser.get_adv_data()
                 if adv_type!=AdvType.ADV_SCAN_RSP or self.__active_scan:
-                    report = BleAdvPduReceived(
+                    report = BleAdvPduReceived.build(ProtocolHub.LAST_VERSION,
                         adv_type=adv_type,
                         rssi=randint(-80, -30),
                         bd_address=advertiser.address.value,

@@ -28,12 +28,13 @@ class Registry:
         parent_class.VERSIONS[version][name] = clazz
 
     @classmethod
-    def bound(cls, name: str = None, version: int = 1):
+    def bound(cls, name: Optional[str] = None, version: int = 1):
         """Retrieve the given node class `name` for version `version`.
 
         If there is no defined class for version N, look for a corresponding
         class in version N-1, N-2 until 0.
         """
+
         # Look for node class from given name and version
         if version in cls.VERSIONS:
             if name in cls.VERSIONS[version]:
@@ -45,6 +46,12 @@ class Registry:
 
         # If not found, raise exception
         raise UnsupportedVersionException(name, version)
+
+    @classmethod
+    def build(cls, name: Optional[str] = None, version: int = 1, **kwargs):
+        """Retrieve the given node class `name` for version `version` and
+        build an instance with the provided parameters."""
+        return cls.bound(name, version).build(version, **kwargs)
 
     def is_packet_compat(self, packet: Packet) -> bool:
         """Default method to determine if a packet is compatible or not."""

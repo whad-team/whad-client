@@ -212,7 +212,7 @@ class PhyDomain(Registry):
         :type ook: bool
         :return: instance of `SetAskMod`
         """
-        return PhyDomain.bound('mod_ask', self.proto_version)(
+        return PhyDomain.build('mod_ask', self.proto_version,
             ook=ook
         )
 
@@ -223,7 +223,7 @@ class PhyDomain(Registry):
         :type deviation: int
         :return: instance of `SetFskMod`
         """
-        return PhyDomain.bound('mod_fsk', self.proto_version)(
+        return PhyDomain.build('mod_fsk', self.proto_version,
             deviation=deviation
         )
 
@@ -234,7 +234,7 @@ class PhyDomain(Registry):
         :type deviation: int
         :return: instance of `SetGfskMod`
         """
-        return PhyDomain.bound('mod_gfsk', self.proto_version)(
+        return PhyDomain.build('mod_gfsk', self.proto_version,
             deviation=deviation
         )
 
@@ -242,7 +242,7 @@ class PhyDomain(Registry):
         """Create a SetBpskMod message
         :return: instance of `SetBpskMod`
         """
-        return PhyDomain.bound('mod_bpsk', self.proto_version)()
+        return PhyDomain.build('mod_bpsk', self.proto_version)
 
     def create_set_qpsk_mod(self, offset: bool) -> HubMessage:
         """Create a SetQpskMod message
@@ -251,7 +251,7 @@ class PhyDomain(Registry):
         :type offset: bool
         :return: instance of `SetQpskMod`
         """
-        return PhyDomain.bound('mod_qpsk', self.proto_version)(
+        return PhyDomain.build('mod_qpsk', self.proto_version,
             offset=offset
         )
 
@@ -262,7 +262,7 @@ class PhyDomain(Registry):
         :type deviation: int
         :return: instance of `Set4FskMod`
         """
-        return PhyDomain.bound('mod_4fsk', self.proto_version)(
+        return PhyDomain.build('mod_4fsk', self.proto_version,
             deviation=deviation
         )
 
@@ -273,7 +273,7 @@ class PhyDomain(Registry):
         :type deviation: int
         :return: instance of `SetMskMod`
         """
-        return PhyDomain.bound('mod_msk', self.proto_version)(
+        return PhyDomain.build('mod_msk', self.proto_version,
             deviation=deviation
         )
 
@@ -296,7 +296,7 @@ class PhyDomain(Registry):
         :type invert_iq: bool, optional
         :return: instance of `SetLoRaMod`
         """
-        return PhyDomain.bound('mod_lora', self.proto_version)(
+        return PhyDomain.build('mod_lora', self.proto_version,
             bandwidth=bandwidth,
             sf=sf,
             cr=cr,
@@ -314,7 +314,7 @@ class PhyDomain(Registry):
         :type frequency: int
         :return: instance of `SetFreq`
         """
-        return PhyDomain.bound('set_freq', self.proto_version)(
+        return PhyDomain.build('set_freq', self.proto_version,
             frequency=frequency
         )
 
@@ -323,7 +323,7 @@ class PhyDomain(Registry):
 
         :return: instance of `GetSupportedFreqs`
         """
-        return PhyDomain.bound('get_supported_freq', self.proto_version)()
+        return PhyDomain.build('get_supported_freq', self.proto_version)
 
     def create_supported_freq_ranges(self, ranges: List[tuple]) -> HubMessage:
         """Create a SupportedFreqRanges message
@@ -333,7 +333,7 @@ class PhyDomain(Registry):
         :return: instance of `SupportedFreqRanges`
         """
         # Create our supported freq ranges message
-        msg: SupportedFreqRanges = PhyDomain.bound('supported_freq', self.proto_version)()
+        msg: SupportedFreqRanges = PhyDomain.build('supported_freq', self.proto_version)
 
         # Add given ranges
         for start, end in ranges:
@@ -349,7 +349,7 @@ class PhyDomain(Registry):
         :type iq_stream: bool, optional
         :return: instance of `SniffMode`
         """
-        return PhyDomain.bound('sniff', self.proto_version)(iq_stream=iq_stream)
+        return PhyDomain.build('sniff', self.proto_version, iq_stream=iq_stream)
 
     def create_jam_mode(self, mode: int) -> HubMessage:
         """Create a JamMode message
@@ -358,28 +358,28 @@ class PhyDomain(Registry):
         :type mode: int
         :return: instance of `JamMode`
         """
-        return PhyDomain.bound('jam', self.proto_version)(mode=mode)
+        return PhyDomain.build('jam', self.proto_version, mode=mode)
 
     def create_monitor_mode(self) -> HubMessage:
         """Create a MonitorMode message.
 
         :return: instance of `MonitorMode`
         """
-        return PhyDomain.bound('monitor', self.proto_version)()
+        return PhyDomain.build('monitor', self.proto_version)
 
     def create_start(self) -> HubMessage:
         """Create a Start message
 
         :return: instance of `Start`
         """
-        return PhyDomain.bound('start', self.proto_version)()
+        return PhyDomain.build('start', self.proto_version)
 
     def create_stop(self) -> HubMessage:
         """Create a Stop message
 
         :return: instance of `Stop`
         """
-        return PhyDomain.bound('stop', self.proto_version)()
+        return PhyDomain.build('stop', self.proto_version)
 
     def create_jammed(self, timestamp: int) -> HubMessage:
         """Create a Jammed notification
@@ -388,7 +388,7 @@ class PhyDomain(Registry):
         :type timestamp: int
         :return: instance of `Jammed`
         """
-        return PhyDomain.bound('jammed', self.proto_version)(
+        return PhyDomain.build('jammed', self.proto_version,
             timestamp=timestamp
         )
 
@@ -402,7 +402,7 @@ class PhyDomain(Registry):
         :return: instance of `MonitoringReport`
         """
         # Create our message
-        msg = PhyDomain.bound('monitor_report', self.proto_version)(
+        msg = PhyDomain.build('monitor_report', self.proto_version,
             timestamp=timestamp
         )
 
@@ -420,7 +420,7 @@ class PhyDomain(Registry):
         :type datarate: int
         :return: instance of `SetDatarate`
         """
-        return PhyDomain.bound('datarate', self.proto_version)(
+        return PhyDomain.build('datarate', self.proto_version,
             rate=datarate
         )
 
@@ -431,7 +431,7 @@ class PhyDomain(Registry):
         :type little: bool
         :return: instance of `SetEndianness`
         """
-        return PhyDomain.bound('endianness', self.proto_version)(
+        return PhyDomain.build('endianness', self.proto_version,
             endianness=Endianness.LITTLE if little else Endianness.BIG
         )
 
@@ -442,7 +442,7 @@ class PhyDomain(Registry):
         :type size: int
         :return: instance of `SetPacketSize`
         """
-        return PhyDomain.bound('packet_size', self.proto_version)(
+        return PhyDomain.build('packet_size', self.proto_version,
             packet_size=size
         )
 
@@ -453,7 +453,7 @@ class PhyDomain(Registry):
         :type power: int
         :return: instance of `SetTxPower`
         """
-        return PhyDomain.bound('tx_power', self.proto_version)(
+        return PhyDomain.build('tx_power', self.proto_version,
             power=power
         )
 
@@ -464,7 +464,7 @@ class PhyDomain(Registry):
         :type syncword: bytes
         :return: instance of `SetSyncWord`
         """
-        return PhyDomain.bound('sync_word', self.proto_version)(
+        return PhyDomain.build('sync_word', self.proto_version,
             sync_word=syncword
         )
 
@@ -475,7 +475,7 @@ class PhyDomain(Registry):
         :type packet: bytes
         :return: instance of `SendPacket`
         """
-        return PhyDomain.bound('send', self.proto_version)(
+        return PhyDomain.build('send', self.proto_version,
             packet=packet
         )
 
@@ -487,7 +487,7 @@ class PhyDomain(Registry):
         :return: instance of `SendRawPacket`
         """
         # Create our message
-        msg = PhyDomain.bound('send_raw', self.proto_version)()
+        msg = PhyDomain.build('send_raw', self.proto_version)
 
         # Add samples
         for sample in iq:
@@ -524,7 +524,7 @@ class PhyDomain(Registry):
         :return: instance of `PacketReceived`
         """
 
-        msg = PhyDomain.bound('packet', self.proto_version)(
+        msg = PhyDomain.build('packet', self.proto_version,
             frequency=frequency,
             packet=packet
         )
@@ -566,7 +566,7 @@ class PhyDomain(Registry):
         :type timestamp: int, optional
         :return: instance of `PacketReceived`
         """
-        msg = PhyDomain.bound('raw_packet', self.proto_version)(
+        msg = PhyDomain.build('raw_packet', self.proto_version,
             frequency=frequency,
             packet=packet
         )
@@ -605,7 +605,7 @@ class PhyDomain(Registry):
         :return: instance of `SchedulePacket`
         """
         # Create message
-        msg = PhyDomain.bound('sched_send', self.proto_version)(
+        msg = PhyDomain.build('sched_send', self.proto_version,
             packet=packet,
         )
 
@@ -624,7 +624,7 @@ class PhyDomain(Registry):
         :type full: bool, optional
         :return: instance of `SchedulePacketResponse`
         """
-        return PhyDomain.bound('sched_pkt_rsp', self.proto_version)(
+        return PhyDomain.build('sched_pkt_rsp', self.proto_version,
             id=packet_id,
             full=full
         )
@@ -636,7 +636,7 @@ class PhyDomain(Registry):
         :type packet_id: int
         :return: instance of SchedulePacketSent
         """
-        return PhyDomain.bound('sched_pkt_sent', self.proto_version)(
+        return PhyDomain.build('sched_pkt_sent', self.proto_version,
             id=packet_id
         )
 

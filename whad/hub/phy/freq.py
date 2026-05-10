@@ -10,8 +10,8 @@ class GetSupportedFreqs(PbMessageWrapper):
     """PHY Get supported frequencies message
     """
 
-    def __init__(self, message: Message = None):
-        super().__init__(message=message)
+    def __init__(self, version: int, message: Message = None):
+        super().__init__(version, message=message)
         self.message.phy.get_supported_freq.CopyFrom(GetSupportedFrequenciesCmd())
 
 @pb_bind(PhyDomain, 'set_freq', 1)
