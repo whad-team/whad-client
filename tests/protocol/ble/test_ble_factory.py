@@ -6,7 +6,7 @@ from whad.protocol.whad_pb2 import Message
 from whad.protocol.ble.ble_pb2 import JamAdvCmd, CentralModeCmd, StartCmd, StopCmd
 from whad.hub.ble import BleDomain, SetBdAddress, SniffAdv, SniffConnReq, \
     SniffAccessAddress, SniffActiveConn, AccessAddressDiscovered, JamAdv, \
-    JamAdvChan,JamConn, ScanMode, AdvMode, AdvModeV3, CentralMode, PeriphMode, PeriphModeV3, SetAdvData, \
+    JamAdvChan,JamConn, ScanMode, AdvMode, CentralMode, PeriphMode, SetAdvData, \
     SendBleRawPdu, SendBlePdu, BleAdvPduReceived,AddressType, \
     BlePduReceived, BleRawPduReceived, ConnectTo, Disconnect, Connected, Disconnected, \
     BleStart, BleStop, HijackMaster, HijackSlave, HijackBoth, Hijacked, ReactiveJam, \
