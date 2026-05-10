@@ -33,8 +33,8 @@ class MonitorMode(PbMessageWrapper):
     """PHY Monitor mode message
     """
 
-    def __init__(self, message: Message = None):
-        super().__init__(message=message)
+    def __init__(self, version: int, message: Message = None):
+        super().__init__(version, message=message)
         self.message.phy.monitor.CopyFrom(MonitorCmd())
 
 @pb_bind(PhyDomain, 'monitor_report', 1)
@@ -50,8 +50,8 @@ class Start(PbMessageWrapper):
     """PHY Start mode message
     """
 
-    def __init__(self, message: Message = None):
-        super().__init__(message=message)
+    def __init__(self, version: int, message: Message = None):
+        super().__init__(version, message=message)
         self.message.phy.start.CopyFrom(StartCmd())
 
 @pb_bind(PhyDomain, 'stop', 1)
@@ -59,6 +59,6 @@ class Stop(PbMessageWrapper):
     """PHY Stop mode message
     """
 
-    def __init__(self, message: Message = None):
-        super().__init__(message=message)
+    def __init__(self, version: int, message: Message = None):
+        super().__init__(version, message=message)
         self.message.phy.stop.CopyFrom(StopCmd())

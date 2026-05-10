@@ -131,13 +131,13 @@ class TestDiscoveryCrafting(object):
     def test_discovery_info_query_crafting(self):
         """Test info query message crafting.
         """
-        msg = InfoQuery(proto_ver = 42)
+        msg = InfoQuery.build(1, proto_ver = 42)
         assert msg.proto_ver == 42
 
     def test_discovery_info_resp_crafting(self):
         """Test info response message crafting.
         """
-        msg = InfoQueryResp(type = 42, device_id = b'bidon', proto_min_ver = 3,
+        msg = InfoQueryResp.build(1, type = 42, device_id = b'bidon', proto_min_ver = 3,
                             max_speed = 115200, fw_author = b'John Wick',
                             fw_url = b'https://linux.org', fw_version_major=2,
                             fw_version_minor=3, fw_version_rev=4,capabilities=[
@@ -159,20 +159,20 @@ class TestDiscoveryCrafting(object):
     def test_discovery_domain_info_query_crafting(self):
         """Test discovery domain info query message crafting.
         """
-        msg = DomainInfoQuery(domain=2)
+        msg = DomainInfoQuery.build(1, domain=2)
         assert msg.domain == 2
 
     def test_discovery_domain_info_resp_crafting(self):
         """test discovery domain info response message crafting.
         """
-        msg = DomainInfoQueryResp(domain=1, supported_commands=0x1122334455)
+        msg = DomainInfoQueryResp.build(1, domain=1, supported_commands=0x1122334455)
         assert msg.domain == 1
         assert msg.supported_commands == 0x1122334455
 
     def test_discovery_speed_update_crafting(self):
         """Test discovery speed update message crafting.
         """
-        msg = SetSpeed(speed=9600)
+        msg = SetSpeed.build(1, speed=9600)
         assert msg.speed == 9600
 
 

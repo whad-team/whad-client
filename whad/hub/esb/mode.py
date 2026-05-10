@@ -35,20 +35,20 @@ class Jammed(PbMessageWrapper):
         return JammedEvt(
             timestamp=self.timestamp
         )
-    
+
     @staticmethod
     def from_event(event):
         """Create a Jammed message from event.
         """
-        return Jammed(timestamp=event.timestamp)
+        return Jammed.build(3, timestamp=event.timestamp)
 
 @pb_bind(EsbDomain, 'start', 1)
 class EsbStart(PbMessageWrapper):
     """ESB EsbStart message
     """
 
-    def __init__(self, message: Message = None):
-        super().__init__(message=message)
+    def __init__(self, version, message: Message = None):
+        super().__init__(version, message=message)
         self.message.esb.start.CopyFrom(StartCmd())
 
 @pb_bind(EsbDomain, 'stop', 1)
@@ -56,8 +56,8 @@ class EsbStop(PbMessageWrapper):
     """ESB EsbStop message
     """
 
-    def __init__(self, message: Message = None):
-        super().__init__(message=message)
+    def __init__(self, version, message: Message = None):
+        super().__init__(version, message=message)
         self.message.esb.stop.CopyFrom(StopCmd())
 
 @pb_bind(EsbDomain, 'prx', 1)

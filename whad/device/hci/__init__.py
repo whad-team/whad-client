@@ -454,7 +454,6 @@ class Hci(VirtualDevice):
 
 
         except (BrokenPipeError, OSError) as err:
-            print(err)
             logger.error("Error, waiting...")
             sleep(1)
 

@@ -22,7 +22,7 @@ class IPacketSequence:
         """
         if index >= 0 and index <= len(self.packets):
             return self.packets[index].packet
-        
+
     def count_packets(self) -> int:
         """Return the number of packets in this prepare sequence message.
         """
@@ -37,8 +37,8 @@ class PrepareSequenceManual(PbMessageWrapper, IPacketSequence):
     direction = PbFieldInt("ble.prepare.direction")
     packets = PbFieldArray("ble.prepare.sequence")
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, version: int, **kwargs):
+        super().__init__(version, **kwargs)
         self.message.ble.prepare.trigger.manual.CopyFrom(PrepareSequenceCmd.ManualTrigger())
 
 @pb_bind(BleDomain, "prepare_connevt", 1)

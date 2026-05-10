@@ -37,7 +37,7 @@ class SendPdu(PbMessageWrapper):
         else:
             return None
 
-        msg = SendPdu(
+        msg = SendPdu.build(1,
             channel=channel,
             pdu=pdu
         )
@@ -98,7 +98,7 @@ class SendRawPdu(PbMessageWrapper):
         if Dot15d4FCS in packet:
             pdu = bytes(packet[Dot15d4FCS])[:-2]
 
-            msg = SendRawPdu(
+            msg = SendRawPdu.build(1,
                 channel=channel,
                 pdu=pdu,
                 fcs=packet.fcs
@@ -115,7 +115,7 @@ class SendRawPdu(PbMessageWrapper):
             else:
                 fcs = 0
 
-            msg = SendRawPdu(
+            msg = SendRawPdu.build(1,
                 channel=channel,
                 pdu=pdu,
                 fcs=fcs
@@ -131,7 +131,7 @@ class SendRawPdu(PbMessageWrapper):
             else:
                 fcs = 0
 
-            msg = SendRawPdu(
+            msg = SendRawPdu.build(1,
                 channel=channel,
                 pdu=pdu,
                 fcs=fcs
@@ -294,7 +294,7 @@ class PduReceived(PbMessageWrapper):
         """Convert scapy packet to a PduReceived message
         """
         # Create a PduReceived message
-        msg = PduReceived(
+        msg = PduReceived.build(1,
             channel=packet.metadata.channel,
             pdu=bytes(packet.getlayer(Dot15d4)),
         )
@@ -504,14 +504,14 @@ class RawPduReceived(PbMessageWrapper):
             if self.fcs_validity is not None:
                 packet.metadata.is_fcs_valid = self.fcs_validity
 
-            return packet 
+            return packet
 
     @staticmethod
     def from_packet(packet):
         """Convert packet to a RawPduReceived message.
         """
         # Create a PduReceived message
-        msg = RawPduReceived(
+        msg = RawPduReceived.build(1,
             channel=packet.metadata.channel,
             pdu=bytes(packet.getlayer(Dot15d4FCS))[:-2],
             fcs=packet.fcs

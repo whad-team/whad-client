@@ -5,7 +5,7 @@ from typing import Optional, Tuple
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.ble.ble_pb2 import CentralModeCmd, StartCmd as BleStartCmd, StopCmd as BleStopCmd
 from whad.hub.message import pb_bind, PbFieldBytes, PbMessageWrapper, PbFieldBool, PbFieldInt
-from whad.hub.ble import BleDomain, BleAdvType, ChannelMap
+from whad.hub.ble import BleDomain, BleAdvType, ChannelMap, BleCsa
 
 @pb_bind(BleDomain, 'scan_mode', 1)
 class ScanMode(PbMessageWrapper):
@@ -13,13 +13,8 @@ class ScanMode(PbMessageWrapper):
     """
     active = PbFieldBool('ble.scan_mode.active_scan')
 
-
-@pb_bind(BleDomain, 'scan_mode', version=3)
-class ScanModeV3(PbMessageWrapper):
-    """BLE scan mode message class
-    """
-    active = PbFieldBool('ble.scan_mode.active_scan')
-    interval = PbFieldInt('ble.scan_mode.interval')
+    # Introduced in v3, not available in versions 1 & 2.
+    use_ext_adv = PbFieldBool('ble.scan_mode.use_ext_adv', min_version=3, default=False)
 
 @pb_bind(BleDomain, 'adv_mode', 1)
 class AdvMode(PbMessageWrapper):
@@ -29,38 +24,19 @@ class AdvMode(PbMessageWrapper):
     scanrsp_data = PbFieldBytes('ble.adv_mode.scanrsp_data')
 
     # Protocol version 2 use 0x20 for both min and max values, we reflect this here.
-    adv_type = BleAdvType.ADV_IND
-    channel_map = ChannelMap([37, 38, 39]).value
-    inter_min = 0x20
-    inter_max = 0x20
-
-@pb_bind(BleDomain, 'adv_mode', version=3)
-class AdvModeV3(PbMessageWrapper):
-    """
-    Ble advertising mode message class with more control over
-    advertising parameters:
-      - advertising type
-      - channel map
-      - minimal and maximal advertising interval values
-
-    Important note:
-      - `scan_data` field has been renamed to `adv_data`
-
-    """
-    adv_data = PbFieldBytes('ble.adv_mode.adv_data')
-    scanrsp_data = PbFieldBytes('ble.adv_mode.scanrsp_data')
-    adv_type = PbFieldInt('ble.adv_mode.adv_type')
-    channel_map = PbFieldBytes('ble.adv_mode.channel_map')
-    inter_min = PbFieldInt('ble.adv_mode.inter_min')
-    inter_max = PbFieldInt('ble.adv_mode.inter_max')
+    adv_type = PbFieldInt('ble.adv_mode.adv_type', min_version=3, default=BleAdvType.ADV_IND)
+    channel_map = PbFieldBytes('ble.adv_mode.channel_map', min_version=3, default=ChannelMap([37, 38, 39]).value)
+    inter_min = PbFieldInt('ble.adv_mode.inter_min', min_version=3, default=0x20)
+    inter_max = PbFieldInt('ble.adv_mode.inter_max', min_version=3, default=0x4000)
+    csa = PbFieldInt('ble.adv_mode.csa', min_version=3, default=BleCsa.CSA1)
 
 @pb_bind(BleDomain, 'central_mode', 1)
 class CentralMode(PbMessageWrapper):
     """BLE advertising mode message class
     """
 
-    def __init__(self, message: Message = None):
-        super().__init__(message=message)
+    def __init__(self, version: int, message: Message = None):
+        super().__init__(version, message=message)
         self.message.ble.central_mode.CopyFrom(CentralModeCmd())
 
 @pb_bind(BleDomain, 'periph_mode', 1)
@@ -71,10 +47,10 @@ class PeriphMode(PbMessageWrapper):
     scanrsp_data = PbFieldBytes('ble.periph_mode.scanrsp_data')
 
     # Default fields required by inherited classes (versions greater than 1)
-    adv_type = BleAdvType.ADV_IND
-    inter_min = 0x20
-    inter_max = 0x20
-    channel_map = ChannelMap([37, 38, 39]).value
+    adv_type = PbFieldInt('ble.periph_mode.adv_type', min_version=3, default=BleAdvType.ADV_IND)
+    channel_map = PbFieldBytes('ble.periph_mode.channel_map', min_version=3, default=ChannelMap([37,38,39]).value)
+    inter_min = PbFieldInt('ble.periph_mode.inter_min', min_version=3, default=0x20)
+    inter_max = PbFieldInt('ble.periph_mode.inter_max', min_version=3, default=0x4000)
 
     def get_adv_data(self) -> Optional[bytes]:
         """Retrieve advertising data."""
@@ -134,48 +110,36 @@ class PeriphModeV3(PeriphMode):
 
     def get_scan_data(self) -> Optional[bytes]:
         """Retrieve scan response data, if set."""
-        return self.get_field_value(PeriphModeV3.scanrsp_data)
+        return self.get_field_value(PeriphMode.scanrsp_data)
 
     def get_adv_type(self) -> Optional[int]:
         """Retrieve the advertisement type."""
-        return self.get_field_value(PeriphModeV3.adv_type)
+        return self.get_field_value(PeriphMode.adv_type)
 
     def get_channel_map(self) -> Optional[ChannelMap]:
         """Retrieve channel map."""
         # Read value from message
-        value = self.get_field_value(PeriphModeV3.channel_map)
+        value = self.get_field_value(PeriphMode.channel_map)
         if value is not None and isinstance(value, bytes):
             return ChannelMap.from_bytes(value)
         return None
 
     def get_interval(self) -> Optional[Tuple[int, int]]:
         """Retrieve advertising interval min/max values."""
-        inter_min = self.get_field_value(PeriphModeV3.inter_min)
-        inter_max = self.get_field_value(PeriphModeV3.inter_max)
+        inter_min = self.get_field_value(PeriphMode.inter_min)
+        inter_max = self.get_field_value(PeriphMode.inter_max)
         if inter_min is not None and inter_max is not None:
             if inter_min in range(0x20, 0x4001) and inter_max in range(0x20, 0x4001):
                 return (inter_min, inter_max)
         return None
-
-@pb_bind(BleDomain, 'periph_mode', version=3)
-class PeriphModeV3(PeriphMode):
-    """BLE advertising mode message class, improved starting from version 3
-    """
-    adv_data = PbFieldBytes('ble.periph_mode.adv_data')
-    scanrsp_data = PbFieldBytes('ble.periph_mode.scanrsp_data')
-    adv_type = PbFieldInt('ble.periph_mode.adv_type')
-    channel_map = PbFieldBytes('ble.periph_mode.channel_map')
-    inter_min = PbFieldInt('ble.periph_mode.inter_min')
-    inter_max = PbFieldInt('ble.periph_mode.inter_max')
-
 
 @pb_bind(BleDomain, 'start', 1)
 class BleStart(PbMessageWrapper):
     """BLE start mode message class
     """
 
-    def __init__(self, message: Message = None):
-        super().__init__(message=message)
+    def __init__(self, version: int, message: Message = None):
+        super().__init__(version, message=message)
         self.message.ble.start.CopyFrom(BleStartCmd())
 
 @pb_bind(BleDomain, 'stop', 1)
@@ -183,8 +147,8 @@ class BleStop(PbMessageWrapper):
     """BLE stop mode message class
     """
 
-    def __init__(self, message: Message = None):
-        super().__init__(message=message)
+    def __init__(self, version: int, message: Message = None):
+        super().__init__(version, message=message)
         self.message.ble.stop.CopyFrom(BleStopCmd())
 
 @pb_bind(BleDomain, 'encryption', 1)

@@ -9,7 +9,7 @@ from .chanmap import ChannelMap
 
 from scapy.layers.bluetooth4LE import BTLE_RF, BTLE, BTLE_ADV, BTLE_DATA
 
-from whad.protocol.ble.ble_pb2 import BleDirection, BleAdvType, BleAddrType
+from whad.protocol.ble.ble_pb2 import BleDirection, BleAdvType, BleAddrType, BlePhy, BleCsa
 from whad.hub.registry import Registry
 from whad.hub.message import HubMessage, pb_bind
 from whad.hub import ProtocolHub
@@ -83,6 +83,9 @@ class Commands:
     PrepareSequence = 0x18
     TriggerSequence = 0x19
     DeleteSequence = 0x1a
+    SetPhy = 0x1b;
+    SetSupportedPhys = 0x1c;
+    SetTxPowerLevel = 0x1d;
 
 
 class Direction:
@@ -101,10 +104,34 @@ class AdvType:
     ADV_NONCONN_IND = BleAdvType.ADV_NONCONN_IND
     ADV_SCAN_IND = BleAdvType.ADV_SCAN_IND
     ADV_SCAN_RSP = BleAdvType.ADV_SCAN_RSP
+    ADV_EXT_IND = BleAdvType.ADV_EXT_IND
+    ADV_DECISION_IND = BleAdvType.ADV_DECISION_IND
 
 class AddressType:
     PUBLIC = BleAddrType.PUBLIC
     RANDOM = BleAddrType.RANDOM
+    RPA = BleAddrType.RPA
+
+class BlePhy:
+    LE_1M = BlePhy.LE_1M
+    LE_1M_CODED = BlePhy.LE_1M_CODED
+    LE_2M = BlePhy.LE_2M
+    LE_2M_2BT = BlePhy.LE_2M_2BT
+
+    @staticmethod
+    def check(value: Optional[int]) -> bool:
+        return value in [
+            BlePhy.LE_1M, BlePhy.LE_1M_CODED,
+            BlePhy.LE_2M, BlePhy.LE_2M_2BT,
+        ]
+
+class BleCsa:
+    CSA1 = BleCsa.CSA1
+    CSA2 = BleCsa.CSA2
+    CSA3A = BleCsa.CSA3a
+    CSA3B = BleCsa.CSA3b
+    CSA3C = BleCsa.CSA3c
+
 
 @dataclass(repr=False)
 class BLEMetadata(Metadata):
@@ -114,6 +141,7 @@ class BLEMetadata(Metadata):
     relative_timestamp : int = None
     decrypted : bool = None
     encrypt: bool = False
+    phy: int = BlePhy.LE_1M
 
     @classmethod
     def convert_from_header(cls, pkt):
@@ -187,26 +215,36 @@ def generate_ble_metadata(message):
         if message.relative_timestamp is not None:
             metadata.relative_timestamp = message.relative_timestamp
             metadata.decrypted = message.decrypted
+        if BlePhy.check(message.phy):
+            metadata.phy = message.phy
 
         metadata.connection_handle = message.conn_handle
 
     elif isinstance(message, BleAdvPduReceived):
         metadata.direction = BleDirection.UNKNOWN
         metadata.rssi = message.rssi
+        if BlePhy.check(message.phy):
+            metadata.phy = message.phy
 
     elif isinstance(message, BlePduReceived):
         metadata.connection_handle = message.conn_handle
         metadata.direction = message.direction
         metadata.decrypted = message.decrypted
+        if BlePhy.check(message.phy):
+            metadata.phy = message.phy
 
     elif isinstance(message, SendBlePdu):
         metadata.connection_handle = message.conn_handle
         metadata.direction = message.direction
+        if BlePhy.check(message.phy):
+            metadata.phy = message.phy
 
     elif isinstance(message, SendBleRawPdu):
         metadata.direction = message.direction
         metadata.crc = message.crc
         metadata.connection_handle = message.conn_handle
+        if BlePhy.check(message.phy):
+            metadata.phy = message.phy
 
     return metadata
 
@@ -282,12 +320,12 @@ class BleDomain(Registry):
         :return: SetBdAddress message
         :rtype: HubMessage
         """
-        return BleDomain.bound('set_bd_addr', self.proto_version)(
+        return BleDomain.build('set_bd_addr', self.proto_version,
             bd_address=bd_address.value,
             addr_type=AddressType.PUBLIC if bd_address.is_public() else AddressType.RANDOM
         )
 
-    def create_sniff_adv(self, channel: int, bd_address: BDAddress = None,
+    def create_sniff_adv(self, channel: int, bd_address: Optional[BDAddress] = None,
                        use_ext_adv: bool = False) -> HubMessage:
         """Create a SniffAdv message.
 
@@ -304,13 +342,13 @@ class BleDomain(Registry):
             target_address = bd_address
         else:
             target_address = BDAddress('FF:FF:FF:FF:FF:FF')
-        return BleDomain.bound('sniff_adv', self.proto_version)(
+        return BleDomain.build('sniff_adv', self.proto_version,
             bd_address=target_address.value,
             channel=channel,
             use_extended_adv=use_ext_adv
         )
 
-    def create_sniff_connreq(self, channel: int, bd_address: BDAddress = None,
+    def create_sniff_connreq(self, channel: int, bd_address: Optional[BDAddress] = None,
                            show_empty: bool = False, show_adv: bool = False) -> HubMessage:
         """Create a SniffConnReq message.
 
@@ -328,14 +366,14 @@ class BleDomain(Registry):
             target_address = bd_address
         else:
             target_address = BDAddress('FF:FF:FF:FF:FF:FF')
-        return BleDomain.bound('sniff_connreq', self.proto_version)(
+        return BleDomain.build('sniff_connreq', self.proto_version,
             bd_address=target_address.value,
             channel=channel,
             show_empty_packets=show_empty,
             show_advertisements=show_adv
         )
 
-    def create_sniff_access_address(self, channels: List[int]) -> HubMessage:
+    def create_sniff_access_address(self, channels: List[int], phy: int = BlePhy.LE_1M) -> HubMessage:
         """Create a SniffAccessAddress message.
 
         :param channels: List of channels
@@ -343,13 +381,15 @@ class BleDomain(Registry):
         :return: an instance of SniffAccessAddress message
         :rtype: HubMessage
         """
-        return BleDomain.bound('sniff_aa', self.proto_version)(
-            monitored_channels=ChannelMap(channels).value
+        return BleDomain.build('sniff_aa', self.proto_version,
+            monitored_channels=ChannelMap(channels).value,
+            phy=phy
         )
 
     def create_sniff_active_conn(self, access_address: int, crc_init: int = None,
                               channel_map: ChannelMap = None, interval: int = None,
-                              increment: int = None, channels: List[int] = None):
+                              increment: int = None, channels: List[int] = None,
+                              phy: int = BlePhy.LE_1M):
         """Create a SniffActiveConn message.
 
         :param access_address: Target connection access address
@@ -364,12 +404,15 @@ class BleDomain(Registry):
         :type increment: int, optional
         :param channels: Channels to sniff on when recovering connection parameters
         :type channels: list, optional
+        :param phy: BLE PHY to use
+        :type phy: int, optional
         :return: instance of SniffActiveConn message
         :rtype: SniffActiveConn
         """
         # Create default createSniffActiveConn message
-        sniff_connreq = BleDomain.bound('sniff_conn', self.proto_version)(
-            access_address=access_address
+        sniff_connreq = BleDomain.build('sniff_conn', self.proto_version,
+            access_address=access_address,
+            phy=phy
         )
 
         # Add optional fields if provided
@@ -399,7 +442,7 @@ class BleDomain(Registry):
         :return: instance of AccessAddressDiscovered
         :rtype: AccessAddressDiscovered
         """
-        return BleDomain.bound('aa_disc', self.proto_version)(
+        return BleDomain.build('aa_disc', self.proto_version,
             access_address=access_address,
             rssi=rssi,
             timestamp=timestamp
@@ -411,7 +454,7 @@ class BleDomain(Registry):
         :return: instance of JamAdv message
         :rtype: JamAdv
         """
-        return BleDomain.bound('jam_adv', self.proto_version)()
+        return BleDomain.build('jam_adv', self.proto_version)
 
     def create_jam_adv_chan(self, channel: int) -> HubMessage:
         """Create a JamAdvChan message.
@@ -421,11 +464,11 @@ class BleDomain(Registry):
         :return: instance of JamAdvChan
         :rtype: JamAdvChan
         """
-        return BleDomain.bound('jam_adv_chan', self.proto_version)(
+        return BleDomain.build('jam_adv_chan', self.proto_version,
             channel=channel
         )
 
-    def create_jam_conn(self, access_address: int) -> HubMessage:
+    def create_jam_conn(self, access_address: int, phy = BlePhy.LE_1M) -> HubMessage:
         """Create a JamConn message.
 
         :param access_address: Target connection access address
@@ -433,8 +476,9 @@ class BleDomain(Registry):
         :return: instance of JamConn message
         :rtype: JamConn
         """
-        return BleDomain.bound('jam_conn', self.proto_version)(
-            access_address=access_address
+        return BleDomain.build('jam_conn', self.proto_version,
+            access_address=access_address,
+            phy=phy
         )
 
     def create_reactive_jam(self, channel: int, pattern: bytes, position: int) -> HubMessage:
@@ -449,13 +493,13 @@ class BleDomain(Registry):
         :return: instance of ReactiveJam
         :rtype: ReactiveJam
         """
-        return BleDomain.bound('reactive_jam', self.proto_version)(
+        return BleDomain.build('reactive_jam', self.proto_version,
             channel=channel,
             pattern=pattern,
             position=position
         )
 
-    def create_scan_mode(self, active: bool = False, interval : int = 20) -> HubMessage:
+    def create_scan_mode(self, active: bool = False, interval : int = 20, use_ext_adv: bool = False) -> HubMessage:
         """Create a ScanMode message.
 
         :param active: Enable active scan mode
@@ -466,14 +510,16 @@ class BleDomain(Registry):
         :rtype: ScanMode
         """
         return BleDomain.bound('scan_mode', self.proto_version)(
-            active=active, 
-            interval=interval
+            active=active,
+            interval=interval,
+            use_ext_adv=use_ext_adv
         )
 
     def create_adv_mode(self, adv_data: bytes, scanrsp_data: Optional[bytes] = None,
                         adv_type: BleAdvType = BleAdvType.ADV_IND,
                         channel_map: Optional[ChannelMap] =  None,
-                        inter_min: int = 0x20, inter_max: int = 0x4000) -> HubMessage:
+                        inter_min: int = 0x20, inter_max: int = 0x4000,
+                        csa: int = BleCsa.CSA1) -> HubMessage:
         """Create an AdvMode message.
 
         :param adv_data: Advertisement data (31 bytes max)
@@ -483,9 +529,16 @@ class BleDomain(Registry):
         :return: instance of AdvMode message
         :rtype: AdvMode
         """
-        message = BleDomain.bound('adv_mode', self.proto_version)(
+        message = BleDomain.build('adv_mode', self.proto_version,
             adv_data=adv_data,
         )
+
+        # Set CSA
+        if csa in [BleCsa.CSA1, BleCsa.CSA2]:
+            message.csa = csa
+        else:
+            logger.error("create_adv_mode: invalid CSA, must be CSA1 or CSA2.")
+            raise ValueError()
 
         # Set scan response if provided
         if scanrsp_data is not None:
@@ -494,16 +547,16 @@ class BleDomain(Registry):
         # Set advertisement type and interval range
         message.adv_type = adv_type
         if inter_min not in range(0x20, 0x4001):
-            logger.error("create_periph_mode: invalid minimal interval value, must be in range 0x20 ... 0x4000.")
+            logger.error("create_adv_mode: invalid minimal interval value, must be in range 0x20 ... 0x4000.")
             raise ValueError()
         if inter_max not in range(0x20, 0x4001):
-            logger.error("create_periph_mode: invalid maximal interval value, must be in range 0x20 ... 0x4000.")
+            logger.error("create_adv_mode: invalid maximal interval value, must be in range 0x20 ... 0x4000.")
             raise ValueError()
         if inter_min > inter_max:
-            logger.error("create_periph_mode: invalid `inter_min` value, must be lower or equal to interval max.")
+            logger.error("create_adv_mode: invalid `inter_min` value, must be lower or equal to interval max.")
             raise ValueError()
         if inter_max < inter_max:
-            logger.error("create_periph_mode: invalid `inter_max` value, must be greater or equal to interval min.")
+            logger.error("create_adv_mode: invalid `inter_max` value, must be greater or equal to interval min.")
             raise ValueError()
         message.inter_min = inter_min
         message.inter_max = inter_max
@@ -526,7 +579,7 @@ class BleDomain(Registry):
         :return: instance of CentralMode message
         :rtype: CentralMode
         """
-        return BleDomain.bound('central_mode', self.proto_version)()
+        return BleDomain.build('central_mode', self.proto_version)
 
     def create_periph_mode(self, adv_data: bytes, scan_rsp: Optional[bytes] = None, adv_type: BleAdvType = BleAdvType.ADV_IND,
                            channel_map: Optional[ChannelMap] = None, inter_min: int = 0x20, inter_max: int = 0x4000) -> HubMessage:
@@ -546,8 +599,8 @@ class BleDomain(Registry):
         :return: instance of PeriphMode message
         :rtype: PeriphMode
         """
-        message = BleDomain.bound('periph_mode', self.proto_version)(
-        )
+        message = BleDomain.build('periph_mode', self.proto_version)
+
         if adv_data is not None:
             message.adv_data = adv_data
         if scan_rsp is not None:
@@ -586,7 +639,7 @@ class BleDomain(Registry):
         :return: instance of Start message
         :rtype: Start
         """
-        return BleDomain.bound("start", self.proto_version)()
+        return BleDomain.build("start", self.proto_version)
 
     def create_stop(self) -> HubMessage:
         """Create a Stop message.
@@ -594,11 +647,12 @@ class BleDomain(Registry):
         :return: instance of Stop message
         :rtype: Stop
         """
-        return BleDomain.bound("stop", self.proto_version)()
+        return BleDomain.build("stop", self.proto_version)
 
     def create_connect_to(self, bd_address: BDAddress = None, access_address: int = None,
                         channel_map: ChannelMap = None, interval: int = None,
-                        increment: int = None, crc_init: int = None) ->HubMessage:
+                        increment: int = None, crc_init: int = None,
+                        csa: int = BleCsa.CSA1) ->HubMessage:
         """Create a ConnectTo message.
 
         :param bd_address: Target BD address
@@ -613,10 +667,12 @@ class BleDomain(Registry):
         :type increment: int, optional
         :param crc_init: CRC initial value to use
         :type crc_init: int, optional
+        :param csa: Channel selection algorithm to use
+        :type csa: int, optional
         :return: instance of ConnectTo message
         :rtype: ConnectTo
         """
-        message = BleDomain.bound("connect", self.proto_version)()
+        message = BleDomain.build("connect", self.proto_version)
 
         # Set bd address if provided
         if bd_address is not None:
@@ -643,6 +699,9 @@ class BleDomain(Registry):
         if crc_init is not None:
             message.crc_init = crc_init
 
+        # Set CSA
+        message.csa = csa
+
         return message
 
 
@@ -654,7 +713,7 @@ class BleDomain(Registry):
         :return: instance of Disconnect message
         :rtype: Disconnect
         """
-        return BleDomain.bound("disconnect", self.proto_version)(
+        return BleDomain.build("disconnect", self.proto_version,
             conn_handle=conn_handle
         )
 
@@ -673,7 +732,7 @@ class BleDomain(Registry):
         :return: instance of Synchronized
         :rtype: Synchronized
         """
-        return BleDomain.bound("synchronized", self.proto_version)(
+        return BleDomain.build("synchronized", self.proto_version,
             access_address=access_address,
             crc_init=crc_init,
             hop_interval=interval,
@@ -696,7 +755,7 @@ class BleDomain(Registry):
         :return: instance of a Connected message
         :rtype: Connected
         """
-        return BleDomain.bound("connected", self.proto_version)(
+        return BleDomain.build("connected", self.proto_version,
             initiator=initiator.value,
             advertiser=advertiser.value,
             access_address=access_address,
@@ -715,7 +774,7 @@ class BleDomain(Registry):
         :return: instance of Disconnected
         :rtype: Disconnected
         """
-        return BleDomain.bound("disconnected", self.proto_version)(
+        return BleDomain.build("disconnected", self.proto_version,
             reason=reason,
             conn_handle=conn_handle
         )
@@ -728,7 +787,7 @@ class BleDomain(Registry):
         :return: instance of Desynchronized
         :rtype: Desynchronized
         """
-        return BleDomain.bound("desynchronized", self.proto_version)(
+        return BleDomain.build("desynchronized", self.proto_version,
             accesss_address=accesss_address
         )
 
@@ -742,7 +801,7 @@ class BleDomain(Registry):
         :return: instance of SetAdvData message
         :rtype: SetAdvData
         """
-        message = BleDomain.bound("set_adv_data", self.proto_version)(
+        message = BleDomain.build("set_adv_data", self.proto_version,
             adv_data=adv_data
         )
 
@@ -754,7 +813,8 @@ class BleDomain(Registry):
 
     def create_send_raw_pdu(self, direction: int, pdu: bytes, \
                          crc: int = None, encrypt: bool = False, \
-                         access_address: int = None, conn_handle: int = None) -> HubMessage:
+                         access_address: int = None, conn_handle: int = None,
+                         phy: Optional[int] = None) -> HubMessage:
         """Create a SendRawPdu message.
 
         :param direction: PDU direction
@@ -769,14 +829,24 @@ class BleDomain(Registry):
         :type encrypt: bool, optional
         :param access_address: Connection access address
         :type access_address: int, optional
+        :param phy: BLE PHY to use
+        :type phy: int
         :return: instance of SendRawPdu message
         :rtype: SendRawPdu
         """
         # Create a SendRawPdu message
-        message = BleDomain.bound("send_raw_pdu", self.proto_version)(
+        message = BleDomain.build("send_raw_pdu", self.proto_version,
             direction=direction,
             pdu=pdu
         )
+
+        # Set PHY
+        if phy is not None:
+            if BlePhy.check(phy):
+                message.phy = phy
+            else:
+                logger.error("create_send_raw_pdu: provided PHY is invalid.")
+                raise ValueError()
 
         # Set optional fields
         if conn_handle is not None:
@@ -794,7 +864,7 @@ class BleDomain(Registry):
         return message
 
     def create_send_pdu(self, direction: int, pdu: bytes, conn_handle: int, \
-                      encrypt: bool = False) -> HubMessage:
+                        encrypt: bool = False, phy: Optional[int] = None) -> HubMessage:
         """Create a SendBlePdu message.
 
         :param direction: PDU direction
@@ -808,12 +878,20 @@ class BleDomain(Registry):
         :return: instance of SendRawPdu message
         :rtype: SendBleRawPdu
         """
-        return BleDomain.bound("send_pdu", self.proto_version)(
+        message = BleDomain.build("send_pdu", self.proto_version,
             direction=direction,
             conn_handle=conn_handle,
             pdu=pdu,
-            encrypt=encrypt
+            encrypt=encrypt,
         )
+
+        if phy is not None:
+            if BlePhy.check(phy):
+                message.phy = phy
+            else:
+                raise ValueError()
+
+        return message
 
     def create_adv_pdu_received(self, adv_type: AdvType, rssi: int, bd_address: BDAddress, \
                              adv_data: bytes):
@@ -830,7 +908,7 @@ class BleDomain(Registry):
         :return: instance of AdvPduReceived
         :rtype: AdvPduReceived
         """
-        return BleDomain.bound("adv_pdu", self.proto_version)(
+        return BleDomain.build("adv_pdu", self.proto_version,
             adv_type=adv_type,
             rssi=rssi,
             bd_address=bd_address.value,
@@ -855,7 +933,7 @@ class BleDomain(Registry):
         :return: instance of PduReceived
         :rtype: PduReceived
         """
-        return BleDomain.bound("pdu", self.proto_version)(
+        return BleDomain.build("pdu", self.proto_version,
             direction=direction,
             pdu=pdu,
             conn_handle=conn_handle,
@@ -868,7 +946,8 @@ class BleDomain(Registry):
                              rssi: int = None, timestamp: int = None, \
                              rel_timestamp: int = None, crc: int = None, \
                              crc_validity: bool = None, processed: bool = False, \
-                             decrypted: bool = False, channel: int = None) -> HubMessage:
+                             decrypted: bool = False, channel: int = None,
+                             phy: int = BlePhy.LE_1M) -> HubMessage:
         """Create a RawPduReceived message
 
         :param direction: PDU direction
@@ -892,15 +971,18 @@ class BleDomain(Registry):
         :type processed: bool
         :param decrypted: Set to True if PDU has been decrypted by firmware
         :type decrypted: bool
+        :param phy: BLE PHY used when this PDU has been received (default: LE_1M)
+        :type phy: int, optional
         :return: instance of RawPduReceived
         :rtype: RawPduReceived
         """
         # Build message with mandatory fields
-        message = BleDomain.bound("raw_pdu", self.proto_version)(
+        message = BleDomain.build("raw_pdu", self.proto_version,
             direction=direction,
             pdu=pdu,
             processed=processed,
-            decrypted=decrypted
+            decrypted=decrypted,
+            phy=phy
         )
 
         # Add optional fields if any
@@ -936,7 +1018,7 @@ class BleDomain(Registry):
         :return: instance of Injected message
         :rtype: Injected
         """
-        return BleDomain.bound("injected", self.proto_version)(
+        return BleDomain.build("injected", self.proto_version,
             access_address=access_address,
             success=success,
             injection_attempts=attempts
@@ -950,7 +1032,7 @@ class BleDomain(Registry):
         :return: instance of HijackMaster
         :rtype: HijackMaster
         """
-        return BleDomain.bound("hijack_master", self.proto_version)(
+        return BleDomain.build("hijack_master", self.proto_version,
             access_address=access_address
         )
 
@@ -962,7 +1044,7 @@ class BleDomain(Registry):
         :return: instance of HijackSlave
         :rtype: HijackSlave
         """
-        return BleDomain.bound("hijack_slave", self.proto_version)(
+        return BleDomain.build("hijack_slave", self.proto_version,
             access_address=access_address
         )
 
@@ -974,7 +1056,7 @@ class BleDomain(Registry):
         :return: instance of HijackBoth
         :rtype: HijackBoth
         """
-        return BleDomain.bound("hijack_both", self.proto_version)(
+        return BleDomain.build("hijack_both", self.proto_version,
             access_address=access_address
         )
 
@@ -988,7 +1070,7 @@ class BleDomain(Registry):
         :return: instance of Hijacked message
         :rtype: Hijacked
         """
-        return BleDomain.bound("hijacked", self.proto_version)(
+        return BleDomain.build("hijacked", self.proto_version,
             access_address=access_address,
             success=success
         )
@@ -1006,7 +1088,7 @@ class BleDomain(Registry):
         :rtype: PrepareSequenceManual
         """
         # Create our PrepareSequenceManual message
-        message = BleDomain.bound("prepare_manual", self.proto_version)(
+        message = BleDomain.build("prepare_manual", self.proto_version,
             sequence_id=seq_id,
             direction=direction
         )
@@ -1033,7 +1115,7 @@ class BleDomain(Registry):
         :return: instance of PrepareSequenceConnEvt
         :rtype: PrepareSequenceConnEvt
         """
-        message = BleDomain.bound("prepare_connevt", self.proto_version)(
+        message = BleDomain.build("prepare_connevt", self.proto_version,
             sequence_id=seq_id,
             direction=direction,
             conn_evt=conn_evt
@@ -1065,7 +1147,7 @@ class BleDomain(Registry):
         :return: instance of PrepareSequencePattern
         :rtype: PrepareSequencePattern
         """
-        message = BleDomain.bound("prepare_pattern", self.proto_version)(
+        message = BleDomain.build("prepare_pattern", self.proto_version,
             sequence_id=seq_id,
             direction=direction,
             pattern=pattern,
@@ -1088,7 +1170,7 @@ class BleDomain(Registry):
         :return: instance of Triggered
         :rtype: Triggered
         """
-        return BleDomain.bound("triggered", self.proto_version)(
+        return BleDomain.build("triggered", self.proto_version,
             seq_id=seq_id
         )
 
@@ -1100,7 +1182,7 @@ class BleDomain(Registry):
         :return: instance of Trigger
         :rtype: Trigger
         """
-        return BleDomain.bound("trigger", self.proto_version)(
+        return BleDomain.build("trigger", self.proto_version,
             sequence_id=seq_id
         )
 
@@ -1112,7 +1194,7 @@ class BleDomain(Registry):
         :return: instance of DeleteSequence
         :rtype: DeleteSequence
         """
-        return BleDomain.bound("delete_seq", self.proto_version)(
+        return BleDomain.build("delete_seq", self.proto_version,
             sequence_id=seq_id
         )
 
@@ -1136,7 +1218,7 @@ class BleDomain(Registry):
         :type enabled: bool
         :return: instance of `SetEncryption`
         """
-        return BleDomain.bound("encryption", self.proto_version)(
+        return BleDomain.build("encryption", self.proto_version,
             conn_handle=conn_handle,
             enabled=enabled,
             ll_key=ll_key,
@@ -1162,11 +1244,11 @@ from .sniffing import SniffAdv, SniffConnReq, SniffAccessAddress, SniffActiveCon
     AccessAddressDiscovered
 from .jamming import JamAdv, JamAdvChan, JamConn, ReactiveJam
 from .mode import (
-    ScanMode, AdvMode, AdvModeV3, CentralMode, PeriphMode, PeriphModeV3, BleStart, BleStop,
+    ScanMode, AdvMode, CentralMode, PeriphMode, BleStart, BleStop,
     SetEncryption
 )
 from .pdu import SetAdvData, SendBleRawPdu, SendBlePdu, BleAdvPduReceived, BlePduReceived, \
-    BleRawPduReceived, Injected
+    BleRawPduReceived, Injected, SendBleRawPduV3, SendBlePduV3, BleRawPduReceivedV3
 from .connect import ConnectTo, Disconnect, Connected, Disconnected, Synchronized, \
     Desynchronized
 from .hijack import HijackMaster, HijackSlave, HijackBoth, Hijacked
@@ -1194,10 +1276,13 @@ __all__ = [
     "PeriphMode",
     "SetAdvData",
     "SendBleRawPdu",
+    "SendBleRawPduV3",
     "SendBlePdu",
+    "SendBlePduV3",
     "BleAdvPduReceived",
     "BlePduReceived",
     "BleRawPduReceived",
+    "BleRawPduReceivedV3",
     "ConnectTo",
     "Disconnect",
     "Connected",

@@ -66,7 +66,7 @@ class Discovery(Registry):
     def create_info_query(self, proto_ver: int) -> HubMessage:
         """Create a device info query message.
         """
-        return Discovery.bound('info_query', self.proto_version)(
+        return Discovery.build('info_query', self.proto_version,
             proto_ver=proto_ver
         )
 
@@ -76,7 +76,7 @@ class Discovery(Registry):
                               fw_version_rev: int, capabilities: List[int]) -> HubMessage:
         """Create a device info query response message.
         """
-        return Discovery.bound('info_resp', self.proto_version)(
+        return Discovery.build('info_resp', self.proto_version,
             type=type, device_id=device_id, proto_min_ver=proto_min_ver,
             max_speed=max_speed, fw_author=fw_author, fw_url=fw_url,
             fw_version_major=fw_version_major, fw_version_minor=fw_version_minor,
@@ -86,33 +86,33 @@ class Discovery(Registry):
     def create_domain_query(self, domain: int) -> HubMessage:
         """Create a domain info query message.
         """
-        return Discovery.bound('domain_query', self.proto_version)(
+        return Discovery.build('domain_query', self.proto_version,
             domain=domain
         )
 
     def create_domain_resp(self, domain: int, supported_commands: int) -> HubMessage:
         """Create a device info response message
         """
-        return Discovery.bound('domain_resp', self.proto_version)(
+        return Discovery.build('domain_resp', self.proto_version,
             domain=domain, supported_commands=supported_commands
         )
 
     def create_set_speed(self, speed: int) -> HubMessage:
         """Create a speed update message.
         """
-        return Discovery.bound('set_speed', self.proto_version)(
+        return Discovery.build('set_speed', self.proto_version,
             speed=speed
         )
 
     def create_reset_query(self) -> HubMessage:
         """Create a device reset query.
         """
-        return Discovery.bound('reset_query', self.proto_version)()
+        return Discovery.build('reset_query', self.proto_version)
 
     def create_device_ready(self) -> HubMessage:
         """Create a device ready response.
         """
-        return Discovery.bound('ready_resp', self.proto_version)()
+        return Discovery.build('ready_resp', self.proto_version)
 
 from .info import InfoQuery, InfoQueryResp
 from .domain import DomainInfoQuery, DomainInfoQueryResp

@@ -14,10 +14,10 @@ from whad.device.mock import MockDevice
 from whad.exceptions import WhadDeviceDisconnected, WhadDeviceNotReady
 
 from whad.hub.ble.address import SetBdAddress
-from whad.hub.ble.mode import PeriphMode, PeriphModeV3, BleStart, BleStop
+from whad.hub.ble.mode import PeriphMode, BleStart, BleStop
 from whad.hub.ble.connect import Connected
 from whad.hub.ble import BDAddress, Commands, Direction, AdvType, ChannelMap
-from whad.hub.ble.pdu import BlePduReceived, SetAdvData, SendBlePdu, BlePduReceived
+from whad.hub.ble.pdu import BlePduReceived, SetAdvData, SendBlePdu, BlePduReceived, SendBlePduV3
 from whad.hub.generic.cmdresult import Success, Error, WrongMode
 from whad.hub.discovery import Capability, Domain, DeviceType
 from whad.ble.profile.attribute import UUID
@@ -133,7 +133,7 @@ class PeripheralMock(MockDevice):
             self.__conn_handle = randint(1, 100)
 
             # Add a Connected message to the connector received message queue
-            msg = Connected(
+            msg = Connected.build(ProtocolHub.LAST_VERSION,
                 initiator=initiator.value,
                 advertiser=self.__bdaddr.value,
                 access_address=0,
@@ -157,7 +157,7 @@ class PeripheralMock(MockDevice):
         """Convert L2CAP PDUs to a list of BlePduReceived messages."""
         messages = []
         for pdu in pdus:
-            messages.append(BlePduReceived(
+            messages.append(BlePduReceived.build(ProtocolHub.LAST_VERSION,
                 conn_handle=self.__conn_handle,
                 direction=Direction.MASTER_TO_SLAVE,
                 pdu=bytes(pdu),
@@ -280,7 +280,7 @@ class PeripheralMock(MockDevice):
         self.__client.find_by_type_value(start_handle, end_handle, attr_type, attr_value)
         return self.wait_procedure()
 
-    @MockDevice.route(PeriphMode,PeriphModeV3)
+    @MockDevice.route(PeriphMode)
     def on_periph_mode(self, message: PeriphMode):
         """BLE Peripheral mode handler, supports all versions of PeriphMode.
 
@@ -325,7 +325,7 @@ class PeripheralMock(MockDevice):
         """Handle SetBdAddress."""
         return Success()
 
-    @MockDevice.route(SendBlePdu)
+    @MockDevice.route(SendBlePdu, SendBlePduV3)
     def on_send_pdu(self, send_pdu: SendBlePdu) -> Union[HubMessage, List[HubMessage]]:
         """Handle SendPdu command from connector.
 
@@ -340,7 +340,7 @@ class PeripheralMock(MockDevice):
                 # Convert response PDUs into BlePduReceived messages and add them
                 # to the messages sent back to the connector
                 for answer in answers:
-                    result.append(BlePduReceived(
+                    result.append(BlePduReceived.build(ProtocolHub.LAST_VERSION,
                         conn_handle=send_pdu.conn_handle,
                         direction=Direction.MASTER_TO_SLAVE,
                         pdu=bytes(answer),
