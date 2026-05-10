@@ -132,7 +132,6 @@ class BleCsa:
     CSA3B = BleCsa.CSA3b
     CSA3C = BleCsa.CSA3c
 
-
 @dataclass(repr=False)
 class BLEMetadata(Metadata):
     direction : BleDirection = None
