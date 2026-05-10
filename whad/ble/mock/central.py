@@ -17,7 +17,7 @@ from whad.device.mock import MockDevice
 from whad.hub.generic.cmdresult import Success, WrongMode, Error
 from whad.hub.message import HubMessage
 from whad.hub.ble.mode import CentralMode, BleStart, BleStop
-from whad.hub.ble.pdu import BlePduReceived, SendBlePdu
+from whad.hub.ble.pdu import BlePduReceived, SendBlePdu, SendBlePduV3
 from whad.hub.ble.connect import ConnectTo, Connected
 from whad.hub.ble import BDAddress, Commands, Direction
 from whad.hub.discovery import Capability, Domain, DeviceType
@@ -188,7 +188,7 @@ class CentralMock(MockDevice):
 
         # Device found ? "Connect" to this device and send a notification.
         if target is not None:
-            connection_evt = Connected(
+            connection_evt = Connected.build(ProtocolHub.LAST_VERSION,
                 access_address=0,
                 initiator=self.__address.value,
                 advertiser=target.address.value,
@@ -219,7 +219,7 @@ class CentralMock(MockDevice):
         self.__conn_evt_ts = 0
         return Success()
 
-    @MockDevice.route(SendBlePdu)
+    @MockDevice.route(SendBlePdu, SendBlePduV3)
     def on_send_pdu(self, send_pdu: SendBlePdu) -> Union[HubMessage, list[HubMessage]]:
         """Handle SendPdu command from connector.
 
@@ -237,7 +237,7 @@ class CentralMock(MockDevice):
                 # Convert response PDUs into BlePduReceived messages and add them
                 # to the messages sent back to the connector
                 for answer in answers:
-                    result.append(BlePduReceived(
+                    result.append(BlePduReceived.build(ProtocolHub.LAST_VERSION,
                         conn_handle=send_pdu.conn_handle,
                         direction=Direction.SLAVE_TO_MASTER,
                         pdu=bytes(answer),

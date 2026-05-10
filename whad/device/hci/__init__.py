@@ -447,7 +447,6 @@ class Hci(VirtualDevice):
 
 
         except (BrokenPipeError, OSError) as err:
-            print(err)
             logger.error("Error, waiting...")
             sleep(1)
 
@@ -1574,7 +1573,6 @@ class Hci(VirtualDevice):
     def _on_whad_ble_send_pdu(self, message):
         """Send a given PDU into the active connection
         """
-        print("hci::send_pdu")
         # Make sure we have an active connection
         if self.__conn_state == HCIConnectionState.ESTABLISHED:
             logger.debug("[%s] Received WHAD BLE send_pdu message", self.interface)

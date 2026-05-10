@@ -31,9 +31,9 @@ class SetGfskMod(PbMessageWrapper):
 class SetBpskMod(PbMessageWrapper):
     """PHY BPSK modulation message
     """
-    
-    def __init__(self, message: Message = None):
-        super().__init__(message=message)
+
+    def __init__(self, version: int, message: Message = None):
+        super().__init__(version, message=message)
         self.message.phy.mod_bpsk.CopyFrom(SetBPSKModulationCmd())
 
 @pb_bind(PhyDomain, 'mod_qpsk', 1)

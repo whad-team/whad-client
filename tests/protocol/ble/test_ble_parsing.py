@@ -7,17 +7,18 @@ from whad.protocol.ble.ble_pb2 import JamAdvCmd, CentralModeCmd, StartCmd as Ble
 from whad.hub.ble import (
     BleDomain, SetBdAddress, SniffAdv, SniffConnReq, SniffAccessAddress,
     SniffActiveConn, AccessAddressDiscovered, JamAdv, JamAdvChan,JamConn,
-    ScanMode, AdvMode, AdvModeV3, CentralMode, PeriphMode, PeriphModeV3,
+    ScanMode, AdvMode, CentralMode, PeriphMode,
     SetAdvData, SendBleRawPdu, SendBlePdu, BleAdvPduReceived,AddressType,
     BlePduReceived, BleRawPduReceived, ConnectTo, Disconnect, Connected,
     Disconnected, BleStart, BleStop, HijackMaster, HijackSlave, HijackBoth,
     Hijacked, ReactiveJam, Synchronized, Desynchronized, PrepareSequenceManual,
     PrepareSequenceConnEvt, PrepareSequencePattern, Injected, Trigger,
-    Triggered, DeleteSequence, SetEncryption, ChannelMap, BleAdvType
+    Triggered, DeleteSequence, SetEncryption, ChannelMap, BleAdvType,
+    BlePhy, BleCsa, BleRawPduReceivedV3
 )
 
 from .test_ble_hijack import hijack_master, hijack_slave, hijack_both, hijacked
-from .test_ble_pdu import send_ble_pdu, send_ble_raw_pdu, raw_pdu, ble_pdu, ble_adv_pdu, set_adv_data
+from .test_ble_pdu import send_ble_pdu, send_ble_raw_pdu, raw_pdu, ble_pdu, ble_adv_pdu, set_adv_data, raw_pdu_v3
 from .test_ble_prepseq import prep_seq_manual, prep_seq_connevt, prep_seq_reception, ble_trigger, \
     ble_triggered, ble_delete_seq
 
@@ -47,7 +48,7 @@ class TestSetBdAddress(object):
     def test_crafting(self):
         """Check SetBdAddress crafting.
         """
-        msg = SetBdAddress(
+        msg = SetBdAddress.build(1,
             addr_type=AddressType.PUBLIC,
             bd_address=BD_ADDRESS_DEFAULT
         )
@@ -59,7 +60,7 @@ def sniff_adv():
     """Create a SniffAdv protobuf message
     """
     msg = Message()
-    msg.ble.sniff_adv.use_extended_adv = False
+    msg.ble.sniff_adv.use_ext_adv = False
     msg.ble.sniff_adv.channel = 2
     msg.ble.sniff_adv.bd_address = BD_ADDRESS_DEFAULT
     return msg
@@ -74,14 +75,14 @@ class TestSniffAdv(object):
         parsed_obj = SniffAdv.parse(1, sniff_adv)
         assert isinstance(parsed_obj, SniffAdv)
         assert parsed_obj.channel == 2
-        assert parsed_obj.use_extended_adv == False
+        assert parsed_obj.use_ext_adv == False
         assert parsed_obj.bd_address == BD_ADDRESS_DEFAULT
 
     def test_crafting(self):
         """Check SniffAdv crafting.
         """
-        msg = SniffAdv(use_extended_adv=True, channel=37, bd_address=BD_ADDRESS_DEFAULT)
-        assert msg.use_extended_adv == True
+        msg = SniffAdv.build(1, use_ext_adv=True, channel=37, bd_address=BD_ADDRESS_DEFAULT)
+        assert msg.use_ext_adv == True
         assert msg.channel == 37
         assert msg.bd_address == BD_ADDRESS_DEFAULT
 
@@ -113,7 +114,7 @@ class TestSniffConnReq(object):
     def test_crafting(self):
         """Check SniffConnReq message crafting.
         """
-        msg = SniffConnReq(
+        msg = SniffConnReq.build(1,
             show_empty_packets=True,
             show_advertisements=False,
             channel=16,
@@ -146,7 +147,7 @@ class TestSniffAccessAddress(object):
     def test_crafting(self):
         """Check SniffAccessAddress crafting
         """
-        msg = SniffAccessAddress(monitored_channels=bytes([2, 17, 28]))
+        msg = SniffAccessAddress.build(1, monitored_channels=bytes([2, 17, 28]))
         assert msg.monitored_channels == bytes([2, 17, 28])
 
 
@@ -183,7 +184,7 @@ class TestSniffActiveConn(object):
     def test_crafting(self):
         """Check SniffActiveConn crafting
         """
-        msg = SniffActiveConn(
+        msg = SniffActiveConn.build(1,
             access_address=0x12345678,
             crc_init=0xAABBCC,
             channel_map=bytes(range(37)),
@@ -222,7 +223,7 @@ class TestAccessAddressDiscovered(object):
     def test_crafting(self):
         """Check AccessAddressDiscovered crafting
         """
-        msg = AccessAddressDiscovered(
+        msg = AccessAddressDiscovered.build(1,
             access_address=0x99887766,
             rssi=-68,
             timestamp=7890
@@ -267,7 +268,7 @@ class TestJamAdvChan(object):
     def test_crafting(self):
         """Check JamAdvChan crafting
         """
-        msg = JamAdvChan(channel=25)
+        msg = JamAdvChan.build(1, channel=25)
         assert msg.channel == 25
 
 @pytest.fixture
@@ -286,12 +287,40 @@ class TestJamConn(object):
         parsed_obj = JamConn.parse(1, jam_conn)
         assert isinstance(parsed_obj, JamConn)
         assert parsed_obj.access_address == 0x11223344
+        assert parsed_obj.phy == BlePhy.LE_1M
 
     def test_crafting(self):
         """Check JamConn crafting
         """
-        msg = JamConn(access_address=0x99887766)
+        msg = JamConn.build(1, access_address=0x99887766)
         assert msg.access_address == 0x99887766
+
+@pytest.fixture
+def jam_conn_v3():
+    msg = Message()
+    msg.ble.jam_conn.access_address = 0x11223344
+    msg.ble.jam_conn.phy = BlePhy.LE_2M
+    return msg
+
+class TestJamConnV3(object):
+    """Test JamConnV3 message parsing/crafting
+    """
+
+    def test_parsing(self, jam_conn_v3):
+        """Check JamConn parsing
+        """
+        parsed_obj = JamConn.parse(3, jam_conn_v3)
+        assert isinstance(parsed_obj, JamConn)
+        assert parsed_obj.access_address == 0x11223344
+        assert parsed_obj.phy == BlePhy.LE_2M
+
+    def test_crafting(self):
+        """Check JamConn crafting
+        """
+        msg = JamConn.build(3, access_address=0x99887766, phy=BlePhy.LE_1M_CODED)
+        print(msg)
+        assert msg.access_address == 0x99887766
+        assert msg.phy == BlePhy.LE_1M_CODED
 
 @pytest.fixture
 def reactive_jam():
@@ -319,7 +348,7 @@ class TestReactiveJam(object):
     def test_crafting(self):
         """Check ReactiveJam crafting
         """
-        msg = ReactiveJam(channel=3, pattern=b"FOOBAR", position=2)
+        msg = ReactiveJam.build(1, channel=3, pattern=b"FOOBAR", position=2)
         assert msg.channel == 3
         assert msg.pattern == b"FOOBAR"
         assert msg.position == 2
@@ -340,12 +369,40 @@ class TestScanMode(object):
         parsed_obj = ScanMode.parse(1, scan_mode)
         assert isinstance(parsed_obj, ScanMode)
         assert parsed_obj.active == True
+        assert parsed_obj.use_ext_adv == False
 
     def test_crafting(self):
         """Check ScanMode crafting
         """
-        msg = ScanMode(active=False)
+        msg = ScanMode.build(1, active=False)
         assert msg.active == False
+        assert msg.use_ext_adv == False
+
+@pytest.fixture
+def scan_mode_v3():
+    msg = Message()
+    msg.ble.scan_mode.active_scan = True
+    msg.ble.scan_mode.use_ext_adv = True
+    return msg
+
+class TestScanModeV3(object):
+    """Test ScanModeV3 message parsing/crafting
+    """
+
+    def test_parsing(self, scan_mode_v3):
+        """Check ScanMode parsing
+        """
+        parsed_obj = ScanMode.parse(3, scan_mode_v3)
+        assert isinstance(parsed_obj, ScanMode)
+        assert parsed_obj.active == True
+        assert parsed_obj.use_ext_adv == True
+
+    def test_crafting(self):
+        """Check ScanMode crafting
+        """
+        msg = ScanMode.build(3, active=False, use_ext_adv=True)
+        assert msg.active == False
+        assert msg.use_ext_adv == True
 
 @pytest.fixture
 def adv_mode():
@@ -362,24 +419,25 @@ class TestAdvMode(object):
         """Check AdvMode parsing
         """
         parsed_obj = AdvMode.parse(1, adv_mode)
+        print(parsed_obj)
         assert isinstance(parsed_obj, AdvMode)
         assert parsed_obj.adv_data == b'TEST'
         assert parsed_obj.scanrsp_data == b'RESPONSE'
         assert parsed_obj.inter_min == 0x20
-        assert parsed_obj.inter_max == 0x20
+        assert parsed_obj.inter_max == 0x4000
         assert parsed_obj.channel_map == ChannelMap([37, 38, 39]).value
 
     def test_crafting(self):
         """Check AdvMode crafting
         """
-        msg = AdvMode(
+        msg = AdvMode.build(1,
             adv_data=b'HELLOWORLD',
             scanrsp_data=b'FOOBAR'
         )
         assert msg.adv_data == b'HELLOWORLD'
         assert msg.scanrsp_data == b'FOOBAR'
-        assert msg.inter_min == 0x20
-        assert msg.inter_max == 0x20
+        assert msg.inter_min == 0x20        # Default value as defined in AdvMode class
+        assert msg.inter_max == 0x4000      # Default value as defined in AdvMode class
         assert msg.channel_map == ChannelMap([37, 38, 39]).value
 
 @pytest.fixture
@@ -400,8 +458,8 @@ class TestAdvModeV3(object):
     def test_parsing(self, adv_mode_v3):
         """Check AdvMode parsing
         """
-        parsed_obj = AdvModeV3.parse(1, adv_mode_v3)
-        assert isinstance(parsed_obj, AdvModeV3)
+        parsed_obj = AdvMode.parse(3, adv_mode_v3)
+        assert isinstance(parsed_obj, AdvMode)
         assert parsed_obj.adv_data == b'TEST'
         assert parsed_obj.scanrsp_data == b'RESPONSE'
         assert parsed_obj.adv_type == BleAdvType.ADV_NONCONN_IND
@@ -412,7 +470,7 @@ class TestAdvModeV3(object):
     def test_crafting(self):
         """Check AdvMode crafting
         """
-        msg = AdvModeV3(
+        msg = AdvMode.build(3,
             adv_data=b'HELLOWORLD',
             scanrsp_data=b'FOOBAR',
             adv_type=BleAdvType.ADV_IND,
@@ -464,7 +522,7 @@ class TestPeriphMode(object):
     def test_crafting(self):
         """Check PeriphMode crafting
         """
-        msg = PeriphMode(
+        msg = PeriphMode.build(1,
             adv_data=b'HELLOWORLD',
             scanrsp_data=b'FOOBAR'
         )
@@ -472,7 +530,7 @@ class TestPeriphMode(object):
         assert msg.scanrsp_data == b'FOOBAR'
         assert msg.channel_map == ChannelMap([37, 38, 39]).value
         assert msg.inter_min == 0x20
-        assert msg.inter_max == 0x20
+        assert msg.inter_max == 0x4000
 
 @pytest.fixture
 def periph_mode_v3():
@@ -492,8 +550,8 @@ class TestPeriphModeV3(object):
     def test_parsing(self, periph_mode_v3):
         """Check PeriphModeV3 parsing
         """
-        parsed_obj = PeriphModeV3.parse(3, periph_mode_v3)
-        assert isinstance(parsed_obj, PeriphModeV3)
+        parsed_obj = PeriphMode.parse(3, periph_mode_v3)
+        assert isinstance(parsed_obj, PeriphMode)
         assert parsed_obj.adv_data == b'TEST'
         assert parsed_obj.scanrsp_data == b'RESPONSE'
         assert parsed_obj.adv_type == BleAdvType.ADV_NONCONN_IND
@@ -504,7 +562,7 @@ class TestPeriphModeV3(object):
     def test_crafting(self):
         """Check PeriphMode v3 crafting
         """
-        msg = PeriphModeV3(
+        msg = PeriphMode.build(3,
             adv_data=b'HELLOWORLD',
             scanrsp_data=b'FOOBAR',
             adv_type=BleAdvType.ADV_IND,
@@ -542,7 +600,7 @@ def ble_stop():
     """
     msg = Message()
     msg.ble.stop.CopyFrom(BleStopCmd())
-    return msg   
+    return msg
 
 class TestStop(object):
     """Test Stop message parsing/crafting
@@ -584,11 +642,12 @@ class TestConnectTo(object):
         assert parsed_obj.hop_interval == 6
         assert parsed_obj.hop_increment == 22
         assert parsed_obj.crc_init == 0x112233
+        assert parsed_obj.csa == BleCsa.CSA1
 
     def test_crafting(self):
         """Check ConnectTo crafting
         """
-        msg = ConnectTo(
+        msg = ConnectTo.build(1,
             bd_address=BD_ADDRESS_DEFAULT,
             addr_type=AddressType.RANDOM,
             access_address=0x99887766,
@@ -604,6 +663,62 @@ class TestConnectTo(object):
         assert msg.hop_interval == 12
         assert msg.hop_increment == 8
         assert msg.crc_init == 0x424242
+        assert msg.csa == BleCsa.CSA1
+
+@pytest.fixture
+def connect_v3():
+    """Create a BLE connect protocol buffer message (proto v3)
+    """
+    msg = Message()
+    msg.ble.connect.bd_address = BD_ADDRESS_DEFAULT
+    msg.ble.connect.addr_type = AddressType.PUBLIC
+    msg.ble.connect.access_address = 0x11223344
+    msg.ble.connect.channel_map = bytes(range(5))
+    msg.ble.connect.hop_interval = 6
+    msg.ble.connect.hop_increment = 22
+    msg.ble.connect.crc_init = 0x112233
+    msg.ble.connect.csa = BleCsa.CSA2
+    return msg
+
+class TestConnectToV3(object):
+    """Test ConnectToV3 message parsing/crafting
+    """
+
+    def test_parsing(self, connect_v3):
+        """Check ConnectToV3 parsing
+        """
+        parsed_obj = ConnectTo.parse(3, connect_v3)
+        assert isinstance(parsed_obj, ConnectTo)
+        assert parsed_obj.bd_address == BD_ADDRESS_DEFAULT
+        assert parsed_obj.addr_type == AddressType.PUBLIC
+        assert parsed_obj.access_address == 0x11223344
+        assert parsed_obj.channel_map == bytes(range(5))
+        assert parsed_obj.hop_interval == 6
+        assert parsed_obj.hop_increment == 22
+        assert parsed_obj.crc_init == 0x112233
+        assert parsed_obj.csa == BleCsa.CSA2
+
+    def test_crafting(self):
+        """Check ConnectTo crafting
+        """
+        msg = ConnectTo.build(3,
+            bd_address=BD_ADDRESS_DEFAULT,
+            addr_type=AddressType.RANDOM,
+            access_address=0x99887766,
+            channel_map=bytes([1,2,3]),
+            hop_interval=12,
+            hop_increment=8,
+            crc_init=0x424242,
+            csa=BleCsa.CSA2
+        )
+        assert msg.bd_address == BD_ADDRESS_DEFAULT
+        assert msg.addr_type == AddressType.RANDOM
+        assert msg.access_address == 0x99887766
+        assert msg.channel_map == bytes([1,2,3])
+        assert msg.hop_interval == 12
+        assert msg.hop_increment == 8
+        assert msg.crc_init == 0x424242
+        assert msg.csa == BleCsa.CSA2
 
 @pytest.fixture
 def disconnect():
@@ -628,7 +743,7 @@ class TestDisconnect(object):
     def test_crafting(self):
         """Check Disconnect crafting
         """
-        msg = Disconnect(conn_handle=1)
+        msg = Disconnect.build(1, conn_handle=1)
         assert msg.conn_handle == 1
 
 @pytest.fixture
@@ -663,7 +778,7 @@ class TestConnected(object):
     def test_crafting(self):
         """Check Connected crafting
         """
-        msg = Connected(
+        msg = Connected.build(1,
             initiator=BD_ADDRESS_DEFAULT,
             advertiser=BD_ADDRESS_DEFAULT,
             access_address=0x99887766,
@@ -708,7 +823,7 @@ class TestSynchronized(object):
     def test_crafting(self):
         """Check ConnectTo crafting
         """
-        msg = Synchronized(
+        msg = Synchronized.build(1,
             access_address=0x99887766,
             channel_map=bytes([1,2,3]),
             hop_interval=12,
@@ -745,7 +860,7 @@ class TestDisconnected(object):
     def test_crafting(self):
         """Check Disconnected crafting
         """
-        msg = Disconnected(reason=33, conn_handle=5)
+        msg = Disconnected.build(1, reason=33, conn_handle=5)
         assert msg.reason == 33
         assert msg.conn_handle == 5
 
@@ -755,7 +870,7 @@ def desynchronized():
     """
     msg = Message()
     msg.ble.desynchronized.access_address = 0x11223344
-    return msg    
+    return msg
 
 class TestDesynchronized(object):
     """Test Desynchronized message parsing/crafting
@@ -771,7 +886,7 @@ class TestDesynchronized(object):
     def test_crafting(self):
         """Check Desynchronized crafting
         """
-        msg = Desynchronized(access_address=0x99887766)
+        msg = Desynchronized.build(1, access_address=0x99887766)
         assert msg.access_address == 0x99887766
 
 
@@ -801,7 +916,7 @@ class TestInjected(object):
     def test_crafting(self):
         """Check Injected crafting
         """
-        msg = Injected(success=False, access_address=0x99887766, injection_attempts=1)
+        msg = Injected.build(1, success=False, access_address=0x99887766, injection_attempts=1)
         assert msg.success == False
         assert msg.access_address == 0x99887766
         assert msg.injection_attempts == 1
@@ -839,7 +954,7 @@ class TestSetEncryption(object):
     def test_crafting(self):
         """Check SetEncryption message crafting.
         """
-        msg = SetEncryption(
+        msg = SetEncryption.build(1,
             conn_handle=12,
             enabled=False,
             ll_key=b"FOO_LLKEY",
@@ -993,11 +1108,17 @@ class TestBleDomainParsing(object):
         msg = BleDomain.parse(1, ble_pdu)
         assert isinstance(msg, BlePduReceived)
 
-    def test_raw_pdu_parsing(self, raw_pdu):
+    def test_raw_pdu_parsing_v1(self, raw_pdu):
         """Check RawPduReceived message parsing
         """
         msg = BleDomain.parse(1, raw_pdu)
         assert isinstance(msg, BleRawPduReceived)
+
+    def test_raw_pdu_parsingi_v3(self, raw_pdu_v3):
+        """Check RawPduReceived message parsing
+        """
+        msg = BleDomain.parse(3, raw_pdu_v3)
+        assert isinstance(msg, BleRawPduReceivedV3)
 
     def test_connect_parsing(self, connect):
         """Check ConnectTo message parsing

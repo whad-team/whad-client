@@ -77,43 +77,44 @@ class TestCommandResultCrafting(object):
     def test_cmdresult_success(self):
         """Create a Success() object and check result_code.
         """
-        success = Success()
+        success = Success.build(1)
         assert success.result_code == ResultCode.SUCCESS
 
     def test_cmdresult_error(self):
         """Create a Error() object and check result_code.
         """
-        success = Error()
+        success = Error.build(1)
         assert success.result_code == ResultCode.ERROR
 
     def test_cmdresult_param_error(self):
         """Create a ParameterError() object and check result_code.
         """
-        success = ParameterError()
+        success = ParameterError.build(1)
         assert success.result_code == ResultCode.PARAMETER_ERROR
 
     def test_cmdresult_wrong_mode(self):
         """Create a WrongMode() object and check result_code.
         """
-        success = WrongMode()
+        success = WrongMode.build(1)
         assert success.result_code == ResultCode.WRONG_MODE
 
     def test_cmdresult_unsupported_domain(self):
         """Create a UnsupportedDomain() object and check result_code.
         """
-        success = UnsupportedDomain()
+        success = UnsupportedDomain.build(1)
+        print(success)
         assert success.result_code == ResultCode.UNSUPPORTED_DOMAIN
 
     def test_cmdresult_busy(self):
         """Create a Busy() object and check result_code.
         """
-        success = Busy()
+        success = Busy.build(1)
         assert success.result_code == ResultCode.BUSY
 
     def test_cmdresult_disconnected(self):
         """Create a Disconnected() object and check result_code.
         """
-        success = Disconnected()
+        success = Disconnected.build(1)
         assert success.result_code == ResultCode.DISCONNECTED
 
 
@@ -133,7 +134,7 @@ class TestProgress(object):
     def test_progress_crafting(self):
         """Test generic progress message crafting.
         """
-        obj = Progress(value=50)
+        obj = Progress.build(1, value=50)
         assert obj.value == 50
 
 class TestDebug(object):
@@ -154,7 +155,7 @@ class TestDebug(object):
     def test_debug_crafting(self):
         """Test generic debug message crafting.
         """
-        msg = Debug(level=42, msg=b"Hello world !")
+        msg = Debug.build(1, level=42, msg=b"Hello world !")
         assert msg.msg == b"Hello world !"
         assert msg.level == 42
 
@@ -174,7 +175,7 @@ class TestVerbose(object):
     def test_verbose_crafting(self):
         """Test generic verbose message crafting.
         """
-        msg = Verbose(msg=b"This is a test")
+        msg = Verbose.build(1, msg=b"This is a test")
         assert msg.msg == b"This is a test"
 
 
@@ -285,4 +286,4 @@ class TestGeneric(object):
         generic = Generic(1)
         msg = generic.create_progress(10)
         assert isinstance(msg, Progress)
-        
+

@@ -10,7 +10,7 @@ from whad.hub import ProtocolHub
 from whad.hub.message import HubMessage
 from whad.device.mock import MockDevice
 
-from whad.hub.ble.mode import AdvMode, AdvModeV3, BleStart, BleStop
+from whad.hub.ble.mode import AdvMode, BleStart, BleStop
 from whad.hub.ble import BDAddress, Commands, ChannelMap, AdvType
 from whad.hub.ble.pdu import SetAdvData
 from whad.hub.generic.cmdresult import Success, Error, WrongMode, ParameterError
@@ -143,7 +143,7 @@ class AdvertiserMock(MockDevice):
         # Success
         return Success()
 
-    @MockDevice.route(AdvMode, AdvModeV3)
+    @MockDevice.route(AdvMode)
     def on_adv_mode(self, msg: AdvMode):
         """Handle AdvMode message.
 
