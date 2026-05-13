@@ -507,8 +507,8 @@ class LinkLayerProxy:
         """Central event handler
         """
         if isinstance(event, CentralDisconnected):
-            # Central has disconnected, 
-            if self.__peripheral.conn_handle is not None:
+            # Central has disconnected,
+            if self.__peripheral is not None and self.__peripheral.conn_handle is not None:
                 self.__peripheral.disconnect(self.__peripheral.conn_handle)
                 self.__peripheral.wait_disconnection()
                 self.__peripheral.stop()
@@ -914,7 +914,7 @@ class GattProxy:
         """
         if isinstance(event, CentralDisconnected):
             # Central has disconnected, kill peripheral
-            if self.__peripheral.conn_handle is not None:
+            if self.__peripheral is not None and self.__peripheral.conn_handle is not None:
                 self.__peripheral.disconnect(self.__peripheral.conn_handle)
 
             # Reconnect to Central using the already discovered GATT profile
