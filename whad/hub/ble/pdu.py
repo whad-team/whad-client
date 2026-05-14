@@ -63,7 +63,9 @@ class SendBleRawPdu(PbMessageWrapper):
     pdu = PbFieldBytes("ble.send_raw_pdu.pdu")
     crc = PbFieldInt("ble.send_raw_pdu.crc")
     encrypt = PbFieldBool("ble.send_raw_pdu.encrypt")
-    phy = BlePhy.LE_1M
+
+    # Introduced in protocol v3
+    phy = PbFieldInt('ble.send_raw_pdu.phy', min_version=3, default=BlePhy.LE_1M)
 
     @dissect_failsafe
     def to_packet(self):
@@ -77,6 +79,7 @@ class SendBleRawPdu(PbMessageWrapper):
         packet.metadata.encrypt = self.encrypt
         packet.metadata.direction = self.direction
         packet.metadata.raw = True
+        packet.metadata.phy = self.phy
 
         return packet
 
@@ -98,50 +101,6 @@ class SendBleRawPdu(PbMessageWrapper):
             return None
 
         return SendBleRawPdu.build(1,
-            direction=direction,
-            pdu=pdu,
-            conn_handle=connection_handle,
-            access_address=BTLE(raw(packet)).access_addr,
-            crc=BTLE(raw(packet)).crc,
-            encrypt=encrypt
-        )
-
-@pb_bind(BleDomain, "send_raw_pdu", 3)
-class SendBleRawPduV3(SendBleRawPdu):
-    """BLE send raw PDU message class
-    """
-    phy = PbFieldBool('ble.send_raw_pdu.phy', True)
-
-    @dissect_failsafe
-    def to_packet(self):
-        """Convert message to the corresponding Scapy packet
-        """
-        # Use the previous version conversion method and add phy
-        # to packet's metadata structure.
-        packet = super().to_packet()
-        if self.phy is not None and BlePhy.check(self.phy):
-            packet.metadata.phy = self.phy
-
-        return packet
-
-    @staticmethod
-    def from_packet(packet, encrypt=False):
-        """Convert packet to SendRawBlePduV3 message.
-        """
-        direction = packet.metadata.direction
-        connection_handle = packet.metadata.connection_handle
-
-        # Extract PDU
-        if BTLE_DATA in packet:
-            pdu = raw(packet[BTLE_DATA:])
-        elif BTLE_CTRL in packet:
-            pdu = raw(packet[BTLE_CTRL:])
-        elif BTLE_ADV in packet:
-            pdu = raw(packet[BTLE_ADV:])
-        else:
-            return None
-
-        return SendBleRawPduV3.build(3,
             direction=direction,
             pdu=pdu,
             conn_handle=connection_handle,
@@ -204,51 +163,6 @@ class SendBlePdu(PbMessageWrapper):
             encrypt=encrypt,
             phy=packet.metadata.phy
         )
-
-@pb_bind(BleDomain, "send_pdu", 3)
-class SendBlePduV3(SendBlePdu):
-    """BLE send PDU message class
-    """
-    phy = PbFieldBool("ble.send_pdu.phy", True)
-
-    @dissect_failsafe
-    def to_packet(self):
-        """Convert message to the corresponding Scapy packet
-        """
-        packet = super().to_packet()
-
-        # Set packet metadata's phy
-        if BlePhy.check(self.phy):
-            packet.metadata.phy = self.phy
-
-        return packet
-
-    @staticmethod
-    def from_packet(packet, encrypt=False):
-        """Convert packet to SendBlePduV3 message.
-        """
-        direction = packet.metadata.direction
-        connection_handle = packet.metadata.connection_handle
-
-        # Extract PDU
-        if BTLE_DATA in packet:
-            pdu = packet_to_bytes(packet[BTLE_DATA:])
-        elif BTLE_CTRL in packet:
-            pdu = packet_to_bytes(packet[BTLE_CTRL:])
-        elif BTLE_ADV in packet:
-            pdu = packet_to_bytes(packet[BTLE_ADV:])
-        else:
-            return None
-
-        # Create a SendPdu message
-        return SendBlePduV3(3,
-            direction=direction,
-            conn_handle=connection_handle,
-            pdu=pdu,
-            encrypt=encrypt,
-            phy=packet.metadata.phy
-        )
-
 
 @pb_bind(BleDomain, "adv_pdu", 1)
 class BleAdvPduReceived(PbMessageWrapper):
