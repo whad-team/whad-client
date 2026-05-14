@@ -18,7 +18,7 @@ from whad.hub.ble import (
 )
 
 from .test_ble_hijack import hijack_master, hijack_slave, hijack_both, hijacked
-from .test_ble_pdu import send_ble_pdu, send_ble_raw_pdu, raw_pdu, ble_pdu, ble_adv_pdu, set_adv_data, raw_pdu_v3
+from .test_ble_pdu import send_ble_pdu, send_ble_pdu_v3, send_ble_raw_pdu, send_ble_raw_pdu_v3, ble_pdu, ble_adv_pdu, set_adv_data, raw_pdu, raw_pdu_v3
 from .test_ble_prepseq import prep_seq_manual, prep_seq_connevt, prep_seq_reception, ble_trigger, \
     ble_triggered, ble_delete_seq
 
@@ -1084,16 +1084,28 @@ class TestBleDomainParsing(object):
         msg = BleDomain.parse(1, set_adv_data)
         assert isinstance(msg, SetAdvData)
 
-    def test_send_raw_pdu_parsing(self, send_ble_raw_pdu):
+    def test_send_raw_pdu_parsing_v1(self, send_ble_raw_pdu):
         """Check SendRawPdu message parsing
         """
         msg = BleDomain.parse(1, send_ble_raw_pdu)
         assert isinstance(msg, SendBleRawPdu)
 
-    def test_send_pdu_parsing(self, send_ble_pdu):
+    def test_send_raw_pdu_parsing_v3(self, send_ble_raw_pdu_v3):
+        """Check SendRawPdu message parsing
+        """
+        msg = BleDomain.parse(3, send_ble_raw_pdu_v3)
+        assert isinstance(msg, SendBleRawPdu)
+
+    def test_send_pdu_parsing_v1(self, send_ble_pdu):
         """Check SendPdu message parsing
         """
         msg = BleDomain.parse(1, send_ble_pdu)
+        assert isinstance(msg, SendBlePdu)
+
+    def test_send_pdu_parsing_v3(self, send_ble_pdu_v3):
+        """Check SendPdu message parsing
+        """
+        msg = BleDomain.parse(3, send_ble_pdu_v3)
         assert isinstance(msg, SendBlePdu)
 
     def test_adv_pdu_parsing(self, ble_adv_pdu):
@@ -1114,7 +1126,7 @@ class TestBleDomainParsing(object):
         msg = BleDomain.parse(1, raw_pdu)
         assert isinstance(msg, BleRawPduReceived)
 
-    def test_raw_pdu_parsingi_v3(self, raw_pdu_v3):
+    def test_raw_pdu_parsing_v3(self, raw_pdu_v3):
         """Check RawPduReceived message parsing
         """
         msg = BleDomain.parse(3, raw_pdu_v3)
