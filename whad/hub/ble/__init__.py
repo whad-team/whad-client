@@ -1235,7 +1235,7 @@ from .mode import (
     SetEncryption
 )
 from .pdu import SetAdvData, SendBleRawPdu, SendBlePdu, BleAdvPduReceived, BlePduReceived, \
-    BleRawPduReceived, Injected, SendBleRawPduV3, SendBlePduV3, BleRawPduReceivedV3
+    BleRawPduReceived, Injected, BleRawPduReceivedV3
 from .connect import ConnectTo, Disconnect, Connected, Disconnected, Synchronized, \
     Desynchronized
 from .hijack import HijackMaster, HijackSlave, HijackBoth, Hijacked
@@ -1263,9 +1263,7 @@ __all__ = [
     "PeriphMode",
     "SetAdvData",
     "SendBleRawPdu",
-    "SendBleRawPduV3",
     "SendBlePdu",
-    "SendBlePduV3",
     "BleAdvPduReceived",
     "BlePduReceived",
     "BleRawPduReceived",

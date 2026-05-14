@@ -12,7 +12,7 @@ from whad.hub.ble import BleDomain, SetBdAddress, SniffAdv, SniffConnReq, \
     BleStart, BleStop, HijackMaster, HijackSlave, HijackBoth, Hijacked, ReactiveJam, \
     Synchronized, Desynchronized, PrepareSequenceManual, PrepareSequenceConnEvt, \
     PrepareSequencePattern, Injected, Direction, AdvType, Triggered, Trigger, DeleteSequence, \
-    SetEncryption, SendBleRawPduV3, BleRawPduReceivedV3
+    SetEncryption, BleRawPduReceivedV3
 
 from whad.hub.ble import BleCsa, BlePhy
 from whad.hub.ble.bdaddr import BDAddress
@@ -308,15 +308,26 @@ class TestBleDomainFactory(object):
             conn_handle=1,
             phy=BlePhy.LE_2M
         )
-        assert isinstance(obj, SendBleRawPduV3)
+        assert isinstance(obj, SendBleRawPdu)
 
-    def test_SendPdu(self, factory: BleDomain):
+    def test_SendPdu_v1(self, factory: BleDomain):
         """Test creation of SendBlePdu message
         """
         obj = factory.create_send_pdu(
             Direction.MASTER_TO_SLAVE,
             b"HELLOWORLD",
             1
+        )
+        assert isinstance(obj, SendBlePdu)
+
+    def test_SendPdu_v3(self, factory_v3: BleDomain):
+        """Test creation of SendBlePdu message
+        """
+        obj = factory_v3.create_send_pdu(
+            Direction.MASTER_TO_SLAVE,
+            b"HELLOWORLD",
+            1,
+            phy=BlePhy.LE_2M
         )
         assert isinstance(obj, SendBlePdu)
 

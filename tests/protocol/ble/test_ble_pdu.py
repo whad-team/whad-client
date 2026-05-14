@@ -6,7 +6,7 @@ from whad.protocol.whad_pb2 import Message
 from whad.hub.message import AbstractPacket
 from whad.hub.ble import SendBleRawPdu, Direction, SendBlePdu, BleAdvPduReceived, \
     AdvType, AddressType, BlePduReceived, BleRawPduReceived, SetAdvData, \
-    BlePhy, SendBleRawPduV3, BleRawPduReceivedV3
+    BlePhy, BleRawPduReceivedV3
 
 BD_ADDRESS_DEFAULT = bytes([0x11, 0x22, 0x33, 0x44, 0x55, 0x66])
 
@@ -109,8 +109,8 @@ class TestSendRawPduV3(object):
     def test_parsing(self, send_ble_raw_pdu_v3):
         """Check SendBleRawPdu parsing
         """
-        parsed_obj = SendBleRawPduV3.parse(3, send_ble_raw_pdu_v3)
-        assert isinstance(parsed_obj, SendBleRawPduV3)
+        parsed_obj = SendBleRawPdu.parse(3, send_ble_raw_pdu_v3)
+        assert isinstance(parsed_obj, SendBleRawPdu)
         assert parsed_obj.direction == Direction.MASTER_TO_SLAVE
         assert parsed_obj.conn_handle == 1
         assert parsed_obj.access_address == 0x11223344
@@ -128,7 +128,8 @@ class TestSendRawPduV3(object):
             access_address=0x99887766,
             pdu=b"FOOBAR",
             crc=0xAABBCC,
-            encrypt=True
+            encrypt=True,
+            phy=BlePhy.LE_1M_CODED
         )
         assert msg.direction == Direction.SLAVE_TO_MASTER
         assert msg.conn_handle == 2
@@ -136,6 +137,7 @@ class TestSendRawPduV3(object):
         assert msg.pdu == b"FOOBAR"
         assert msg.crc == 0xAABBCC
         assert msg.encrypt == True
+        assert msg.phy == BlePhy.LE_1M_CODED
 
 @pytest.fixture
 def send_ble_pdu():
@@ -175,6 +177,49 @@ class TestSendPdu(object):
         assert msg.conn_handle == 2
         assert msg.pdu == b"FOOBAR"
         assert msg.encrypt == True
+
+@pytest.fixture
+def send_ble_pdu_v3():
+    """Create a send_ble_pdu protocol buffer message.
+    """
+    msg = Message()
+    msg.ble.send_pdu.direction = Direction.MASTER_TO_SLAVE
+    msg.ble.send_pdu.conn_handle = 1
+    msg.ble.send_pdu.pdu = b"HELLOWORLD"
+    msg.ble.send_pdu.encrypt = False
+    msg.ble.send_pdu.phy = BlePhy.LE_2M
+    return msg
+
+class TestSendPduV3(object):
+    """Test SendPdu v3 message parsing/crafting
+    """
+
+    def test_parsing(self, send_ble_pdu_v3):
+        """Check SendBlePdu parsing
+        """
+        parsed_obj = SendBlePdu.parse(3, send_ble_pdu_v3)
+        assert isinstance(parsed_obj, SendBlePdu)
+        assert parsed_obj.direction == Direction.MASTER_TO_SLAVE
+        assert parsed_obj.conn_handle == 1
+        assert parsed_obj.pdu == b"HELLOWORLD"
+        assert parsed_obj.encrypt == False
+        assert parsed_obj.phy == BlePhy.LE_2M
+
+    def test_crafting(self):
+        """Check SendPdu crafting
+        """
+        msg = SendBlePdu.build(3,
+            direction=Direction.SLAVE_TO_MASTER,
+            conn_handle=2,
+            pdu=b"FOOBAR",
+            encrypt=True,
+            phy=BlePhy.LE_1M_CODED
+        )
+        assert msg.direction == Direction.SLAVE_TO_MASTER
+        assert msg.conn_handle == 2
+        assert msg.pdu == b"FOOBAR"
+        assert msg.encrypt == True
+        assert msg.phy == BlePhy.LE_1M_CODED
 
 
 @pytest.fixture
