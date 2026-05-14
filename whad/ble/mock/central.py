@@ -17,7 +17,7 @@ from whad.device.mock import MockDevice
 from whad.hub.generic.cmdresult import Success, WrongMode, Error
 from whad.hub.message import HubMessage
 from whad.hub.ble.mode import CentralMode, BleStart, BleStop
-from whad.hub.ble.pdu import BlePduReceived, SendBlePdu, SendBlePduV3
+from whad.hub.ble.pdu import BlePduReceived, SendBlePdu
 from whad.hub.ble.connect import ConnectTo, Connected
 from whad.hub.ble import BDAddress, Commands, Direction
 from whad.hub.discovery import Capability, Domain, DeviceType
@@ -219,7 +219,7 @@ class CentralMock(MockDevice):
         self.__conn_evt_ts = 0
         return Success()
 
-    @MockDevice.route(SendBlePdu, SendBlePduV3)
+    @MockDevice.route(SendBlePdu)
     def on_send_pdu(self, send_pdu: SendBlePdu) -> Union[HubMessage, list[HubMessage]]:
         """Handle SendPdu command from connector.
 

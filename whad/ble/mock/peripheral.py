@@ -17,7 +17,7 @@ from whad.hub.ble.address import SetBdAddress
 from whad.hub.ble.mode import PeriphMode, PeriphModeV3, BleStart, BleStop
 from whad.hub.ble.connect import Connected
 from whad.hub.ble import BDAddress, Commands, Direction, AdvType, ChannelMap
-from whad.hub.ble.pdu import BlePduReceived, SetAdvData, SendBlePdu, BlePduReceived, SendBlePduV3
+from whad.hub.ble.pdu import BlePduReceived, SetAdvData, SendBlePdu, BlePduReceived
 from whad.hub.generic.cmdresult import Success, Error, WrongMode
 from whad.hub.discovery import Capability, Domain, DeviceType
 from whad.ble.profile.attribute import UUID
@@ -325,7 +325,7 @@ class PeripheralMock(MockDevice):
         """Handle SetBdAddress."""
         return Success()
 
-    @MockDevice.route(SendBlePdu, SendBlePduV3)
+    @MockDevice.route(SendBlePdu)
     def on_send_pdu(self, send_pdu: SendBlePdu) -> Union[HubMessage, List[HubMessage]]:
         """Handle SendPdu command from connector.
 

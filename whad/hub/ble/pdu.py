@@ -104,7 +104,9 @@ class SendBleRawPdu(PbMessageWrapper):
     pdu = PbFieldBytes("ble.send_raw_pdu.pdu")
     crc = PbFieldInt("ble.send_raw_pdu.crc")
     encrypt = PbFieldBool("ble.send_raw_pdu.encrypt")
-    phy = BlePhy.LE_1M
+
+    # Introduced in protocol v3
+    phy = PbFieldInt('ble.send_raw_pdu.phy', min_version=3, default=BlePhy.LE_1M)
 
     # Introduced in protocol v3
     phy = PbFieldInt('ble.send_raw_pdu.phy', min_version=3, default=BlePhy.LE_1M)
