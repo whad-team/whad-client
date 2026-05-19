@@ -76,6 +76,32 @@ class AdvMode(PbMessageWrapper):
             else:
                 yield ExtAdvPdu(pdu.adv_data)
 
+@pb_bind(BleDomain, 'ext_adv_mode', 3)
+class ExtAdvMode(PbMessageWrapper):
+    """Ble extended advertising mode message class
+    """
+    channel_map = PbFieldBytes('ble.ext_adv_mode.channel_map')
+    inter_min = PbFieldInt('ble.ext_adv_mode.inter_min')
+    inter_max = PbFieldInt('ble.ext_adv_mode.inter_max')
+    csa = PbFieldInt('ble.ext_adv_mode.csa')
+    ext_pdus = PbFieldArray('ble.ext_adv_mode.ext_pdus')
+
+    def add_pdu(self, header_len: int, adv_mode: int, header: bytes, adv_data: bytes):
+        """Add an extended PDU to advertise on secondary channels."""
+        ext_pdu = self.message.ble.ext_adv_mode.ext_pdus.add()
+        ext_pdu.header_len = header_len
+        ext_pdu.adv_mode = adv_mode
+        ext_pdu.header = header
+        ext_pdu.adv_data = adv_data
+
+    def get_pdu(self, index: int):
+        if index >= 0 and index < len(self.ext_pdus):
+            return self.ext_pdus[index]
+        return None
+
+    def pdus(self):
+        yield from self.ext_pdus
+
 @pb_bind(BleDomain, 'central_mode', 1)
 class CentralMode(PbMessageWrapper):
     """BLE advertising mode message class
