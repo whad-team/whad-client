@@ -84,9 +84,9 @@ class Commands:
     TriggerSequence = 0x19
     DeleteSequence = 0x1a
     SetPhy = 0x1b;
-    SetSupportedPhys = 0x1c;
-    SetTxPowerLevel = 0x1d;
-
+    SetSupportedPhys = 0x1c
+    SetTxPowerLevel = 0x1d
+    SetExtAdvPdus = 0x1e
 
 class Direction:
     """BLE PDU direction
@@ -131,6 +131,34 @@ class BleCsa:
     CSA3A = BleCsa.CSA3a
     CSA3B = BleCsa.CSA3b
     CSA3C = BleCsa.CSA3c
+
+class ExtAdvPdu:
+    """Ble Extended Advertising PDU."""
+    def __init__(self, header_len: int, adv_mode: int, header: bytes, adv_data: bytes):
+        self.__header_len = header_len & 0x3F # 6-bit field
+        self.__adv_mode = adv_mode & 0x3 # 2-bit field
+        self.__header = header
+        self.__adv_data = adv_data
+
+    @property
+    def header_len(self) -> int:
+        """Header length."""
+        return self.__header_len
+
+    @property
+    def adv_mode(self) -> int:
+        """Advertising mode."""
+        return self.__adv_mode
+
+    @property
+    def header(self) -> bytes:
+        """Header payload."""
+        return self.__header
+
+    @property
+    def adv_data(self) -> bytes:
+        """Advertising Data."""
+        return self.__adv_data
 
 @dataclass(repr=False)
 class BLEMetadata(Metadata):
@@ -323,6 +351,29 @@ class BleDomain(Registry):
             bd_address=bd_address.value,
             addr_type=AddressType.PUBLIC if bd_address.is_public() else AddressType.RANDOM
         )
+
+    def create_set_phy(self, tx_phy: int, rx_phy: int) -> HubMessage:
+        """Create a SetPhy message.
+
+        :param tx_phy: TX PHY, one of BlePhy enum.
+        :type  tx_phy: int
+        :param rx_phy: RX PHY, one of BlePhy enum.
+        :type  rx_phy: int
+        :return: SetPhy message
+        :rtype: HubMessage
+        """
+        return BleDomain.build('set_phy', self.proto_version,
+                               tx_phy=tx_phy, rx_phy=rx_phy)
+
+    def create_set_tx_power_level(self, level: int) -> HubMessage:
+        """Create a SetTxPowerLevel message.
+
+        :param level: TX power level in dBm
+        :type  level: int
+        :return: SetTxPowerLevel message
+        :rtype: HubMessage
+        """
+        return BleDomain.build('set_tx_pwr', self.proto_version, level=level)
 
     def create_sniff_adv(self, channel: int, bd_address: Optional[BDAddress] = None,
                        use_ext_adv: bool = False) -> HubMessage:
@@ -517,7 +568,7 @@ class BleDomain(Registry):
                         adv_type: BleAdvType = BleAdvType.ADV_IND,
                         channel_map: Optional[ChannelMap] =  None,
                         inter_min: int = 0x20, inter_max: int = 0x4000,
-                        csa: int = BleCsa.CSA1) -> HubMessage:
+                        csa: int = BleCsa.CSA1, ext_pdus: Optional[List[ExtAdvPdu]] = None) -> HubMessage:
         """Create an AdvMode message.
 
         :param adv_data: Advertisement data (31 bytes max)
@@ -542,8 +593,19 @@ class BleDomain(Registry):
         if scanrsp_data is not None:
             message.scanrsp_data = scanrsp_data
 
-        # Set advertisement type and interval range
-        message.adv_type = adv_type
+        # If protocol version >= 3 and ext_pdus is not None, switch to extended advertising
+        if self.proto_version >= 3 and ext_pdus is not None:
+            message.adv_type = AdvType.ADV_EXT_IND
+            for pdu in ext_pdus:
+                if isinstance(pdu, ExtAdvPdu):
+                    message.add_pdu(pdu)
+                else:
+                    raise ValueError()
+        else:
+            # Set advertisement type
+            message.adv_type = adv_type
+
+        # Set interval range
         if inter_min not in range(0x20, 0x4001):
             logger.error("create_adv_mode: invalid minimal interval value, must be in range 0x20 ... 0x4000.")
             raise ValueError()
@@ -571,6 +633,70 @@ class BleDomain(Registry):
         # Return generated message
         return message
 
+    def create_ext_adv_mode(self, channel_map: Optional[ChannelMap] =  None,
+                        inter_min: int = 0x20, inter_max: int = 0x4000,
+                            csa: int = BleCsa.CSA1, pdus: Optional[List[ExtAdvPdu]] = None) -> HubMessage:
+        """Create a AdvMode message using extended advertising.
+
+        :param channel_map: Channel map to use for primary advertising.
+        :type  channel_map: ChannelMap
+        :param inter_min: Minimum advertising interval
+        :type  inter_min: int
+        :param inter_max: Maximum advertising interval
+        :type  inter_max: int
+        :param csa: Channel Selection Algorithm to use (BleCsa.CSA1 or BleCsa.CSA2)
+        :type  csa: int
+        :param pdus: Extended Advertising PDUs
+        :type  pdus: list
+        """
+        # If hardware does not support this feature, report it to user
+        if self.proto_version < 3:
+            logger.warning("[core::hub::ble] Extended advertising mode requested, not supported by hardware!")
+            logger.warning("[core::hub::ble] Falling back to legacy advertising.")
+
+        # Create message
+        message = BleDomain.build('adv_mode', self.proto_version, adv_type=BleAdvType.ADV_EXT_IND)
+
+        # Set CSA
+        if csa in [BleCsa.CSA1, BleCsa.CSA2]:
+            message.csa = csa
+        else:
+            logger.error("create_ext_adv_mode: invalid CSA, must be CSA1 or CSA2.")
+            raise ValueError()
+
+        # Set interval values
+        if inter_min not in range(0x20, 0x4001):
+            logger.error("create_ext_adv_mode: invalid minimal interval value, must be in range 0x20 ... 0x4000.")
+            raise ValueError()
+        if inter_max not in range(0x20, 0x4001):
+            logger.error("create_ext_adv_mode: invalid maximal interval value, must be in range 0x20 ... 0x4000.")
+            raise ValueError()
+        if inter_min > inter_max:
+            logger.error("create_ext_adv_mode: invalid `inter_min` value, must be lower or equal to interval max.")
+            raise ValueError()
+        if inter_max < inter_max:
+            logger.error("create_ext_adv_mode: invalid `inter_max` value, must be greater or equal to interval min.")
+            raise ValueError()
+        message.inter_min = inter_min
+        message.inter_max = inter_max
+
+        # Check specified channels and build channel map
+        if channel_map is None:
+            channel_map = ChannelMap([37, 38, 39])
+        else:
+            channel_map.filter(lambda x: x in (37, 38, 39))
+            if len(channel_map) == 0:
+                raise ValueError()
+        message.channel_map = channel_map.value
+
+        # Add PDUs if any
+        if pdus is not None:
+            for pdu in pdus:
+                message.add_pdu(pdu)
+
+        # Success
+        return message
+
     def create_central_mode(self) -> HubMessage:
         """Create a CentralMode message.
 
@@ -580,7 +706,8 @@ class BleDomain(Registry):
         return BleDomain.build('central_mode', self.proto_version)
 
     def create_periph_mode(self, adv_data: bytes, scan_rsp: Optional[bytes] = None, adv_type: BleAdvType = BleAdvType.ADV_IND,
-                           channel_map: Optional[ChannelMap] = None, inter_min: int = 0x20, inter_max: int = 0x4000) -> HubMessage:
+                           channel_map: Optional[ChannelMap] = None, inter_min: int = 0x20, inter_max: int = 0x4000,
+                           ext_pdus: Optional[List[ExtAdvPdu]] = None) -> HubMessage:
         """Create an PeriphMode message.
 
         :param adv_data: Advertisement data (31 bytes max)
@@ -595,17 +722,39 @@ class BleDomain(Registry):
         :type  inter_min: int, optional
         :param inter_max: Maximum interval value for advertising (inter_min <= value <= 0x4000)
         :return: instance of PeriphMode message
+        :param ext_pdus: Extended Advertising PDUs
+        :type  ext_pdus: list
         :rtype: PeriphMode
         """
         message = BleDomain.build('periph_mode', self.proto_version)
 
-        if adv_data is not None:
-            message.adv_data = adv_data
-        if scan_rsp is not None:
-            message.scanrsp_data = scan_rsp
+        # Set advertising data (legacy) and extended advertising PDUs
+        if ext_pdus is None or self.proto_version < 3:
+            if self.proto_version < 3 and ext_pdus is not None:
+                # Fallback to legacy advertising
+                logger.warning("[core::hub::ble] Extended advertising requested for PeripheralMode, not supported by hardware!")
+                logger.warning("[core::hub::ble] Falling back to legacy advertising.")
 
-        # Set advertisement type and interval range
-        message.adv_type = adv_type
+            # Set legacy advertising data
+            if adv_data is not None:
+                message.adv_data = adv_data
+            if scan_rsp is not None:
+                message.scanrsp_data = scan_rsp
+
+            # Set advertisement type
+            message.adv_type = adv_type
+        else:
+            # Enabling extended advertising
+            message.adv_type = AdvType.ADV_EXT_IND
+
+            # Extended advertising is supported, set PDUs
+            for pdu in ext_pdus:
+                if isinstance(pdu, ExtAdvPdu):
+                    message.add_pdu(pdu)
+                else:
+                    raise ValueError()
+
+        # Set interval range
         if inter_min not in range(0x20, 0x4001):
             logger.error("create_periph_mode: invalid minimal interval value, must be in range 0x20 ... 0x4000.")
             raise ValueError()
@@ -1232,10 +1381,10 @@ from .sniffing import SniffAdv, SniffConnReq, SniffAccessAddress, SniffActiveCon
 from .jamming import JamAdv, JamAdvChan, JamConn, ReactiveJam
 from .mode import (
     ScanMode, AdvMode, CentralMode, PeriphMode, BleStart, BleStop,
-    SetEncryption
+    SetEncryption, SetPhy, SetTxPowerLevel
 )
 from .pdu import SetAdvData, SendBleRawPdu, SendBlePdu, BleAdvPduReceived, BlePduReceived, \
-    BleRawPduReceived, Injected, BleRawPduReceivedV3
+    BleRawPduReceived, Injected
 from .connect import ConnectTo, Disconnect, Connected, Disconnected, Synchronized, \
     Desynchronized
 from .hijack import HijackMaster, HijackSlave, HijackBoth, Hijacked
@@ -1267,7 +1416,6 @@ __all__ = [
     "BleAdvPduReceived",
     "BlePduReceived",
     "BleRawPduReceived",
-    "BleRawPduReceivedV3",
     "ConnectTo",
     "Disconnect",
     "Connected",
@@ -1288,5 +1436,9 @@ __all__ = [
     "PrepareSequence",
     "Triggered",
     "Trigger",
-    "DeleteSequence"
+    "DeleteSequence",
+
+    ## introduced in version 3
+    "SetPhy",
+    "SetTxPowerLevel",
 ]
