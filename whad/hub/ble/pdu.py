@@ -276,7 +276,7 @@ class BleRawPduReceived(PbMessageWrapper):
     decrypted = PbFieldBool("ble.raw_pdu.decrypted")
 
     # Introduced in protocol v3
-    phy = BlePhy.LE_1M
+    phy = PbFieldInt('ble.raw_pdu.phy', min_version=3, default=BlePhy.LE_1M)
 
     @dissect_failsafe
     def to_packet(self):
@@ -293,7 +293,7 @@ class BleRawPduReceived(PbMessageWrapper):
         packet.metadata.raw = True
 
         # In versions < 3, phy defaults to LE_1M
-        packet.metadata.phy = BlePhy.LE_1M
+        packet.metadata.phy = self.phy
 
         if self.rssi is not None:
             packet.metadata.rssi = self.rssi
@@ -323,58 +323,6 @@ class BleRawPduReceived(PbMessageWrapper):
                 return None
 
             return BleRawPduReceived.build(1,
-                pdu=pdu,
-                access_address=BTLE(raw(packet)).access_addr,
-                crc=BTLE(raw(packet)).crc,
-                direction=packet.metadata.direction,
-                conn_handle=packet.metadata.connection_handle,
-                channel=packet.metadata.channel,
-                rssi=packet.metadata.rssi,
-                timestamp=packet.metadata.timestamp,
-                crc_validity=packet.metadata.is_crc_valid,
-                relative_timestamp=packet.metadata.relative_timestamp,
-                decrypted=packet.metadata.decrypted,
-                processed=packet.metadata.processed
-            )
-
-        return None
-
-@pb_bind(BleDomain, "raw_pdu", 3)
-class BleRawPduReceivedV3(BleRawPduReceived):
-    """BLE raw PDU received message class
-    """
-    phy = PbFieldInt("ble.raw_pdu.phy")
-
-    @dissect_failsafe
-    def to_packet(self):
-        """Convert message into its corresponding Scapy packet
-        """
-        packet = super().to_packet()
-
-        # Populate metadata's phy
-        if BlePhy.check(self.phy):
-            packet.metadata.phy = self.phy
-
-        # Return packet
-        return packet
-
-    @staticmethod
-    def from_packet(packet):
-        """Create message from Scapy packet
-        """
-
-        if BTLE in packet:
-            # Extract PDU
-            if BTLE_DATA in packet:
-                pdu = raw(packet[BTLE_DATA:])
-            elif BTLE_CTRL in packet:
-                pdu = raw(packet[BTLE_CTRL:])
-            elif BTLE_ADV in packet:
-                pdu = raw(packet[BTLE_ADV:])
-            else:
-                return None
-
-            return BleRawPduReceivedV3.build(3,
                 pdu=pdu,
                 access_address=BTLE(raw(packet)).access_addr,
                 crc=BTLE(raw(packet)).crc,

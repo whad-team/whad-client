@@ -5,7 +5,7 @@ from typing import Optional, Tuple
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.ble.ble_pb2 import CentralModeCmd, StartCmd as BleStartCmd, StopCmd as BleStopCmd
 from whad.hub.message import pb_bind, PbFieldBytes, PbMessageWrapper, PbFieldBool, PbFieldInt, PbFieldArray
-from whad.hub.ble import BleDomain, BleAdvType, ChannelMap, BleCsa
+from whad.hub.ble import BleDomain, BleAdvType, ChannelMap, BleCsa, ExtAdvPdu
 
 @pb_bind(BleDomain, 'scan_mode', 1)
 class ScanMode(PbMessageWrapper):
@@ -29,24 +29,15 @@ class AdvMode(PbMessageWrapper):
     inter_min = PbFieldInt('ble.adv_mode.inter_min', min_version=3, default=0x20)
     inter_max = PbFieldInt('ble.adv_mode.inter_max', min_version=3, default=0x4000)
     csa = PbFieldInt('ble.adv_mode.csa', min_version=3, default=BleCsa.CSA1)
+    ext_pdus = PbFieldArray('ble.adv_mode.ext_pdus', min_version=3, default=[])
 
-@pb_bind(BleDomain, 'ext_adv_mode', 3)
-class ExtAdvMode(PbMessageWrapper):
-    """Ble extended advertising mode message class
-    """
-    channel_map = PbFieldBytes('ble.ext_adv_mode.channel_map')
-    inter_min = PbFieldInt('ble.ext_adv_mode.inter_min')
-    inter_max = PbFieldInt('ble.ext_adv_mode.inter_max')
-    csa = PbFieldInt('ble.ext_adv_mode.csa')
-    ext_pdus = PbFieldArray('ble.ext_adv_mode.ext_pdus')
-
-    def add_pdu(self, header_len: int, adv_mode: int, header: bytes, adv_data: bytes):
+    def add_pdu(self, pdu: ExtAdvPdu):
         """Add an extended PDU to advertise on secondary channels."""
-        ext_pdu = self.message.ble.ext_adv_mode.ext_pdus.add()
-        ext_pdu.header_len = header_len
-        ext_pdu.adv_mode = adv_mode
-        ext_pdu.header = header
-        ext_pdu.adv_data = adv_data
+        ext_pdu = self.message.ble.adv_mode.ext_pdus.add()
+        ext_pdu.header_len = pdu.header_len
+        ext_pdu.adv_mode = pdu.adv_mode
+        ext_pdu.header = pdu.header
+        ext_pdu.adv_data = pdu.adv_data
 
     def get_pdu(self, index: int):
         if index >= 0 and index < len(self.ext_pdus):
@@ -77,6 +68,23 @@ class PeriphMode(PbMessageWrapper):
     channel_map = PbFieldBytes('ble.periph_mode.channel_map', min_version=3, default=ChannelMap([37,38,39]).value)
     inter_min = PbFieldInt('ble.periph_mode.inter_min', min_version=3, default=0x20)
     inter_max = PbFieldInt('ble.periph_mode.inter_max', min_version=3, default=0x4000)
+    ext_pdus = PbFieldArray('ble.periph_mode.ext_pdus', min_version=3, default=[])
+
+    def add_pdu(self, pdu: ExtAdvPdu):
+        """Add an extended PDU to advertise on secondary channels."""
+        ext_pdu = self.message.ble.periph_mode.ext_pdus.add()
+        ext_pdu.header_len = pdu.header_len
+        ext_pdu.adv_mode = pdu.adv_mode
+        ext_pdu.header = pdu.header
+        ext_pdu.adv_data = pdu.adv_data
+
+    def get_pdu(self, index: int):
+        if index >= 0 and index < len(self.ext_pdus):
+            return self.ext_pdus[index]
+        return None
+
+    def pdus(self):
+        yield from self.ext_pdus
 
     def get_adv_data(self) -> Optional[bytes]:
         """Retrieve advertising data."""
@@ -200,3 +208,14 @@ class SetEncryption(PbMessageWrapper):
     key = PbFieldBytes('ble.encryption.key')
     rand = PbFieldBytes('ble.encryption.rand')
     ediv = PbFieldBytes('ble.encryption.ediv')
+
+@pb_bind(BleDomain, 'set_phy', 3)
+class SetPhy(PbMessageWrapper):
+    """SetPhy message wrapper, introduced in version 3."""
+    tx_phy = PbFieldInt('ble.set_phy.tx_phy')
+    rx_phy = PbFieldInt('ble.set_phy.rx_phy')
+
+@pb_bind(BleDomain, 'set_tx_pwr', 3)
+class SetTxPowerLevel(PbMessageWrapper):
+    """Set BLE TX power."""
+    level = PbFieldInt('ble.set_tx_pwr.level')

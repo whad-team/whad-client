@@ -7,6 +7,7 @@ from whad.ble.stack.gatt import GattClient, GattServer
 from whad.common.triggers import ManualTrigger, ConnectionEventTrigger, ReceptionTrigger
 from whad.hub.ble.bdaddr import BDAddress
 from whad.hub.ble.chanmap import ChannelMap
+from whad.hub.ble import BlePhy as PHY, BleCsa as CSA
 
 from whad.ble.profile.attribute import UUID
 from whad.ble.profile import (
@@ -41,6 +42,8 @@ __all__ = [
     'GattServer',
     'BDAddress',
     'UUID',
+    'PHY',
+    'CSA',
     'Profile',
     'read',
     'write',
