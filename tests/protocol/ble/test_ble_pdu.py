@@ -6,7 +6,7 @@ from whad.protocol.whad_pb2 import Message
 from whad.hub.message import AbstractPacket
 from whad.hub.ble import SendBleRawPdu, Direction, SendBlePdu, BleAdvPduReceived, \
     AdvType, AddressType, BlePduReceived, BleRawPduReceived, SetAdvData, \
-    BlePhy, BleRawPduReceivedV3
+    BlePhy
 
 BD_ADDRESS_DEFAULT = bytes([0x11, 0x22, 0x33, 0x44, 0x55, 0x66])
 
@@ -457,7 +457,7 @@ class TestRawPduReceivedV3(object):
     def test_parsing(self, raw_pdu_v3):
         """Check BleRawPduReceivedV3 parsing
         """
-        parsed_obj = BleRawPduReceivedV3.parse(3, raw_pdu_v3)
+        parsed_obj = BleRawPduReceived.parse(3, raw_pdu_v3)
         assert isinstance(parsed_obj, BleRawPduReceived)
         assert parsed_obj.direction == Direction.MASTER_TO_SLAVE
         assert parsed_obj.channel == 10
@@ -476,7 +476,7 @@ class TestRawPduReceivedV3(object):
     def test_crafting(self):
         """Check BleRawPduReceivedV3 crafting
         """
-        msg = BleRawPduReceivedV3.build(3,
+        msg = BleRawPduReceived.build(3,
             direction=Direction.SLAVE_TO_MASTER,
             channel=22,
             rssi=-10,

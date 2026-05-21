@@ -14,7 +14,7 @@ from whad.hub.ble import (
     Hijacked, ReactiveJam, Synchronized, Desynchronized, PrepareSequenceManual,
     PrepareSequenceConnEvt, PrepareSequencePattern, Injected, Trigger,
     Triggered, DeleteSequence, SetEncryption, ChannelMap, BleAdvType,
-    BlePhy, BleCsa, BleRawPduReceivedV3
+    BlePhy, BleCsa, ExtAdvPdu, SetPhy, SetTxPowerLevel
 )
 
 from .test_ble_hijack import hijack_master, hijack_slave, hijack_both, hijacked
@@ -54,6 +54,64 @@ class TestSetBdAddress(object):
         )
         assert msg.addr_type == AddressType.PUBLIC
         assert msg.bd_address == BD_ADDRESS_DEFAULT
+
+@pytest.fixture
+def set_phy():
+    """Create a SetPhy protobuf message
+    """
+    msg = Message()
+    msg.ble.set_phy.tx_phy = BlePhy.LE_2M
+    msg.ble.set_phy.rx_phy = BlePhy.LE_1M_CODED
+    return msg
+
+class TestSetPhy(object):
+    """Test SetPhy message parsing/crafting.
+    """
+
+    def test_parsing(self, set_phy):
+        """Check SetPhy parsing
+        """
+        parsed_obj = SetPhy.parse(3, set_phy)
+        assert isinstance(parsed_obj, SetPhy)
+        assert parsed_obj.tx_phy == BlePhy.LE_2M
+        assert parsed_obj.rx_phy == BlePhy.LE_1M_CODED
+
+    def test_crafting(self):
+        """Check SetPhy crafting.
+        """
+        msg = SetPhy.build(3,
+            tx_phy=BlePhy.LE_1M_CODED,
+            rx_phy=BlePhy.LE_2M
+        )
+        assert msg.tx_phy == BlePhy.LE_1M_CODED
+        assert msg.rx_phy == BlePhy.LE_2M
+
+@pytest.fixture
+def set_tx_power_level():
+    """Create a SetTxPowerLevel protobuf message
+    """
+    msg = Message()
+    msg.ble.set_tx_pwr.level = -10
+    return msg
+
+class TestSetTxPowerLevel(object):
+    """Test SetTxPowerLevel message parsing/crafting.
+    """
+
+    def test_parsing(self, set_tx_power_level):
+        """Check SetTxPowerLevel parsing
+        """
+        parsed_obj = SetTxPowerLevel.parse(3, set_tx_power_level)
+        assert isinstance(parsed_obj, SetTxPowerLevel)
+        assert parsed_obj.level == -10
+
+    def test_crafting(self):
+        """Check SetTxPowerLevel crafting.
+        """
+        msg = SetTxPowerLevel.build(3,
+            level=-1
+        )
+        assert msg.level == -1
 
 @pytest.fixture
 def sniff_adv():
@@ -485,6 +543,60 @@ class TestAdvModeV3(object):
         assert msg.channel_map == ChannelMap([37]).value
 
 @pytest.fixture
+def ext_adv_mode():
+    msg = Message()
+    msg.ble.adv_mode.channel_map = ChannelMap([37, 38, 39]).value
+    msg.ble.adv_mode.inter_min = 0x42
+    msg.ble.adv_mode.inter_max = 0x1000
+    msg.ble.adv_mode.csa = BleCsa.CSA2
+
+    pdu = msg.ble.adv_mode.ext_pdus.add()
+    pdu.header_len = 0
+    pdu.adv_mode = 3
+    pdu.header = b''
+    pdu.adv_data = b'FOOBAR'
+
+    return msg
+
+class TestAdvModeExtended(object):
+    """Test ExtAdvMode message parsing/crafting defined from protocol v3
+    """
+
+    def test_parsing(self, ext_adv_mode):
+        """Check AdvMode parsing
+        """
+        parsed_obj = AdvMode.parse(3, ext_adv_mode)
+        assert isinstance(parsed_obj, AdvMode)
+        assert parsed_obj.inter_min == 0x42
+        assert parsed_obj.inter_max == 0x1000
+        assert parsed_obj.channel_map == ChannelMap([37, 38, 39]).value
+        assert len(parsed_obj.ext_pdus) == 1
+        assert parsed_obj.ext_pdus[0].header_len == 0
+        assert parsed_obj.ext_pdus[0].adv_mode == 3
+        assert parsed_obj.ext_pdus[0].header == b''
+        assert parsed_obj.ext_pdus[0].adv_data == b'FOOBAR'
+
+    def test_crafting(self):
+        """Check AdvMode crafting
+        """
+        msg = AdvMode.build(3,
+            channel_map=ChannelMap([37]).value,
+            inter_min=0x50,
+            inter_max=0x60,
+            csa=BleCsa.CSA2,
+        )
+        msg.add_pdu(ExtAdvPdu(3, 1, b'AAA', b'FOOBAR'))
+        assert msg.inter_min == 0x50
+        assert msg.inter_max == 0x60
+        assert msg.channel_map == ChannelMap([37]).value
+        assert msg.csa == BleCsa.CSA2
+        assert len(msg.ext_pdus) == 1
+        assert msg.ext_pdus[0].header_len == 3
+        assert msg.ext_pdus[0].adv_mode == 1
+        assert msg.ext_pdus[0].header == b'AAA'
+        assert msg.ext_pdus[0].adv_data == b'FOOBAR'
+
+@pytest.fixture
 def central_mode():
     msg = Message()
     msg.ble.central_mode.CopyFrom(CentralModeCmd())
@@ -575,6 +687,70 @@ class TestPeriphModeV3(object):
         assert msg.channel_map == ChannelMap([37, 38]).value
         assert msg.inter_min == 0x20
         assert msg.inter_max == 0x4000
+
+@pytest.fixture
+def periph_mode_extended_v3():
+    msg = Message()
+    msg.ble.periph_mode.adv_data = b'TEST'
+    msg.ble.periph_mode.scanrsp_data = b'RESPONSE'
+    msg.ble.periph_mode.adv_type = BleAdvType.ADV_NONCONN_IND
+    msg.ble.periph_mode.channel_map = ChannelMap([39]).value
+    msg.ble.periph_mode.inter_min = 0x42
+    msg.ble.periph_mode.inter_max = 0x2000
+
+    extpdu = msg.ble.periph_mode.ext_pdus.add()
+    extpdu.header_len = 3
+    extpdu.adv_mode = 1
+    extpdu.header = b'AAA'
+    extpdu.adv_data = b'FOOBAR'
+    return msg
+
+class TestPeriphModeExtendedV3(object):
+    """Test PeriphMode message parsing/crafting with extended advertising (variant introduced in v3)
+    """
+
+    def test_parsing(self, periph_mode_extended_v3):
+        """Check PeriphModeV3 parsing
+        """
+        parsed_obj = PeriphMode.parse(3, periph_mode_extended_v3)
+        assert isinstance(parsed_obj, PeriphMode)
+        assert parsed_obj.adv_data == b'TEST'
+        assert parsed_obj.scanrsp_data == b'RESPONSE'
+        assert parsed_obj.adv_type == BleAdvType.ADV_NONCONN_IND
+        assert parsed_obj.channel_map == ChannelMap([39]).value
+        assert parsed_obj.inter_min == 0x42
+        assert parsed_obj.inter_max == 0x2000
+        assert len(list(parsed_obj.pdus())) == 1
+        ext_pdu = list(parsed_obj.pdus())[0]
+        assert ext_pdu.header_len == 3
+        assert ext_pdu.adv_mode == 1
+        assert ext_pdu.header == b'AAA'
+        assert ext_pdu.adv_data == b'FOOBAR'
+
+    def test_crafting(self):
+        """Check PeriphMode v3 crafting
+        """
+        ext_pdu = ExtAdvPdu(3, 1, b'BBB', b'FOO')
+        msg = PeriphMode.build(3,
+            adv_data=b'HELLOWORLD',
+            scanrsp_data=b'FOOBAR',
+            adv_type=BleAdvType.ADV_IND,
+            channel_map=ChannelMap([37, 38]).value,
+            inter_min=0x20,
+            inter_max=0x4000,
+        )
+        msg.add_pdu(ext_pdu)
+        assert msg.adv_data == b'HELLOWORLD'
+        assert msg.scanrsp_data == b'FOOBAR'
+        assert msg.channel_map == ChannelMap([37, 38]).value
+        assert msg.inter_min == 0x20
+        assert msg.inter_max == 0x4000
+        assert len(list(msg.pdus())) == 1
+        ext_pdu = list(msg.pdus())[0]
+        assert ext_pdu.header_len == 3
+        assert ext_pdu.adv_mode == 1
+        assert ext_pdu.header == b'BBB'
+        assert ext_pdu.adv_data == b'FOO'
 
 @pytest.fixture
 def ble_start():
@@ -1130,7 +1306,7 @@ class TestBleDomainParsing(object):
         """Check RawPduReceived message parsing
         """
         msg = BleDomain.parse(3, raw_pdu_v3)
-        assert isinstance(msg, BleRawPduReceivedV3)
+        assert isinstance(msg, BleRawPduReceived)
 
     def test_connect_parsing(self, connect):
         """Check ConnectTo message parsing
