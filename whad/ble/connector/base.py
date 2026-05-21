@@ -5,7 +5,7 @@ basic BLE-related methods for the attached interface.
 """
 import struct
 import logging
-from typing import Optional, Union
+from typing import Optional, Union, List
 
 # Scapy
 from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_DATA, BTLE_ADV_IND, \
@@ -15,6 +15,7 @@ from scapy.packet import Packet
 
 # Device interface
 from whad.device import Connector
+from whad.hub.ble.mode import SetTxPowerLevel
 from whad.hub.ble.pdu import SetAdvData
 from whad.hub.discovery import Domain, Capability
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
@@ -24,7 +25,7 @@ from whad.helpers import message_filter
 from whad.hub.generic.cmdresult import Success, CommandResult
 from whad.hub.ble.bdaddr import BDAddress
 from whad.hub.ble.chanmap import ChannelMap
-from whad.hub.ble import Commands, AdvType, Direction, BLEMetadata
+from whad.hub.ble import Commands, AdvType, Direction, BLEMetadata, ExtAdvPdu, BlePhy
 from whad.hub.events import ConnectionEvt, DisconnectionEvt, SyncEvt, DesyncEvt, \
     TriggeredEvt, WhadEvent
 
@@ -538,6 +539,40 @@ class BLE(Connector):
         # Cannot set BD address
         return False
 
+    def set_phy(self, tx: int, rx: int) -> bool:
+        """Set TX/RX PHY."""
+        # Check PHY values
+        if tx not in (BlePhy.LE_1M, BlePhy.LE_2M, BlePhy.LE_1M_CODED):
+            raise ValueError()
+
+        # Ensure command is supported.
+        commands = self.device.get_domain_commands(Domain.BtLE)
+        if (commands & (1 << Commands.SetPhy))>0:
+            # Create a SetPhy message
+            msg = self.hub.ble.create_set_phy(tx, rx)
+            resp = self.send_command(msg, message_filter(CommandResult))
+            return isinstance(resp, Success)
+
+        # Cannot set PHY
+        return False
+
+    def set_tx_power(self, level: int) -> bool:
+        """Set TX power level.
+
+        :param level: TX power level in dBm
+        :type  level: int
+        """
+        # Ensure command is supported
+        commands = self.device.get_domain_commands(Domain.BtLE)
+        if (commands & (1 << Commands.SetTxPowerLevel))>0:
+            # Create a SetTxPowerLevel message
+            msg = self.hub.ble.create_set_tx_power_level(level)
+            resp = self.send_command(msg, message_filter(CommandResult))
+            return isinstance(resp, Success)
+
+        # Cannot set TX power level
+        return False
+
     def enable_scan_mode(self, active=False):
         """
         Enable Bluetooth Low Energy scanning mode.
@@ -559,7 +594,8 @@ class BLE(Connector):
         return isinstance(resp, Success)
 
     def enable_adv_mode(self, adv_data=None, scan_data=None, adv_type: AdvType = AdvType.ADV_IND,
-                        channel_map: ChannelMap = None, inter_min: int = 0x20, inter_max: int = 0x4000):
+                        channel_map: ChannelMap = None, inter_min: int = 0x20, inter_max: int = 0x4000,
+                        ext_pdus: Optional[List[ExtAdvPdu]] = None):
         """
         Enable BLE advertising mode (acts as a broadcaster)
         """
@@ -578,6 +614,7 @@ class BLE(Connector):
             channel_map=channel_map,
             inter_min=inter_min,
             inter_max=inter_max,
+            ext_pdus=ext_pdus
         )
 
         resp = self.send_command(msg, message_filter(CommandResult))
@@ -605,7 +642,8 @@ class BLE(Connector):
     def enable_peripheral_mode(self, adv_data: Union[AdvDataFieldList, bytes],
                                scan_data: Optional[Union[AdvDataFieldList, bytes]] = None,
                                adv_type: AdvType = AdvType.ADV_IND, channel_map: Optional[ChannelMap] = None,
-                               inter_min: int = 0x20, inter_max: int = 0x4000):
+                               inter_min: int = 0x20, inter_max: int = 0x4000,
+                               ext_pdus: Optional[List[ExtAdvPdu]] = None):
         """
         Enable Bluetooth Low Energy peripheral mode (acts as slave).
 
@@ -619,8 +657,10 @@ class BLE(Connector):
         :type  channel_map: ChannelMap, optional
         :param inter_min: Minimum advertising interval
         :type  inter_min: int
-        :param inter_max: Maximum advertisin interval
+        :param inter_max: Maximum advertising interval
         :type  inter_max: int
+        :param pdus: Extended Advertising PDUs
+        :type  pdus: list
         """
         # Build advertising data if required
         if isinstance(adv_data, AdvDataFieldList):
@@ -635,7 +675,8 @@ class BLE(Connector):
             adv_type=adv_type,
             channel_map=channel_map,
             inter_min=inter_min,
-            inter_max=inter_max
+            inter_max=inter_max,
+            ext_pdus=ext_pdus
         )
 
         resp = self.send_command(msg, message_filter(CommandResult))

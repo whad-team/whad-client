@@ -11,7 +11,7 @@ from typing import Optional, List, Tuple, Union
 
 from whad.ble.profile.advdata import AdvDataFieldList
 from whad.exceptions import UnsupportedCapability
-from whad.hub.ble import AdvType, ChannelMap
+from whad.hub.ble import AdvType, ChannelMap, ExtAdvPdu
 
 from .base import BLE
 
@@ -22,7 +22,8 @@ class Advertiser(BLE):
     """This connector provides a BLE advertiser role."""
 
     def __init__(self, device, adv_data: Union[AdvDataFieldList, bytes], scanrsp_data: Optional[Union[AdvDataFieldList, bytes]] = None,
-                 adv_type: AdvType = AdvType.ADV_IND, channels: Optional[list] = None, interval: Optional[Tuple[int, int]] = None):
+                 adv_type: AdvType = AdvType.ADV_IND, channels: Optional[list] = None, interval: Optional[Tuple[int, int]] =
+                 None, ext_pdus: Optional[List[ExtAdvPdu]] = None):
         """Advertiser initialization"""
         super().__init__(device)
 
@@ -37,6 +38,8 @@ class Advertiser(BLE):
         # Set advertising type
         if adv_type in (AdvType.ADV_IND, AdvType.ADV_DIRECT_IND, AdvType.ADV_SCAN_IND, AdvType.ADV_NONCONN_IND):
             self.__adv_type = adv_type
+        elif adv_type == AdvType.ADV_EXT_IND and ext_pdus is None:
+            raise ValueError()
         else:
             raise ValueError()
 
@@ -66,6 +69,9 @@ class Advertiser(BLE):
         self.__adv_data = adv_data
         self.__scanrsp_data = scanrsp_data
 
+        # Save extended advertising PDUs
+        self.__ext_pdus = ext_pdus
+
         # Configure the device advertising parameters
         self.__configure()
 
@@ -91,6 +97,11 @@ class Advertiser(BLE):
     def scanrsp_data(self) -> Optional[Union[AdvDataFieldList, bytes]]:
         """Scan response data"""
         return self.__scanrsp_data
+
+    @property
+    def ext_adv_pdus(self) -> Optional[List[ExtAdvPdu]]:
+        """Extended advertising PDUs."""
+        return self.__ext_pdus
 
     @property
     def channels(self) -> List[int]:
@@ -137,12 +148,23 @@ class Advertiser(BLE):
             scanrsp_data = self.scanrsp_data.to_bytes()
         else:
             scanrsp_data = None
+
+        # If adv_type is not set to AdvType.ADV_EXT_IND and extended advertising pdus are set, force type to AdvType.ADV_EXT_IND
+        if self.adv_type != AdvType.ADV_EXT_IND and self.ext_adv_pdus is not None:
+            logger.info((
+                "[Advertiser] Advertisement type not set to ADV_EXT_IND but extended advertising PDUs are set, "
+                "forcing extended advertising mode with type ADV_EXT_IND."
+            ))
+            self.adv_type = AdvType.ADV_EXT_IND
+
+        # Enable advertiser mode with the provided parameters.
         result = self.enable_adv_mode(
             adv_data=adv_data,
             scan_data=scanrsp_data,
             adv_type=self.adv_type,
             channel_map=self.channel_map,
-            inter_min=self.__inter_min, inter_max=self.__inter_max)
+            inter_min=self.__inter_min, inter_max=self.__inter_max,
+            ext_pdus=self.ext_adv_pdus)
 
         # Display a warning if an error occurred
         if not result:
