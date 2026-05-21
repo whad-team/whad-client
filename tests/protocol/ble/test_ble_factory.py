@@ -12,9 +12,9 @@ from whad.hub.ble import BleDomain, SetBdAddress, SniffAdv, SniffConnReq, \
     BleStart, BleStop, HijackMaster, HijackSlave, HijackBoth, Hijacked, ReactiveJam, \
     Synchronized, Desynchronized, PrepareSequenceManual, PrepareSequenceConnEvt, \
     PrepareSequencePattern, Injected, Direction, AdvType, Triggered, Trigger, DeleteSequence, \
-    SetEncryption, BleRawPduReceivedV3
+    SetEncryption, SetPhy, SetTxPowerLevel
 
-from whad.hub.ble import BleCsa, BlePhy
+from whad.hub.ble import BleCsa, BlePhy, ExtAdvPdu
 from whad.hub.ble.bdaddr import BDAddress
 from whad.hub.ble.chanmap import DefaultChannelMap, ChannelMap
 
@@ -46,6 +46,19 @@ class TestBleDomainFactory(object):
         assert isinstance(obj, SetBdAddress)
         assert obj.bd_address == address.value
         assert obj.addr_type == AddressType.PUBLIC
+
+    def test_SetPhy(self, factory_v3: BleDomain):
+        """Test creation of SetPhy message."""
+        obj = factory_v3.create_set_phy(BlePhy.LE_1M, BlePhy.LE_2M)
+        assert isinstance(obj, SetPhy)
+        assert obj.tx_phy == BlePhy.LE_1M
+        assert obj.rx_phy == BlePhy.LE_2M
+
+    def test_SetTxPowerLevel(self, factory_v3: BleDomain):
+        """Test creation of SetTxPowerLevel message."""
+        obj = factory_v3.create_set_tx_power_level(4)
+        assert isinstance(obj, SetTxPowerLevel)
+        assert obj.level == 4
 
     def test_SniffAdv(self, factory: BleDomain):
         """Test creation of SniffAdv message
@@ -165,6 +178,32 @@ class TestBleDomainFactory(object):
         with pytest.raises(ValueError):
             factory_v3.create_adv_mode(b"FOOBAR", channel_map=ChannelMap([1,2,3]))
 
+    def test_AdvMode_extended(self, factory_v3: BleDomain):
+        """Test creation of ExtAdvMode message for proto v3
+        """
+        ext_pdus = [
+            ExtAdvPdu(0, 3, b'', b'FOOBAR')
+        ]
+        obj = factory_v3.create_ext_adv_mode(inter_min=0x40, inter_max=0x1337,
+                                          channel_map=ChannelMap([37, 38, 39]), pdus=ext_pdus, csa=BleCsa.CSA1)
+        assert isinstance(obj, AdvMode)
+
+    def test_ExtAdvMode_ext_pdus(self, factory_v3: BleDomain):
+        """Test creation of ExtAdvMode message for proto v3
+        """
+        ext_pdu = ExtAdvPdu(0, 3, b'', b'FOOBAR')
+        obj = factory_v3.create_ext_adv_mode(inter_min=0x40, inter_max=0x1337,
+                                          channel_map=ChannelMap([37, 38, 39]), csa=BleCsa.CSA1)
+        obj.add_pdu(ext_pdu)
+        assert isinstance(obj, AdvMode)
+        assert len(list(obj.pdus())) == 1
+
+    def test_ExtAdvMode_bad_csa(self, factory_v3: BleDomain):
+        """Test creation of ExtAdvMode message for proto v3 with bad inter max value
+        """
+        with pytest.raises(ValueError):
+            obj = factory_v3.create_ext_adv_mode(inter_min=0x40, inter_max=0,
+                                          channel_map=ChannelMap([37, 38, 39]), csa=0xffff)
 
     def test_CentralMode(self, factory: BleDomain):
         """Test creation of CentralMode message
@@ -208,6 +247,14 @@ class TestBleDomainFactory(object):
         """Test creation of PeriphMode message with bad interval minimal value"""
         with pytest.raises(ValueError):
             factory_v3.create_periph_mode(b"FOOBAR", channel_map=ChannelMap([1,2,3]))
+
+    def test_Periph_v3_extended(self, factory_v3: BleDomain):
+        """Test creation of PeriphMode message with extended PDUs"""
+        ext_pdu = ExtAdvPdu(0, 3, b'', b'FOOBAR')
+        obj = factory_v3.create_periph_mode(adv_data=b'', inter_min=0x40, inter_max=0x1337, ext_pdus=[ext_pdu])
+        assert isinstance(obj, PeriphMode)
+        assert obj.adv_type == AdvType.ADV_EXT_IND
+        assert len(list(obj.ext_pdus)) == 1
 
     def test_Start(self, factory: BleDomain):
         """Test creation of BleStart message
@@ -378,7 +425,7 @@ class TestBleDomainFactory(object):
             channel=12,
             phy=BlePhy.LE_2M
         )
-        assert isinstance(obj, BleRawPduReceivedV3)
+        assert isinstance(obj, BleRawPduReceived)
 
     def test_Injected(self, factory: BleDomain):
         """Test creation of Injected message
