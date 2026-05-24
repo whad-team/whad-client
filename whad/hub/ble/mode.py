@@ -5,7 +5,7 @@ from typing import Optional, Tuple
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.ble.ble_pb2 import CentralModeCmd, StartCmd as BleStartCmd, StopCmd as BleStopCmd
 from whad.hub.message import pb_bind, PbFieldBytes, PbMessageWrapper, PbFieldBool, PbFieldInt, PbFieldArray
-from whad.hub.ble import BleDomain, BleAdvType, ChannelMap, BleCsa, ExtAdvPdu
+from whad.hub.ble import BleDomain, BleAdvType, ChannelMap, BleCsa, AuxPtr, ExtAdvPdu
 
 @pb_bind(BleDomain, 'scan_mode', 1)
 class ScanMode(PbMessageWrapper):
@@ -34,18 +34,47 @@ class AdvMode(PbMessageWrapper):
     def add_pdu(self, pdu: ExtAdvPdu):
         """Add an extended PDU to advertise on secondary channels."""
         ext_pdu = self.message.ble.adv_mode.ext_pdus.add()
-        ext_pdu.header_len = pdu.header_len
-        ext_pdu.adv_mode = pdu.adv_mode
-        ext_pdu.header = pdu.header
         ext_pdu.adv_data = pdu.adv_data
+        if pdu.auxptr is not None:
+            ext_pdu.aux_ptr.channel = pdu.auxptr.channel
+            ext_pdu.aux_ptr.ca = pdu.auxptr.ca
+            ext_pdu.aux_ptr.offset_units = pdu.auxptr.units
+            ext_pdu.aux_ptr.offset = pdu.auxptr.offset
+            ext_pdu.aux_ptr.phy = pdu.auxptr.phy
 
-    def get_pdu(self, index: int):
+    def get_pdu(self, index: int) -> Optional[ExtAdvPdu]:
         if index >= 0 and index < len(self.ext_pdus):
-            return self.ext_pdus[index]
+            pdu = self.ext_pdus[index]
+            if pdu.aux_ptr is not None:
+                return ExtAdvPdu(
+                    pdu.adv_data,
+                    AuxPtr(
+                        pdu.aux_ptr.channel,
+                        pdu.aux_ptr.ca,
+                        pdu.aux_ptr.offset_units,
+                        pdu.aux_ptr.offset,
+                        pdu.aux_ptr.phy
+                    )
+                )
+            else:
+                return ExtAdvPdu(pdu.adv_data)
         return None
 
     def pdus(self):
-        yield from self.ext_pdus
+        for pdu in self.ext_pdus:
+            if pdu.aux_ptr is not None:
+                yield ExtAdvPdu(
+                    pdu.adv_data,
+                    AuxPtr(
+                        pdu.aux_ptr.channel,
+                        pdu.aux_ptr.ca,
+                        pdu.aux_ptr.offset_units,
+                        pdu.aux_ptr.offset,
+                        pdu.aux_ptr.phy
+                    )
+                )
+            else:
+                yield ExtAdvPdu(pdu.adv_data)
 
 @pb_bind(BleDomain, 'central_mode', 1)
 class CentralMode(PbMessageWrapper):
@@ -73,18 +102,47 @@ class PeriphMode(PbMessageWrapper):
     def add_pdu(self, pdu: ExtAdvPdu):
         """Add an extended PDU to advertise on secondary channels."""
         ext_pdu = self.message.ble.periph_mode.ext_pdus.add()
-        ext_pdu.header_len = pdu.header_len
-        ext_pdu.adv_mode = pdu.adv_mode
-        ext_pdu.header = pdu.header
         ext_pdu.adv_data = pdu.adv_data
+
+        if pdu.auxptr is not None:
+            ext_pdu.aux_ptr.channel = pdu.auxptr.channel
+            ext_pdu.aux_ptr.ca = pdu.auxptr.ca
+            ext_pdu.aux_ptr.offset_units = pdu.auxptr.units
+            ext_pdu.aux_ptr.offset = pdu.auxptr.offset
+            ext_pdu.aux_ptr.phy = pdu.auxptr.phy
 
     def get_pdu(self, index: int):
         if index >= 0 and index < len(self.ext_pdus):
-            return self.ext_pdus[index]
+            if pdu.aux_ptr is not None:
+                return ExtAdvPdu(
+                    pdu.adv_data,
+                    AuxPtr(
+                        pdu.aux_ptr.channel,
+                        pdu.aux_ptr.ca,
+                        pdu.aux_ptr.offset_units,
+                        pdu.aux_ptr.offset,
+                        pdu.aux_ptr.phy
+                    )
+                )
+            else:
+                return ExtAdvPdu(pdu.adv_data)
         return None
 
     def pdus(self):
-        yield from self.ext_pdus
+        for pdu in self.ext_pdus:
+            if pdu.aux_ptr is not None:
+                yield ExtAdvPdu(
+                    pdu.adv_data,
+                    AuxPtr(
+                        pdu.aux_ptr.channel,
+                        pdu.aux_ptr.ca,
+                        pdu.aux_ptr.offset_units,
+                        pdu.aux_ptr.offset,
+                        pdu.aux_ptr.phy
+                    )
+                )
+            else:
+                yield ExtAdvPdu(pdu.adv_data)
 
     def get_adv_data(self) -> Optional[bytes]:
         """Retrieve advertising data."""
