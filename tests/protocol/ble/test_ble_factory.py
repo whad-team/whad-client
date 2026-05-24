@@ -250,7 +250,7 @@ class TestBleDomainFactory(object):
         """Test creation of ExtAdvMode message for proto v3
         """
         ext_pdus = [
-            ExtAdvPdu(0, 3, b'', b'FOOBAR')
+            ExtAdvPdu(b'FOOBAR', auxptr=AuxPtr(6, 1, 0, 10, BlePhy.LE_1M))
         ]
         obj = factory_v3.create_ext_adv_mode(inter_min=0x40, inter_max=0x1337,
                                           channel_map=ChannelMap([37, 38, 39]), pdus=ext_pdus, csa=BleCsa.CSA1)
@@ -259,10 +259,9 @@ class TestBleDomainFactory(object):
     def test_ExtAdvMode_ext_pdus(self, factory_v3: BleDomain):
         """Test creation of ExtAdvMode message for proto v3
         """
-        ext_pdu = ExtAdvPdu(0, 3, b'', b'FOOBAR')
         obj = factory_v3.create_ext_adv_mode(inter_min=0x40, inter_max=0x1337,
                                           channel_map=ChannelMap([37, 38, 39]), csa=BleCsa.CSA1)
-        obj.add_pdu(ext_pdu)
+        obj.add_pdu(ExtAdvPdu(b'FOOBAR', AuxPtr(6, 1, 0, 12, BlePhy.LE_2M)))
         assert isinstance(obj, AdvMode)
         assert len(list(obj.pdus())) == 1
 
