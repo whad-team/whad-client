@@ -132,6 +132,61 @@ class BleCsa:
     CSA3B = BleCsa.CSA3b
     CSA3C = BleCsa.CSA3c
 
+class AuxPtr:
+    """Ble Extended Advertising Auxiliary AuxPtr field."""
+    def __init__(self, channel: int, ca: int,  units: int, offset: int, phy: int):
+        self.__channel = channel & 0x3f
+        self.__ca = ca & 0x01
+        self.__units = units & 0x01
+        self.__offset = offset & 0x1fff
+        self.__phy = phy & 0x03
+
+    @property
+    def channel(self) -> int:
+        """AuxPtr channel index field."""
+        return self.__channel
+
+    @property
+    def ca(self) -> int:
+        """AuxPtr clock accuracy field."""
+        return self.__ca
+
+    @property
+    def units(self) -> int:
+        """AuxPtr offset units field."""
+        return self.__units
+
+    @property
+    def offset(self) -> int:
+        """AuxPtr offset field."""
+        return self.__offset
+
+    @property
+    def phy(self) -> int:
+        """AuxPtr PHY field"""
+        return self.__phy
+
+class ExtAdvPdu:
+    """WHAD protocol ExtAdvPdu wrapper."""
+    def __init__(self, adv_data: bytes, auxptr: Optional[AuxPtr] = None):
+        self.__adv_data = adv_data
+        self.__aux_ptr = auxptr
+
+    @property
+    def adv_data(self) -> bytes:
+        return self.__adv_data
+
+    @adv_data.setter
+    def adv_data(self, value: bytes):
+        self.__adv_data = value
+
+    @property
+    def auxptr(self) -> Optional[AuxPtr]:
+        return self.__aux_ptr
+
+    @auxptr.setter
+    def auxptr(self, value: AuxPtr):
+        self.__aux_ptr = value
 
 @dataclass(repr=False)
 class BLEMetadata(Metadata):
@@ -932,6 +987,24 @@ class BleDomain(Registry):
 
         return message
 
+    def create_set_ext_adv_pdus(self, pdus: List[ExtAdvPdu]) -> HubMessage:
+        """Create a SetExtAdvPdus message.
+
+        :param pdus: List of extended advertising PDUs
+        :type  pdus: list
+        :return: instance of SetExtAdvPdus message
+        :rtype: SetExtAdvPdus
+        """
+        message = BleDomain.build("set_ext_adv_pdus", self.proto_version)
+        for pdu in pdus:
+            if isinstance(pdu, ExtAdvPdu):
+                message.add_pdu(pdu)
+            else:
+                raise ValueError()
+
+        # Success
+        return message
+
     def create_send_raw_pdu(self, direction: int, pdu: bytes, \
                          crc: int = None, encrypt: bool = False, \
                          access_address: int = None, conn_handle: int = None,
@@ -1369,7 +1442,7 @@ from .mode import (
     SetEncryption, SetPhy, SetTxPowerLevel
 )
 from .pdu import SetAdvData, SendBleRawPdu, SendBlePdu, BleAdvPduReceived, BlePduReceived, \
-    BleRawPduReceived, Injected
+    BleRawPduReceived, Injected, SetExtAdvPdus
 from .connect import ConnectTo, Disconnect, Connected, Disconnected, Synchronized, \
     Desynchronized
 from .hijack import HijackMaster, HijackSlave, HijackBoth, Hijacked
@@ -1426,4 +1499,5 @@ __all__ = [
     ## introduced in version 3
     "SetPhy",
     "SetTxPowerLevel",
+    "SetExtAdvPdus",
 ]

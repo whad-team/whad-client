@@ -2,6 +2,7 @@
 """
 import pytest
 
+from whad.hub.ble.pdu import SetExtAdvPdus
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.ble.ble_pb2 import JamAdvCmd, CentralModeCmd, StartCmd as BleStartCmd, StopCmd as BleStopCmd
 from whad.hub.ble import (
@@ -14,11 +15,14 @@ from whad.hub.ble import (
     Hijacked, ReactiveJam, Synchronized, Desynchronized, PrepareSequenceManual,
     PrepareSequenceConnEvt, PrepareSequencePattern, Injected, Trigger,
     Triggered, DeleteSequence, SetEncryption, ChannelMap, BleAdvType,
-    BlePhy, BleCsa, ExtAdvPdu, SetPhy, SetTxPowerLevel
+    BlePhy, BleCsa, ExtAdvPdu, AuxPtr, SetPhy, SetTxPowerLevel
 )
 
 from .test_ble_hijack import hijack_master, hijack_slave, hijack_both, hijacked
-from .test_ble_pdu import send_ble_pdu, send_ble_pdu_v3, send_ble_raw_pdu, send_ble_raw_pdu_v3, ble_pdu, ble_adv_pdu, set_adv_data, raw_pdu, raw_pdu_v3
+from .test_ble_pdu import (
+    send_ble_pdu, send_ble_pdu_v3, send_ble_raw_pdu, send_ble_raw_pdu_v3, ble_pdu, ble_adv_pdu,
+    set_ext_adv_pdus, set_adv_data, raw_pdu, raw_pdu_v3,
+)
 from .test_ble_prepseq import prep_seq_manual, prep_seq_connevt, prep_seq_reception, ble_trigger, \
     ble_triggered, ble_delete_seq
 
@@ -551,11 +555,7 @@ def ext_adv_mode():
     msg.ble.adv_mode.csa = BleCsa.CSA2
 
     pdu = msg.ble.adv_mode.ext_pdus.add()
-    pdu.header_len = 0
-    pdu.adv_mode = 3
-    pdu.header = b''
     pdu.adv_data = b'FOOBAR'
-
     return msg
 
 class TestAdvModeExtended(object):
@@ -571,10 +571,8 @@ class TestAdvModeExtended(object):
         assert parsed_obj.inter_max == 0x1000
         assert parsed_obj.channel_map == ChannelMap([37, 38, 39]).value
         assert len(parsed_obj.ext_pdus) == 1
-        assert parsed_obj.ext_pdus[0].header_len == 0
-        assert parsed_obj.ext_pdus[0].adv_mode == 3
-        assert parsed_obj.ext_pdus[0].header == b''
         assert parsed_obj.ext_pdus[0].adv_data == b'FOOBAR'
+        assert not parsed_obj.ext_pdus[0].HasField('aux_ptr')
 
     def test_crafting(self):
         """Check AdvMode crafting
@@ -585,16 +583,20 @@ class TestAdvModeExtended(object):
             inter_max=0x60,
             csa=BleCsa.CSA2,
         )
-        msg.add_pdu(ExtAdvPdu(3, 1, b'AAA', b'FOOBAR'))
+        msg.add_pdu(ExtAdvPdu(b'FOOBAR', AuxPtr(
+                6,1,0,12,BlePhy.LE_2M
+            )))
         assert msg.inter_min == 0x50
         assert msg.inter_max == 0x60
         assert msg.channel_map == ChannelMap([37]).value
         assert msg.csa == BleCsa.CSA2
         assert len(msg.ext_pdus) == 1
-        assert msg.ext_pdus[0].header_len == 3
-        assert msg.ext_pdus[0].adv_mode == 1
-        assert msg.ext_pdus[0].header == b'AAA'
         assert msg.ext_pdus[0].adv_data == b'FOOBAR'
+        assert msg.ext_pdus[0].aux_ptr.channel == 6
+        assert msg.ext_pdus[0].aux_ptr.ca == 1
+        assert msg.ext_pdus[0].aux_ptr.offset_units == 0
+        assert msg.ext_pdus[0].aux_ptr.offset == 12
+        assert msg.ext_pdus[0].aux_ptr.phy == BlePhy.LE_2M
 
 @pytest.fixture
 def central_mode():
@@ -699,10 +701,12 @@ def periph_mode_extended_v3():
     msg.ble.periph_mode.inter_max = 0x2000
 
     extpdu = msg.ble.periph_mode.ext_pdus.add()
-    extpdu.header_len = 3
-    extpdu.adv_mode = 1
-    extpdu.header = b'AAA'
     extpdu.adv_data = b'FOOBAR'
+    extpdu.aux_ptr.channel = 10
+    extpdu.aux_ptr.ca = 1
+    extpdu.aux_ptr.offset_units = 0
+    extpdu.aux_ptr.offset = 1337
+    extpdu.aux_ptr.phy = BlePhy.LE_1M_CODED
     return msg
 
 class TestPeriphModeExtendedV3(object):
@@ -722,15 +726,17 @@ class TestPeriphModeExtendedV3(object):
         assert parsed_obj.inter_max == 0x2000
         assert len(list(parsed_obj.pdus())) == 1
         ext_pdu = list(parsed_obj.pdus())[0]
-        assert ext_pdu.header_len == 3
-        assert ext_pdu.adv_mode == 1
-        assert ext_pdu.header == b'AAA'
         assert ext_pdu.adv_data == b'FOOBAR'
+        assert ext_pdu.auxptr.channel == 10
+        assert ext_pdu.auxptr.ca == 1
+        assert ext_pdu.auxptr.units == 0
+        assert ext_pdu.auxptr.offset == 1337
+        assert ext_pdu.auxptr.phy == BlePhy.LE_1M_CODED
 
     def test_crafting(self):
         """Check PeriphMode v3 crafting
         """
-        ext_pdu = ExtAdvPdu(3, 1, b'BBB', b'FOO')
+        ext_pdu = ExtAdvPdu(b'FOO', AuxPtr(6, 1, 0, 10, BlePhy.LE_1M))
         msg = PeriphMode.build(3,
             adv_data=b'HELLOWORLD',
             scanrsp_data=b'FOOBAR',
@@ -747,10 +753,12 @@ class TestPeriphModeExtendedV3(object):
         assert msg.inter_max == 0x4000
         assert len(list(msg.pdus())) == 1
         ext_pdu = list(msg.pdus())[0]
-        assert ext_pdu.header_len == 3
-        assert ext_pdu.adv_mode == 1
-        assert ext_pdu.header == b'BBB'
         assert ext_pdu.adv_data == b'FOO'
+        assert ext_pdu.auxptr.channel == 6
+        assert ext_pdu.auxptr.ca == 1
+        assert ext_pdu.auxptr.units == 0
+        assert ext_pdu.auxptr.offset == 10
+        assert ext_pdu.auxptr.phy == BlePhy.LE_1M
 
 @pytest.fixture
 def ble_start():
@@ -1259,6 +1267,12 @@ class TestBleDomainParsing(object):
         """
         msg = BleDomain.parse(1, set_adv_data)
         assert isinstance(msg, SetAdvData)
+
+    def test_set_adv_data_parsing(self, set_ext_adv_pdus):
+        """Check SetAdvData message parsing
+        """
+        msg = BleDomain.parse(3, set_ext_adv_pdus)
+        assert isinstance(msg, SetExtAdvPdus)
 
     def test_send_raw_pdu_parsing_v1(self, send_ble_raw_pdu):
         """Check SendRawPdu message parsing

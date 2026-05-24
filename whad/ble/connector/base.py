@@ -16,7 +16,7 @@ from scapy.packet import Packet
 # Device interface
 from whad.device import Connector
 from whad.hub.ble.mode import SetTxPowerLevel
-from whad.hub.ble.pdu import SetAdvData
+from whad.hub.ble.pdu import SetAdvData, SetExtAdvPdus
 from whad.hub.discovery import Domain, Capability
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 
@@ -638,6 +638,22 @@ class BLE(Connector):
         msg = self.hub.ble.create_set_adv_data(adv_data, scan_data)
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
+
+    def set_ext_adv_pdus(self, pdus: List[ExtAdvPdu]) -> bool:
+        """Set extended advertising PDUs, even if the device is already advertising.
+
+        :param pdus: List of extended advertising PDUs
+        :type  pdus: list
+        """
+        commands = self.get_domain_commands(Domain.BtLE)
+        if (commands & (1 << Commands.SetExtAdvPdus))>0:
+            # Create a SetExtAdvPdus message
+            msg = self.hub.create_set_ext_adv_pdus(pdus)
+            resp = self.send_command(msg, message_filter(CommandResult))
+            return isinstance(resp, Success)
+
+        # Not supported
+        return False
 
     def enable_peripheral_mode(self, adv_data: Union[AdvDataFieldList, bytes],
                                scan_data: Optional[Union[AdvDataFieldList, bytes]] = None,

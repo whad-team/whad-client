@@ -12,9 +12,9 @@ from whad.hub.ble import BleDomain, SetBdAddress, SniffAdv, SniffConnReq, \
     BleStart, BleStop, HijackMaster, HijackSlave, HijackBoth, Hijacked, ReactiveJam, \
     Synchronized, Desynchronized, PrepareSequenceManual, PrepareSequenceConnEvt, \
     PrepareSequencePattern, Injected, Direction, AdvType, Triggered, Trigger, DeleteSequence, \
-    SetEncryption, SetPhy, SetTxPowerLevel
+    SetEncryption, SetPhy, SetTxPowerLevel, SetExtAdvPdus
 
-from whad.hub.ble import BleCsa, BlePhy, ExtAdvPdu
+from whad.hub.ble import BleCsa, BlePhy, ExtAdvPdu, AuxPtr
 from whad.hub.ble.bdaddr import BDAddress
 from whad.hub.ble.chanmap import DefaultChannelMap, ChannelMap
 
@@ -243,7 +243,7 @@ class TestBleDomainFactory(object):
 
     def test_Periph_v3_extended(self, factory_v3: BleDomain):
         """Test creation of PeriphMode message with extended PDUs"""
-        ext_pdu = ExtAdvPdu(0, 3, b'', b'FOOBAR')
+        ext_pdu = ExtAdvPdu(b'FOOBAR')
         obj = factory_v3.create_periph_mode(adv_data=b'', inter_min=0x40, inter_max=0x1337, ext_pdus=[ext_pdu])
         assert isinstance(obj, PeriphMode)
         assert obj.adv_type == AdvType.ADV_EXT_IND
@@ -306,7 +306,7 @@ class TestBleDomainFactory(object):
             BDAddress("99:88:77:66:55:44"),
             0x11223344,
             1
-        )   
+        )
         assert isinstance(obj, Connected)
 
     def test_Disconnected(self, factory: BleDomain):
@@ -314,20 +314,26 @@ class TestBleDomainFactory(object):
         """
         obj = factory.create_disconnected(
             13, 1
-        )   
+        )
         assert isinstance(obj, Disconnected)
 
     def test_Desynchronized(self, factory: BleDomain):
         """Test creation of Desynchronized message
         """
-        obj = factory.create_desynchronized(0x11223344)   
+        obj = factory.create_desynchronized(0x11223344)
         assert isinstance(obj, Desynchronized)
 
     def test_SetAdvData(self, factory: BleDomain):
         """Test creation of SetAdvData message
         """
-        obj = factory.create_set_adv_data(adv_data=b"FOOBAR", scan_rsp=b"HELLO")  
+        obj = factory.create_set_adv_data(adv_data=b"FOOBAR", scan_rsp=b"HELLO")
         assert isinstance(obj, SetAdvData)
+
+    def test_SetExtAdvPdus(self, factory_v3: BleDomain):
+        """Test creation of SetExtAdvPdus message
+        """
+        obj = factory_v3.create_set_ext_adv_pdus([ExtAdvPdu(b'FOOBAR')])
+        assert isinstance(obj, SetExtAdvPdus)
 
     def test_SendRawPdu_v1(self, factory: BleDomain):
         """Test creation of SendBleRawPdu message

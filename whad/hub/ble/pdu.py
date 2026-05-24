@@ -1,12 +1,17 @@
 """WHAD Protocol BLE pdu messages abstraction layer.
 """
 import struct
+from typing import Generator
+
 from scapy.compat import raw
-from scapy.layers.bluetooth4LE import BTLE, BTLE_DATA, BTLE_CTRL, BTLE_ADV, BTLE_ADV_IND, \
-    BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP, BTLE_RF
-from whad.hub.message import AbstractPacket, pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper, \
-    PbFieldBool, dissect_failsafe
-from whad.hub.ble import Direction, AdvType, AddressType, BDAddress, BleDomain, BLEMetadata, BlePhy
+from scapy.layers.bluetooth4LE import (
+    BTLE, BTLE_DATA, BTLE_CTRL, BTLE_ADV, BTLE_ADV_IND, BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND,
+    BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP
+)
+from whad.hub.message import (
+    pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper, PbFieldBool, PbFieldArray, dissect_failsafe
+)
+from whad.hub.ble import Direction, AdvType, AddressType, BDAddress, BleDomain, BLEMetadata, BlePhy, ExtAdvPdu, AuxPtr
 
 from struct import pack
 
@@ -52,6 +57,42 @@ class SetAdvData(PbMessageWrapper):
     """
     adv_data = PbFieldBytes("ble.set_adv_data.adv_data")
     scanrsp_data = PbFieldBytes("ble.set_adv_data.scanrsp_data")
+
+@pb_bind(BleDomain, "set_ext_adv_pdus", 3)
+class SetExtAdvPdus(PbMessageWrapper):
+    """BLE set extended advertising pdus message class.
+    """
+    ext_pdus = PbFieldArray('ble.set_ext_adv_pdus.pdus')
+
+    def add_pdu(self, pdu: ExtAdvPdu):
+        """Add an extended advertising PDU.
+
+        :param pdu: Extended advertising PDU to add.
+        :type  pdu: ExtAdvPdu
+        """
+        extpdu = self.message.ble.set_ext_adv_pdus.pdus.add()
+        print(extpdu)
+        extpdu.adv_data = pdu.adv_data
+        if pdu.auxptr is not None:
+            extpdu.aux_ptr.channel = pdu.auxptr.channel
+            extpdu.aux_ptr.ca = pdu.auxptr.ca
+            extpdu.aux_ptr.offset_units = pdu.auxptr.units
+            extpdu.aux_ptr.offset = pdu.auxptr.offset
+            extpdu.aux_ptr.phy = pdu.auxptr.phy
+
+    def pdus(self) -> Generator[ExtAdvPdu, None, None]:
+        """Enumerate this message's extended advertising PDUs."""
+        for pdu in self.ext_pdus:
+            if pdu.HasField('aux_ptr'):
+                yield ExtAdvPdu(pdu.adv_data, AuxPtr(
+                    pdu.aux_ptr.channel,
+                    pdu.aux_ptr.ca,
+                    pdu.aux_ptr.offset_units,
+                    pdu.aux_ptr.offset,
+                    pdu.aux_ptr.phy
+                ))
+            else:
+                yield ExtAdvPdu(pdu.adv_data)
 
 @pb_bind(BleDomain, "send_raw_pdu", 1)
 class SendBleRawPdu(PbMessageWrapper):
