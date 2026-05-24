@@ -2,11 +2,12 @@
 """
 import pytest
 
+from whad.hub.ble.pdu import SetExtAdvPdus
 from whad.protocol.whad_pb2 import Message
 from whad.hub.message import AbstractPacket
 from whad.hub.ble import SendBleRawPdu, Direction, SendBlePdu, BleAdvPduReceived, \
     AdvType, AddressType, BlePduReceived, BleRawPduReceived, SetAdvData, \
-    BlePhy
+    BlePhy, ExtAdvPdu
 
 BD_ADDRESS_DEFAULT = bytes([0x11, 0x22, 0x33, 0x44, 0x55, 0x66])
 
@@ -38,6 +39,47 @@ class TestSetAdvData(object):
         )
         assert msg.adv_data == b'HELLOWORLD'
         assert msg.scanrsp_data == b'FOOBAR'
+
+@pytest.fixture
+def set_ext_adv_pdus():
+    msg = Message()
+    pdu = msg.ble.set_ext_adv_pdus.pdus.add()
+    pdu.adv_data = b'ADVDATA'
+    pdu.aux_ptr.channel = 10
+    pdu.aux_ptr.ca = 1
+    pdu.aux_ptr.offset_units = 0
+    pdu.aux_ptr.offset = 42
+    pdu.aux_ptr.phy = BlePhy.LE_2M
+    return msg
+
+class TestSetExtAdvPdus(object):
+    """Test SetExtAdvPdus message parsing/crafting
+    """
+
+    def test_parsing(self, set_ext_adv_pdus):
+        """Check SetExtAdvPdus parsing
+        """
+        parsed_obj = SetExtAdvPdus.parse(3, set_ext_adv_pdus)
+        assert isinstance(parsed_obj, SetExtAdvPdus)
+        assert len(list(parsed_obj.pdus())) == 1
+        pdu = list(parsed_obj.pdus())[0]
+        assert pdu.adv_data == b'ADVDATA'
+        assert pdu.auxptr is not None
+        assert pdu.auxptr.channel == 10
+        assert pdu.auxptr.ca == 1
+        assert pdu.auxptr.units == 0
+        assert pdu.auxptr.offset == 42
+        assert pdu.auxptr.phy == BlePhy.LE_2M
+
+    def test_crafting(self):
+        """Check SetExtAdvPdus crafting
+        """
+        msg = SetExtAdvPdus.build(3)
+        msg.add_pdu(ExtAdvPdu(b'FOOBAR'))
+        assert len(msg.ext_pdus) == 1
+        pdu = msg.ext_pdus[0]
+        assert not pdu.HasField('aux_ptr')
+        assert pdu.adv_data == b'FOOBAR'
 
 @pytest.fixture
 def send_ble_raw_pdu():
