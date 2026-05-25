@@ -12,7 +12,7 @@ from whad.hub.ble import BleDomain, SetBdAddress, SniffAdv, SniffConnReq, \
     BleStart, BleStop, HijackMaster, HijackSlave, HijackBoth, Hijacked, ReactiveJam, \
     Synchronized, Desynchronized, PrepareSequenceManual, PrepareSequenceConnEvt, \
     PrepareSequencePattern, Injected, Direction, AdvType, Triggered, Trigger, DeleteSequence, \
-    SetEncryption, SetPhy, SetTxPowerLevel, SetExtAdvPdus
+    SetEncryption, SetPhy, SetTxPowerLevel, SetExtAdvPdus, SetSupportedPhys
 
 from whad.hub.ble import BleCsa, BlePhy, ExtAdvPdu, AuxPtr
 from whad.hub.ble.bdaddr import BDAddress
@@ -53,6 +53,13 @@ class TestBleDomainFactory(object):
         assert isinstance(obj, SetPhy)
         assert obj.tx_phy == BlePhy.LE_1M
         assert obj.rx_phy == BlePhy.LE_2M
+
+    def test_SetSupportedPhys(self, factory_v3: BleDomain):
+        """Test creation of SetSupportedPhys message."""
+        obj = factory_v3.create_set_supported_phys([BlePhy.LE_1M, BlePhy.LE_2M], [BlePhy.LE_1M, BlePhy.LE_2M])
+        assert isinstance(obj, SetSupportedPhys)
+        assert obj.tx_phy == [BlePhy.LE_1M, BlePhy.LE_2M]
+        assert obj.rx_phy == [BlePhy.LE_1M, BlePhy.LE_2M]
 
     def test_SetTxPowerLevel(self, factory_v3: BleDomain):
         """Test creation of SetTxPowerLevel message."""

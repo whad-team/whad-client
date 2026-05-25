@@ -2,6 +2,7 @@
 """
 import pytest
 
+from whad.hub.ble.mode import SetSupportedPhys
 from whad.hub.ble.pdu import SetExtAdvPdus
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.ble.ble_pb2 import JamAdvCmd, CentralModeCmd, StartCmd as BleStartCmd, StopCmd as BleStopCmd
@@ -89,6 +90,38 @@ class TestSetPhy(object):
         )
         assert msg.tx_phy == BlePhy.LE_1M_CODED
         assert msg.rx_phy == BlePhy.LE_2M
+
+@pytest.fixture
+def set_supported_phys():
+    """Create a SetSupportedPhys protobuf message
+    """
+    msg = Message()
+    msg.ble.set_supp_phys.tx_phy.extend([BlePhy.LE_2M, BlePhy.LE_1M_CODED])
+    msg.ble.set_supp_phys.rx_phy.extend([BlePhy.LE_1M, BlePhy.LE_1M_CODED])
+    return msg
+
+class TestSetSupportedPhys(object):
+    """Test SetSupportedPhys message parsing/crafting.
+    """
+
+    def test_parsing(self, set_supported_phys):
+        """Check SetSupportedPhys parsing
+        """
+        parsed_obj = SetSupportedPhys.parse(3, set_supported_phys)
+        assert isinstance(parsed_obj, SetSupportedPhys)
+        assert parsed_obj.tx_phy == [BlePhy.LE_2M, BlePhy.LE_1M_CODED]
+        assert parsed_obj.rx_phy == [BlePhy.LE_1M, BlePhy.LE_1M_CODED]
+
+    def test_crafting(self):
+        """Check SetSupportedPhys crafting.
+        """
+        msg = SetSupportedPhys.build(3)
+        msg.add_tx_phy(BlePhy.LE_1M)
+        msg.add_tx_phy(BlePhy.LE_1M_CODED)
+        msg.add_rx_phy(BlePhy.LE_1M)
+        msg.add_rx_phy(BlePhy.LE_2M)
+        assert msg.tx_phy == [BlePhy.LE_1M, BlePhy.LE_1M_CODED]
+        assert msg.rx_phy == [BlePhy.LE_1M, BlePhy.LE_2M]
 
 @pytest.fixture
 def set_tx_power_level():
