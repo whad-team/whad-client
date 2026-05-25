@@ -540,7 +540,15 @@ class BLE(Connector):
         return False
 
     def set_phy(self, tx: int, rx: int) -> bool:
-        """Set TX/RX PHY."""
+        """Force hardware adapter to use the specified PHYs.
+
+        :param tx: TX PHY to use
+        :type  tx: int
+        :param rx: RX PHY to use
+        :type  rx: int
+        :return: `True` if hardware accepted the specified PHYs, `False` otherwise.
+        :rtype: bool
+        """
         # Check PHY values
         if tx not in (BlePhy.LE_1M, BlePhy.LE_2M, BlePhy.LE_1M_CODED):
             raise ValueError()
@@ -554,6 +562,35 @@ class BLE(Connector):
             return isinstance(resp, Success)
 
         # Cannot set PHY
+        return False
+
+    def set_supported_phys(self, tx: List[int], rx: List[int]) -> bool:
+        """Set hardware supported PHYs.
+
+        :param tx: List of supported PHYs for TX
+        :type  tx: list
+        :param rx: List of supported PHYs for RX
+        :type  rx: list
+        :return: `True` on success, `False` otherwise.
+        :rtype: bool
+        """
+        # Check PHY values
+        for txphy in tx:
+            if txphy not in (BlePhy.LE_1M, BlePhy.LE_2M, BlePhy.LE_1M_CODED):
+                raise ValueError()
+        for rxphy in rx:
+            if rxphy not in (BlePhy.LE_1M, BlePhy.LE_2M, BlePhy.LE_1M_CODED):
+                raise ValueError()
+
+        # Ensure command is supported.
+        commands = self.device.get_domain_commands(Domain.BtLE)
+        if (commands & (1 << Commands.SetSupportedPhys))>0:
+            # Create a SetSupportedPhys message
+            msg = self.hub.ble.create_set_supported_phys(tx, rx)
+            resp = self.send_command(msg, message_filter(CommandResult))
+            return isinstance(resp, Success)
+
+        # Cannot set supported PHYs.
         return False
 
     def set_tx_power(self, level: int) -> bool:

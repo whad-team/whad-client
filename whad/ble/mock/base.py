@@ -9,7 +9,7 @@ from scapy.packet import Packet
 from whad.hub.message import HubMessage
 from whad.device.mock import MockDevice
 
-from whad.hub.ble.mode import BleStart, BleStop, SetPhy, SetTxPowerLevel
+from whad.hub.ble.mode import BleStart, BleStop, SetPhy, SetTxPowerLevel, SetSupportedPhys
 from whad.hub.ble import BDAddress, Commands, BlePhy
 from whad.hub.generic.cmdresult import Success, Error
 from whad.hub.discovery import Capability, Domain, DeviceType
@@ -34,10 +34,14 @@ class BasicMock(MockDevice):
         # Set state
         self.__state = BasicMock.STATE_STOPPED
 
-        # Advertising data
+        # TX power level
         self.__tx_power_level = 0
         self.__tx_phy = BlePhy.LE_1M
         self.__rx_phy = BlePhy.LE_1M
+
+        # Supported PHYs
+        self.__tx_supp_phys = [BlePhy.LE_1M]
+        self.__rx_supp_phys = [BlePhy.LE_1M]
 
         """Initialization."""
         super().__init__(
@@ -56,6 +60,7 @@ class BasicMock(MockDevice):
         # Default commands
         commands = [
             Commands.SetPhy,
+            Commands.SetSupportedPhys,
             Commands.SetTxPowerLevel,
             Commands.Start, Commands.Stop,
         ]
@@ -83,6 +88,16 @@ class BasicMock(MockDevice):
     def rx_phy(self) -> int:
         """Currently selected RX PHY."""
         return self.__rx_phy
+
+    @property
+    def rx_supp_phys(self) -> List[int]:
+        """Supported RX PHYs."""
+        return self.__rx_supp_phys
+
+    @property
+    def tx_supp_phys(self) -> List[int]:
+        """Supported TX PHYs."""
+        return self.__tx_supp_phys
 
     def is_started(self) -> bool:
         """Check if peripheral is started."""
@@ -125,4 +140,10 @@ class BasicMock(MockDevice):
     @MockDevice.route(SetTxPowerLevel)
     def on_set_tx_power(self, msg: SetTxPowerLevel):
         self.__tx_power_level = msg.level
+        return Success()
+
+    @MockDevice.route(SetSupportedPhys)
+    def on_set_supp_phys(self, msg: SetSupportedPhys):
+        self.__rx_supp_phys = msg.rx_phy
+        self.__tx_supp_phys = msg.tx_phy
         return Success()
