@@ -393,6 +393,23 @@ class BleDomain(Registry):
         return BleDomain.build('set_phy', self.proto_version,
                                tx_phy=tx_phy, rx_phy=rx_phy)
 
+    def create_set_supported_phys(self, tx_phys: List[int], rx_phys: List[int]) -> HubMessage:
+        """Create a SetSupportedPhys message.
+
+        :param tx_phys: List of supported TX PHYs
+        :type  tx_phys: list
+        :param rx_phys: List of supported RX PHYs
+        :type  rx_phys: list
+        :return: SetSupportedPhys message
+        :rtype: HubMessage
+        """
+        msg = BleDomain.build('set_supp_phys', self.proto_version)
+        for tx in tx_phys:
+            msg.add_tx_phy(tx)
+        for rx in rx_phys:
+            msg.add_rx_phy(rx)
+        return msg
+
     def create_set_tx_power_level(self, level: int) -> HubMessage:
         """Create a SetTxPowerLevel message.
 
@@ -1439,7 +1456,7 @@ from .sniffing import SniffAdv, SniffConnReq, SniffAccessAddress, SniffActiveCon
 from .jamming import JamAdv, JamAdvChan, JamConn, ReactiveJam
 from .mode import (
     ScanMode, AdvMode, CentralMode, PeriphMode, BleStart, BleStop,
-    SetEncryption, SetPhy, SetTxPowerLevel
+    SetEncryption, SetPhy, SetTxPowerLevel, SetSupportedPhys
 )
 from .pdu import SetAdvData, SendBleRawPdu, SendBlePdu, BleAdvPduReceived, BlePduReceived, \
     BleRawPduReceived, Injected, SetExtAdvPdus
@@ -1500,4 +1517,5 @@ __all__ = [
     "SetPhy",
     "SetTxPowerLevel",
     "SetExtAdvPdus",
+    "SetSupportedPhys",
 ]
