@@ -36,3 +36,11 @@ def test_set_tx_power_level_v3(adapter_mock):
     """Test TX power configuration."""
     assert adapter_mock.set_tx_power(-4)
     assert adapter_mock.device.tx_power_level == -4
+
+def test_set_supp_phy_v3(adapter_mock):
+    """Test supported PHYs configuration."""
+    assert adapter_mock.set_supported_phys(
+        [PHY.LE_2M, PHY.LE_1M_CODED],
+        [PHY.LE_2M, PHY.LE_1M_CODED])
+    assert adapter_mock.device.rx_supp_phys == [PHY.LE_2M, PHY.LE_1M_CODED]
+    assert adapter_mock.device.tx_supp_phys == [PHY.LE_2M, PHY.LE_1M_CODED]
