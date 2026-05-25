@@ -242,6 +242,20 @@ class SetPhy(PbMessageWrapper):
     tx_phy = PbFieldInt('ble.set_phy.tx_phy')
     rx_phy = PbFieldInt('ble.set_phy.rx_phy')
 
+@pb_bind(BleDomain, 'set_supp_phys', 3)
+class SetSupportedPhys(PbMessageWrapper):
+    """SetSupportedPhys wrapper, introduced in version 3."""
+    tx_phy = PbFieldArray('ble.set_supp_phys.tx_phy')
+    rx_phy = PbFieldArray('ble.set_supp_phys.rx_phy')
+
+    def add_tx_phy(self, phy: int):
+        """Add a TX PHY to our list of TX PHYs."""
+        self.message.ble.set_supp_phys.tx_phy.append(phy)
+
+    def add_rx_phy(self, phy: int):
+        """Add a RX PHY to our list of RX PHYs."""
+        self.message.ble.set_supp_phys.rx_phy.append(phy)
+
 @pb_bind(BleDomain, 'set_tx_pwr', 3)
 class SetTxPowerLevel(PbMessageWrapper):
     """Set BLE TX power."""
