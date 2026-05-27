@@ -1,9 +1,13 @@
+from typing import Tuple, Optional
+from scapy.all import XByteField, XLE3BytesField, XLEIntField, XLEShortField
 from scapy.packet import bind_layers, Packet
 from scapy.fields import BitField, LEShortField, ByteField, StrFixedLenField, \
-    FlagsField, ByteEnumField, BitEnumField
+    FlagsField, ByteEnumField, BitEnumField, ConditionalField, BitFieldLenField, StrLenField, \
+    PacketField
+from scapy.layers.bluetooth4LE import BDAddrField, BTLE_ADV
 from scapy.layers.bluetooth import SM_Hdr, HCI_Event_LE_Meta, HCI_Command_Hdr, \
     HCI_Event_Command_Complete, _bluetooth_features, _bluetooth_error_codes, \
-    HCI_Cmd_Complete_LE_Read_White_List_Size, ATT_Hdr
+    HCI_Cmd_Complete_LE_Read_White_List_Size, ATT_Hdr, EIR_Hdr
 
 _bluetooth_supported_commands = [
     # Byte 0
@@ -545,6 +549,168 @@ _bluetooth_le_features = [
     "rfu",                                    # Bit 63
 ]
 
+def btle_ext_adv_compute_header_len(pkt: Packet) -> int:
+    """Compute extended header length based on flags."""
+    fields_len = 1
+    if pkt.flags is not None:
+        if pkt.flags.adva:
+            fields_len += 6
+        if pkt.flags.targeta:
+            fields_len += 6
+        if pkt.flags.cteinfo:
+            fields_len += 1
+        if pkt.flags.adi:
+            fields_len += 2
+        if pkt.flags.auxptr:
+            fields_len += 3
+        if pkt.flags.syncinfo:
+            fields_len += 18
+        if pkt.flags.txpower:
+            fields_len += 1
+    return fields_len
+
+def btle_ext_adv_compute_acad_len(pkt: Packet) -> int:
+    """Compute ACAD length based on extended header length and flags."""
+    return pkt.header_len - btle_ext_adv_compute_header_len(pkt)
+
+class AdvDataInfo(Packet):
+    """Advertisement Data Information field as defined in Vol 6 part B, Section 2.3.4.4."""
+    name = "Advertisement Data Information Field"
+
+    fields_desc = [
+        BitField("sid", 0, -4, -2),
+        BitField("did", 0, -12, -2),
+    ]
+
+    def extract_padding(self, s: bytes) -> Tuple[bytes, Optional[bytes]]:
+        return b"", s
+
+class AuxPtr(Packet):
+    """AuxPtr field as defined in Vol 6 part B, Section 2.3.4.5."""
+    name = "BTLE Extended Advertisement Auxiliary Pointer"
+
+    fields_desc = [
+        BitField("offset_units", 0, 1),
+        BitField("ca", 0, 1),
+        BitField("chan_index", 0, 6),
+        BitField("phy", 0, 3, -16),
+        BitField("offset", 0, 13, -16),
+    ]
+
+    def extract_padding(self, s: bytes) -> Tuple[bytes, Optional[bytes]]:
+        return b"", s
+
+class CTEInfo(Packet):
+    """CTEInfo field as defined in Vol 6 part B, Section 2.5.2."""
+    name = "CTEInfo"
+
+    fields_desc = [
+        BitField("type", 0, -2, -1),
+        BitField("rfu", 0, -1, -1),
+        BitField("time", 0, -5, -1)
+    ]
+
+    def extract_padding(self, s: bytes) -> Tuple[bytes, Optional[bytes]]:
+        return b"", s
+
+class SyncInfo(Packet):
+    """SyncInfo field as defined in Vol 6 part B, Section 2.3.4.6."""
+    name = "SyncInfo"
+
+    fields_desc = [
+        BitField("rfu", 0, -1, -2),
+        BitField("offset_adjust", 0, -1, -2),
+        BitField("offset_units", 0, -1, -2),
+        BitField("offset_base", 0, -13, -2),
+        LEShortField("interval", 0),
+        BitField("sca", 0, -3, -5),
+        BitField("chm", 0, -37, -5),
+        XLEIntField("aa", 0),
+        XLE3BytesField("crc_init", 0),
+        LEShortField("per_event_counter", 0),
+    ]
+
+    def extract_padding(self, s: bytes) -> Tuple[bytes, Optional[bytes]]:
+        return b"", s
+
+# Bluetooth Low Energy Extended Advertising PDUs
+class BTLE_EXT_ADV(Packet):
+    """BTLE Extended Advertisement payload"""
+    name = "BTLE Extended Advertisement Payload"
+
+    fields_desc = [
+        BitField("adv_mode", None, 2),
+        BitField("header_len", None, 6),
+        FlagsField("flags", None, 8, [
+            "adva", "targeta", "cteinfo", "adi", "auxptr", "syncinfo", "txpower", "rfu",
+        ]),
+        ConditionalField(BDAddrField("AdvA", None), lambda pkt: pkt.flags and pkt.flags.adva),
+        ConditionalField(BDAddrField("TargetA", None), lambda pkt: pkt.flags and pkt.flags.targeta),
+        ConditionalField(PacketField("cteinfo", None, CTEInfo), lambda pkt: pkt.flags and pkt.flags.cteinfo),
+        ConditionalField(PacketField("adi", None, AdvDataInfo), lambda pkt: pkt.flags and pkt.flags.adi),
+        ConditionalField(PacketField("auxptr", None, AuxPtr), lambda pkt: pkt.flags and pkt.flags.auxptr),
+        ConditionalField(PacketField("syncinfo", None, SyncInfo), lambda pkt: pkt.flags and pkt.flags.syncinfo),
+        ConditionalField(XByteField("txpower", None), lambda pkt: pkt.flags and pkt.flags.txpower),
+        StrLenField("acad", b"", length_from=btle_ext_adv_compute_acad_len)
+    ]
+
+    def __init__(self, *args, **kwargs):
+        """
+        Build flags before packet gets dissected if it has not been provided,
+        so any conditional field would be considered and displayed when show() or
+        show2() are called.
+        """
+        Packet.__init__(self, *args, **kwargs)
+        if "flags" not in kwargs:
+            self.update_flags()
+
+    def build_flags(self):
+        """Compute the 'flags' field value corresponding to the defined fields."""
+        flags = 0
+        if self.getfieldval("AdvA") is not None:
+            flags |= 0x01
+        if self.getfieldval("TargetA") is not None:
+            flags |= 0x02
+        if self.getfieldval("cteinfo") is not None:
+            flags |= 0x04
+        if self.getfieldval("adi") is not None:
+            flags |= 0x08
+        if self.getfieldval("auxptr") is not None:
+            flags |= 0x10
+        if self.getfieldval("syncinfo") is not None:
+            flags |= 0x20
+        if self.getfieldval("txpower") is not None:
+            flags |= 0x40
+        return flags
+
+    def update_flags(self):
+        """Update the packet's flags bit field based on packet defined conditional fields."""
+        self.setfieldval("flags", self.build_flags())
+
+    def update_header_len(self):
+        """Update packet extended header len based on defined conditional fields and ACAD."""
+        self.setfieldval("header_len", btle_ext_adv_compute_header_len(self))
+
+    def do_build(self):
+        """Force flags bit field and extended header length update."""
+        self.update_flags()
+        self.update_header_len()
+        return Packet.do_build(self)
+
+    def post_build(self, pkt, pay):
+        """Update extended header length field if not set."""
+        # Compute extended header length if not set
+        if self.header_len is None:
+            ext_hdr_len = btle_ext_adv_compute_header_len(self) + len(self.acad) # Exclude flags byte
+            pkt = bytes([ext_hdr_len | self.adv_mode<<6]) + pkt[1:]
+        else:
+            ext_hdr_len = self.header_len
+
+        pkt = bytes([ext_hdr_len | self.adv_mode<<6]) + pkt[1:]
+        return pkt+pay
+
+bind_layers(BTLE_ADV, BTLE_EXT_ADV, PDU_type=7)
+
 # Add missing ATT_Handle_Value_Confirmation class
 class ATT_Handle_Value_Confirmation(Packet):
     """ATT Handle value confirmation packet, missing from Scapy BLE definitions
@@ -560,6 +726,7 @@ class SM_Security_Request(Packet):
 bind_layers(SM_Hdr, SM_Security_Request, sm_command=0x0b)
 
 class HCI_LE_Meta_Data_Length_Change(Packet):
+
     name = "Data Length Change"
     fields_desc = [LEShortField("handle", 0),
                    LEShortField("max_tx_octets", 0x001B),
@@ -572,6 +739,7 @@ class HCI_LE_Set_Data_Length(Packet):
     name = "Set Data Length"
     fields_desc = [LEShortField("handle", 0),
                    LEShortField("tx_octets", 0x001B),
+
                    LEShortField("tx_time", 0x0148),
                    ]
 
