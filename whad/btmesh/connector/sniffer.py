@@ -98,7 +98,7 @@ class Sniffer(BTMesh, EventsManager):
 
     def configure(
         self,
-        channel=0xFF,
+        channel=None,
         net_keys=["f7a2a44f8e8a8029064f173ddc1e2b00"],
         app_keys=["63964771734fbd76e3b40519d1d94a48"],
         iv_indexes=["00000000"],
