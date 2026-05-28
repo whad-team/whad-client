@@ -16,7 +16,9 @@ interface = sys.argv[1]
 try:
     dev = WhadDevice.create(interface)
 
-    provisionee = Provisionee(dev)
+    provisionee = Provisionee(dev, unicast_addr=0x0007)
+    provisionee.bearer.configure(bd_address="AA:AA:AA:AA:AA:07") # BD_ADDR used for our experiments, with the whitelist system
+
     provisionee.start()
     provisionee.profile.auto_provision()
 
