@@ -33,7 +33,7 @@ class PathPoisonHijackConfiguration:
 
 
     :param timeout: Timeout (sec) of the attack before quitting. Infinite if not specified (None).
-    :param poison_adresses: The address to use as path_target in the reply. If path_target included in this range, 255 added.
+    :param poison_address: The address to use as path_target in the reply. If path_target included in this range, 255 added.
     :param seqnum_start: The seqnumber to use for the first spoofed Echo Reply (gets incremented each time for each request for each poisoned path)
     :param echo_interval: The path verification interval (sec) used in the Network. If unknown, keep to 7.2 (lowest value possible). Will substract a guard of 0.2 sec. If None, no echo replies sent.
     """
