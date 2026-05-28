@@ -55,7 +55,9 @@ try:
 
     # instantiate of custom profile
     profile = CustomProfile()
-    provisionee = Provisionee(dev, profile=profile)
+    provisionee = Provisionee(dev, profile=profile, unicast_addr=0x0007)
+    provisionee.set_bd_address("AA:AA:AA:AA:AA:07") # BD_ADDR used for our experiments, with the whitelist system
+
     provisionee.start()
 
     profile.auto_provision()
