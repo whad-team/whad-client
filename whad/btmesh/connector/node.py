@@ -37,7 +37,6 @@ from whad.btmesh.profile import BaseMeshProfile
 from copy import copy
 
 
-
 class BTMeshNode(BTMesh):
     """
     Connector class for Bluetooth Mesh device (Rx and Tx capabilities needed)
@@ -56,13 +55,13 @@ class BTMeshNode(BTMesh):
 
         :param device: Whad device handle
         :type device: WhadDeviceConnector
-        :param profile: The profile instance to use 
+        :param profile: The profile instance to use
         :type profile: BaseMeshProfile, optional
         :type prov_stack: Layer, optional
         :raises UnsupportedCapability: Device Cannot inject
         """
         super().__init__(device)
-        #if not self.can_inject():
+        # if not self.can_inject():
         #    raise UnsupportedCapability("Inject")
 
         # Queue of received messages, filled in on reception callback
@@ -155,7 +154,6 @@ class BTMeshNode(BTMesh):
         :type packet: EIR_BTMesh_Beacon
         """
         pass
-
 
     def change_sniffing_channel(self, sniffing_event):
         channels = [37, 38, 39]
@@ -334,6 +332,3 @@ class BTMeshNode(BTMesh):
                 ).discovery_get_hops_thread
             )
             thread.start()
-
-
-

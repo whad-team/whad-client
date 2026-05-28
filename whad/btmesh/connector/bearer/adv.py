@@ -1,15 +1,12 @@
-from scapy.layers.bluetooth4LE import (
-    BTLE_ADV,
-    EIR_Hdr,
-    BTLE_ADV_NONCONN_IND
-)
+from scapy.layers.bluetooth4LE import BTLE_ADV, EIR_Hdr, BTLE_ADV_NONCONN_IND
 from whad.exceptions import (
-        UnsupportedCapability,
-        RequiredImplementation,
-        WhadDeviceDisconnected
+    UnsupportedCapability,
+    RequiredImplementation,
+    WhadDeviceDisconnected,
 )
 from whad.btmesh.connector.bearer import Bearer
 from whad.ble.connector import BLE
+
 
 class AdvBearer(Bearer):
     """
@@ -24,15 +21,14 @@ class AdvBearer(Bearer):
         # Configuration of the advertising bearer
         self.configuration = {
             # BD address in use by the bearer, default is random
-            "bd_address" : "AA:BB:CC:DD:EE:FF", 
+            "bd_address": "AA:BB:CC:DD:EE:FF",
             # Channel in use, if None use three primary advertising channels
-            "channel" : None,
+            "channel": None,
             # Default scanning interval
-            "interval" : 50,
+            "interval": 50,
             # Minimal number of repeatition for an outgoing packet transmission
-            "repeat" : 2
+            "repeat": 3,
         }
-
 
     def configure(self, **kwargs):
         """
@@ -58,24 +54,19 @@ class AdvBearer(Bearer):
 
         # Forge an ADV_NONCONN_IND PDU with configured BD address
         adv_pdu = BTLE_ADV_NONCONN_IND(
-                AdvA=self.configuration["bd_address"],
-                data=packet
+            AdvA=self.configuration["bd_address"], data=packet
         )
 
         # Repeated transmission
         for _ in range(self.configuration["repeat"]):
-            # Calls the underlying BLE `send_adv_pdu` method 
-            res = self.connector.send_adv_pdu(
-                    adv_pdu,
-                    channel = channel
-            )
-        
-        return res
+            # Calls the underlying BLE `send_adv_pdu` method
+            res = self.connector.send_adv_pdu(adv_pdu, channel=channel)
 
+        return res
 
     def start(self):
         """
-        Start the ADV bearer. 
+        Start the ADV bearer.
         """
 
         if self.configuration["channel"] is None:
@@ -85,7 +76,7 @@ class AdvBearer(Bearer):
             success = self.connector.enable_scan_mode(
                 interval=self.configuration["interval"]
             )
-        elif self.configuration["channel"] in (37,38,39):
+        elif self.configuration["channel"] in (37, 38, 39):
             success = self.connector.sniff_advertisements(
                 channel=self.configuration["channel"]
             )
@@ -111,9 +102,9 @@ class AdvBearer(Bearer):
 
     def on_adv_pdu(self, packet):
         """
-        Callback called when an incoming advertising packet is received, 
+        Callback called when an incoming advertising packet is received,
         filters BT Mesh packets according to the ADV bearer.
-        """  
+        """
         if self.bt_mesh_filter(packet):
             self.connector.process_rx_packets(packet)
 
