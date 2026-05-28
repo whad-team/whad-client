@@ -243,6 +243,13 @@ class BTMeshBaseShell(InteractiveShell):
             else:
                 self.error("Node has not been auto provisioned, error.")
                 return
+            # For testing purposes, BD address is set based on unicast address
+            self._connector.bearer.configure(
+                bd_address=(
+                    "AA:AA:AA:AA:AA:"
+                    + "{:02X}".format(self.profile.get_primary_element_addr())
+                )
+            )
 
             self._connector.start()
 
@@ -360,6 +367,8 @@ class BTMeshBaseShell(InteractiveShell):
 
         > address 0x0005
 
+        This will also set the BD_ADDRESS of the node to be "AA:AA:AA:AA:AA:addr"
+        with addr being the LSByte of the address
         By default, will print de device's address
         """
 
@@ -386,6 +395,9 @@ class BTMeshBaseShell(InteractiveShell):
                 self._dev_key_address = addr
 
             self.profile.set_primary_element_addr(addr)
+            self._connector.bearer.configure(
+                bd_address=("AA:AA:AA:AA:AA:" + "{:02X}".format(addr))
+            )
 
             self.success("Address of the device is now : 0x%x" % addr)
         else:
@@ -2394,13 +2406,11 @@ class BTMeshBaseShell(InteractiveShell):
             return type_hint.__name__
 
     def do_quit(self, _):
-        """close BT Mesh node.
-        """
+        """close BT Mesh node."""
         if self._connector is not None:
             self._connector.close()
         return True
 
     def do_exit(self, arg):
-        """alias for <ansicyan>quit</ansicyan>
-        """
+        """alias for <ansicyan>quit</ansicyan>"""
         return self.do_quit(arg)
