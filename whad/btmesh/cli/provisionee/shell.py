@@ -116,6 +116,12 @@ class BTMeshProvisioneeShell(BTMeshBaseShell):
                 return
 
             elif res:
+                self._connector.bearer.configure(
+                    bd_address=(
+                        "AA:AA:AA:AA:AA:"
+                        + "{:02X}".format(self.profile.get_primary_element_addr())
+                    )
+                )
                 self.success("Node is provisioned")
                 self._current_mode = self.MODE_STARTED
                 self.update_prompt()
@@ -155,6 +161,12 @@ class BTMeshProvisioneeShell(BTMeshBaseShell):
                 value = args[1]
 
             res = self._connector.resume_provisioning_with_auth(value)
+            self._connector.bearer.configure(
+                bd_address=(
+                    "AA:AA:AA:AA:AA:"
+                    + "{:02X}".format(self.profile.get_primary_element_addr())
+                )
+            )
             if res:
                 self.success("Node is provisioned")
                 self._current_mode = self.MODE_STARTED
