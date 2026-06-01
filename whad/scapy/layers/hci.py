@@ -1,9 +1,10 @@
 from whad.ble.stack.constants import BT_MANUFACTURERS
 from scapy.packet import Packet, bind_layers
 from scapy.fields import ByteEnumField, ByteField, LEShortEnumField, LEShortField, \
-    StrField, StrNullField, LELongField, XByteField
+    StrField, StrNullField, LELongField, XByteField, LEMACField, LEThreeBytesField, SignedByteField, \
+    PacketListField, FieldLenField
 from scapy.layers.bluetooth import HCI_Command_Hdr, HCI_Event_Command_Complete, \
-    HCI_Event_LE_Meta, LEMACField
+    HCI_Event_LE_Meta, EIR_Hdr
 from scapy.layers.bluetooth4LE import BTLEChanMapField
 
 HCI_VERSIONS = LMP_VERSIONS = {
@@ -115,17 +116,17 @@ class HCI_Cmd_CSR_Write_BD_Address(Packet):
         LEMACField("addr","\x00\x01\x02\x03\x04\x05")
     ]
 
-    def post_build(self,p,pay):
+    def post_build(self, pkt, pay):
         payload = bytearray(b"\xc2\x02\x00\x0c\x00\x11G\x03p\x00\x00\x01\x00\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00")
 
-        payload[17] = p[2]
-        payload[19] = p[0]
-        payload[20] = p[1]
-        payload[21] = p[3]
-        payload[23] = p[4]
-        payload[24] = p[5]
+        payload[17] = pkt[2]
+        payload[19] = pkt[0]
+        payload[20] = pkt[1]
+        payload[21] = pkt[3]
+        payload[23] = pkt[4]
+        payload[24] = pkt[5]
 
-        return payload
+        return bytes(payload)
 
 class HCI_Cmd_CSR_Reset(Packet):
     name = "CSR Write BD Address"

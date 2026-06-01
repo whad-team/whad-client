@@ -3,7 +3,7 @@ from scapy.all import XByteField, XLE3BytesField, XLEIntField, XLEShortField
 from scapy.packet import bind_layers, Packet
 from scapy.fields import BitField, LEShortField, ByteField, StrFixedLenField, \
     FlagsField, ByteEnumField, BitEnumField, ConditionalField, BitFieldLenField, StrLenField, \
-    PacketField
+    PacketField, PacketListField, FieldLenField, LEThreeBytesField, LEMACField, SignedByteField
 from scapy.layers.bluetooth4LE import BDAddrField, BTLE_ADV
 from scapy.layers.bluetooth import SM_Hdr, HCI_Event_LE_Meta, HCI_Command_Hdr, \
     HCI_Event_Command_Complete, _bluetooth_features, _bluetooth_error_codes, \
@@ -689,7 +689,8 @@ class BTLE_EXT_ADV(Packet):
 
     def update_header_len(self):
         """Update packet extended header len based on defined conditional fields and ACAD."""
-        self.setfieldval("header_len", btle_ext_adv_compute_header_len(self))
+        acad_len = len(self.getfieldval("acad"))
+        self.setfieldval("header_len", btle_ext_adv_compute_header_len(self) + acad_len)
 
     def do_build(self):
         """Force flags bit field and extended header length update."""
@@ -813,6 +814,68 @@ class HCI_Cmd_LE_Complete_Suggested_Default_Data_Length(Packet):
         LEShortField("max_tx_time", 0x148)
     ]
 
+# HCI controller, LE Extended Advertising commands (backported from Scapy v2.7.1rc1)
+class HCI_Cmd_LE_Set_Extended_Advertising_Parameters(Packet):
+    name = 'HCI_LE_Set_Extended_Advertising_Parameters'
+    fields_desc = [ByteField('handle', 0),
+                   LEShortField('properties', 19),
+                   LEThreeBytesField('pri_interval_min', 160),
+                   LEThreeBytesField('pri_interval_max', 160),
+                   ByteField('pri_channel_map', 7),
+                   ByteEnumField('own_addr_type', 0, {
+                       0: 'public',
+                       1: 'random',
+                       2: 'rpa_pub',
+                       3: 'rpa_rand'}),
+                   ByteEnumField('peer_addr_type', 0, {
+                       0: 'public',
+                       1: 'random',
+                       2: 'rpa_pub',
+                       3: 'rpa_rand'}),
+                   LEMACField('peer_addr', None),
+                   ByteEnumField("filter_policy", 0, {
+                       0: "all:all",
+                       1: "connect:all scan:whitelist",
+                       2: "connect:whitelist scan:all",
+                       3: "all:whitelist"}),
+                   SignedByteField('tx_power', 127),
+                   ByteEnumField('pri_phy', 1, {1: '1M', 3: 'Coded'}),
+                   ByteField('sec_max_skip', 0),
+                   ByteEnumField('sec_phy', 1, {1: '1M', 2: '2M', 3: 'Coded'}),
+                   ByteField('sid', 0),
+                   ByteField('scan_req_notify_enable', 0)]
+
+
+class HCI_Cmd_LE_Set_Advertising_Set_Random_Address(Packet):
+    name = 'HCI_LE_Set_Advertising_Set_Random_Address'
+    fields_desc = [ByteField('handle', 0), LEMACField('addr', None)]
+
+class HCI_Cmd_LE_Set_Extended_Advertising_Data(Packet):
+    name = 'HCI_LE_Set_Extended_Advertising_Data'
+    fields_desc = [ByteField('handle', 0),
+                   ByteEnumField('operation', 3, {
+                       0: 'intermediate_frag',
+                       1: 'first_frag',
+                       2: 'last_frag',
+                       3: 'complete',
+                       4: 'unchanged_data'}),
+                   ByteEnumField('frag_pref', 1, {0: 'allow_frag', 1: 'no_frag'}),
+                   FieldLenField('len', None, length_of='data', fmt='B'),
+                   PacketListField('data', [], EIR_Hdr, length_from=lambda pkt: pkt.len)]  # noqa: E501
+
+class Extended_Advertise_Set(Packet):
+    name = 'Extended Advertising Set'
+    fields_desc = [ByteField('handle', 0),
+                   LEShortField('duration', 0),
+                   ByteField('max_events', 0)]
+
+class HCI_Cmd_LE_Set_Extended_Advertise_Enable(Packet):
+    name = 'HCI_LE_Set_Extended_Advertising_Enable'
+    fields_desc = [ByteEnumField('enable', 1, {0: 'disable', 1: 'enable'}),
+                   FieldLenField('num_sets', None, count_of='sets', fmt='B'),
+                   PacketListField('sets', [], Extended_Advertise_Set, count_from=lambda pkt: pkt.num_sets)]  # noqa: E501
+
+
 class HCI_Cmd_Write_Simple_Pairing_Mode(Packet):
     name = "Write Simple Pairing Mode"
     fields_desc = [ ByteField("enable", 0), ]
@@ -879,6 +942,11 @@ def unbind_layer(cls, pkt_cls):
             break
     if item is not None:
         pkt_cls.payload_guess.remove(item)
+
+bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Set_Extended_Advertising_Parameters, ogf=0x08, ocf=0x0036)  # noqa: E501
+bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Set_Extended_Advertising_Data, ogf=0x08, ocf=0x0037)  # noqa: E501
+bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Set_Extended_Advertise_Enable, ogf=0x08, ocf=0x0039)  # noqa: E501
+bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Set_Advertising_Set_Random_Address, ogf=0x08, ocf=0x0035)  # noqa: E501
 
 # HCI LE events
 bind_layers(HCI_Command_Hdr, HCI_LE_Set_Data_Length, ogf=0x08, ocf=0x0022)
