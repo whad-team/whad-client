@@ -38,8 +38,8 @@ class Advertiser(BLE):
         # Set advertising type
         if adv_type in (AdvType.ADV_IND, AdvType.ADV_DIRECT_IND, AdvType.ADV_SCAN_IND, AdvType.ADV_NONCONN_IND):
             self.__adv_type = adv_type
-        elif adv_type == AdvType.ADV_EXT_IND and ext_pdus is None:
-            raise ValueError()
+        elif adv_type == AdvType.ADV_EXT_IND and ext_pdus is not None:
+            self.__adv_type = adv_type
         else:
             raise ValueError()
 

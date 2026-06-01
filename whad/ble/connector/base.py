@@ -12,6 +12,7 @@ from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_DATA, BTLE_ADV_IND, \
     BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP, \
     BTLE_CTRL
 from scapy.packet import Packet
+from whad.scapy.layers.bluetooth import BTLE_EXT_ADV, AuxPtr as BleAuxPtr
 
 # Device interface
 from whad.device import Connector
@@ -25,7 +26,7 @@ from whad.helpers import message_filter
 from whad.hub.generic.cmdresult import Success, CommandResult
 from whad.hub.ble.bdaddr import BDAddress
 from whad.hub.ble.chanmap import ChannelMap
-from whad.hub.ble import Commands, AdvType, Direction, BLEMetadata, ExtAdvPdu, BlePhy
+from whad.hub.ble import Commands, AdvType, Direction, BLEMetadata, ExtAdvPdu, BlePhy, AuxPtr
 from whad.hub.events import ConnectionEvt, DisconnectionEvt, SyncEvt, DesyncEvt, \
     TriggeredEvt, WhadEvent
 
@@ -35,6 +36,28 @@ from whad.ble.profile.advdata import AdvDataFieldList
 
 # Logging
 logger = logging.getLogger(__name__)
+
+def wrap_ext_adv(pdus: List[Union[ExtAdvPdu, BTLE_EXT_ADV]]) -> List[ExtAdvPdu]:
+    """Convert a list of mixed BTLE_EXT_ADV PDus and ExtAdvPdu objects into a
+    list of ExtAdvPdu objects."""
+    ext_pdus = []
+    for pdu in pdus:
+        if isinstance(pdu, ExtAdvPdu):
+            ext_pdus.append(pdu)
+        elif isinstance(pdu, Packet) and pdu.haslayer(BTLE_EXT_ADV):
+            # Check if PDU has an AuxPtr field
+            if pdu[BTLE_EXT_ADV].flags.auxptr:
+                auxptr: BleAuxPtr = pdu[BTLE_EXT_ADV].auxptr
+                ext_pdus.append(ExtAdvPdu(bytes(pdu), AuxPtr(
+                    auxptr.chan_index,
+                    auxptr.ca,
+                    auxptr.offset_units,
+                    auxptr.offset,
+                    auxptr.phy
+                )))
+            else:
+                ext_pdus.append(ExtAdvPdu(bytes(pdu)))
+    return ext_pdus
 
 class BLE(Connector):
     """
@@ -632,7 +655,7 @@ class BLE(Connector):
 
     def enable_adv_mode(self, adv_data=None, scan_data=None, adv_type: AdvType = AdvType.ADV_IND,
                         channel_map: ChannelMap = None, inter_min: int = 0x20, inter_max: int = 0x4000,
-                        ext_pdus: Optional[List[ExtAdvPdu]] = None):
+                        ext_pdus: Optional[List[Union[ExtAdvPdu, BTLE_EXT_ADV]]] = None):
         """
         Enable BLE advertising mode (acts as a broadcaster)
         """
@@ -651,7 +674,7 @@ class BLE(Connector):
             channel_map=channel_map,
             inter_min=inter_min,
             inter_max=inter_max,
-            ext_pdus=ext_pdus
+            ext_pdus=wrap_ext_adv(ext_pdus) if ext_pdus else None
         )
 
         resp = self.send_command(msg, message_filter(CommandResult))
@@ -676,7 +699,7 @@ class BLE(Connector):
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
-    def set_ext_adv_pdus(self, pdus: List[ExtAdvPdu]) -> bool:
+    def set_ext_adv_pdus(self, pdus: List[Union[BTLE_EXT_ADV, ExtAdvPdu]]) -> bool:
         """Set extended advertising PDUs, even if the device is already advertising.
 
         :param pdus: List of extended advertising PDUs
@@ -685,7 +708,7 @@ class BLE(Connector):
         commands = self.get_domain_commands(Domain.BtLE)
         if (commands & (1 << Commands.SetExtAdvPdus))>0:
             # Create a SetExtAdvPdus message
-            msg = self.hub.create_set_ext_adv_pdus(pdus)
+            msg = self.hub.create_set_ext_adv_pdus(wrap_ext_adv(pdus))
             resp = self.send_command(msg, message_filter(CommandResult))
             return isinstance(resp, Success)
 
@@ -696,7 +719,7 @@ class BLE(Connector):
                                scan_data: Optional[Union[AdvDataFieldList, bytes]] = None,
                                adv_type: AdvType = AdvType.ADV_IND, channel_map: Optional[ChannelMap] = None,
                                inter_min: int = 0x20, inter_max: int = 0x4000,
-                               ext_pdus: Optional[List[ExtAdvPdu]] = None):
+                               ext_pdus: Optional[List[Union[ExtAdvPdu, BTLE_EXT_ADV]]] = None):
         """
         Enable Bluetooth Low Energy peripheral mode (acts as slave).
 
@@ -729,7 +752,7 @@ class BLE(Connector):
             channel_map=channel_map,
             inter_min=inter_min,
             inter_max=inter_max,
-            ext_pdus=ext_pdus
+            ext_pdus=wrap_ext_adv(ext_pdus) if ext_pdus else None
         )
 
         resp = self.send_command(msg, message_filter(CommandResult))

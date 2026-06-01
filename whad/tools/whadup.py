@@ -259,6 +259,9 @@ def main():
             print_formatted_text(
                 HTML(f"<b> - Version :</b> {escape(dev.info.version_str)}")
             )
+            print_formatted_text(
+                HTML(f"<b> - WHAD Protocol version:</b> {dev.info.whad_version>>8}.{dev.info.whad_version&0xff}")
+            )
             print('')
             try:
                 info("Discovering domains ...")
