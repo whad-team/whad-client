@@ -8,13 +8,13 @@ import logging
 from time import sleep
 from random import randint, choice
 
-from typing import List
+from typing import List, Union
 from whad.device.mock import MockDevice
 from whad.hub import ProtocolHub
 from whad.hub.discovery import DeviceType, Domain, Capability
 from whad.hub.generic.cmdresult import Success, WrongMode, Error
 from whad.hub.ble import BDAddress, Commands
-from whad.hub.ble.mode import ScanMode, BleStart, BleStop
+from whad.hub.ble.mode import ScanMode, BleStart, BleStop, ScanModeV3
 from whad.hub.ble.pdu import BleAdvPduReceived, AdvType
 from whad.hub.ble.sniffing import SniffAdv
 
@@ -116,8 +116,8 @@ class DeviceScan(MockDevice):
         else:
             self.__next_delay = randint(200, 800)/1000.
 
-    @MockDevice.route(ScanMode)
-    def on_scan_mode(self, message: ScanMode):
+    @MockDevice.route(ScanMode, ScanModeV3)
+    def on_scan_mode(self, message: Union[ScanMode, ScanModeV3]):
         """BLE scan mode handler"""
         if not self.__sniffing:
             # Switch to scanning mode
