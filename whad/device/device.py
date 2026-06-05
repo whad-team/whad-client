@@ -900,6 +900,7 @@ class Device:
         :returns: Response message from the device
         :rtype: Message
         """
+        #print(repr(command))
         # If a queue filter is not provided, expect a default CmdResult
         try:
             if keep is None:
@@ -915,6 +916,7 @@ class Device:
         try:
             # Retrieve the first message that matches our filter
             result = self.wait_for_message(self.__timeout, command=True)
+            #print(repr(result))
         except WhadDeviceTimeout as timedout:
             # Forward exception
             raise timedout

@@ -7,7 +7,8 @@ from scapy.layers.zigbee import ZigbeeSecurityHeader
 from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter
 from whad.common.sniffing import EventsManager
-from whad.hub.dot15d4 import RawPduReceived, PduReceived
+from whad.hub.dot15d4 import RawPduReceived, PduReceived, \
+    PduReceivedV3, RawPduReceivedV3
 from whad.hub.message import AbstractPacket
 from whad.exceptions import WhadDeviceDisconnected
 
@@ -153,9 +154,9 @@ class Sniffer(Zigbee, EventsManager):
         try:
             while True:
                 if self.support_raw_pdu():
-                    message_type = RawPduReceived
+                    message_type = (RawPduReceived, RawPduReceivedV3)
                 else:
-                    message_type = PduReceived
+                    message_type = (PduReceived, PduReceivedV3)
 
                 for message in super().capture(messages=(message_type), timeout=1.0):
                     if message is not None and issubclass(message, AbstractPacket):

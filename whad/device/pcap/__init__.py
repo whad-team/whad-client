@@ -203,9 +203,7 @@ class Pcap(VirtualDevice):
             metadata = self._generate_metadata(pkt)
             self._interframe_delay(metadata.timestamp)
             self.__last_timestamp = metadata.timestamp
-            msg = self.__to_whad_zigbee_raw_pdu(bytes(pkt[Dot15d4]), channel=metadata.channel,
-                                           lqi=metadata.lqi, rssi=metadata.rssi,
-                                           timestamp=metadata.timestamp)
+            msg = self.__to_whad_dot15d4_raw_pdu(bytes(pkt[Dot15d4]), metadata)
         elif self.__domain == Domain.BtLE:
             metadata = self._generate_metadata(pkt)
             self._interframe_delay(metadata.timestamp)
@@ -318,26 +316,42 @@ class Pcap(VirtualDevice):
         )
 
     # Virtual device whad message builder
-    def __to_whad_zigbee_raw_pdu(self, packet, channel=None, rssi=None, lqi=None,
-                                  is_fcs_valid=True, timestamp=None):
+    def __to_whad_dot15d4_raw_pdu(self, packet, metadata):
+        
         pdu = packet[:-2]
         fcs = unpack("<H",packet[-2:])[0]
 
         # Create a RawPduReceived message
         msg = self.hub.dot15d4.create_raw_pdu_received(
-            channel,
+            metadata.channel,
             pdu,
             fcs,
-            lqi = lqi,
-            fcs_validity=is_fcs_valid
+            lqi = metadata.lqi,
+            fcs_validity=metadata.is_fcs_valid
         )
 
         # Set timestamp and RSSI if provided
-        if rssi is not None:
-            msg.rssi = rssi
-        if timestamp is not None:
-            msg.timestamp = timestamp
+        if metadata.rssi is not None:
+            msg.rssi = metadata.rssi
+        if metadata.timestamp is not None:
+            msg.timestamp = metadata.timestamp
 
+        if metadata.start_of_slot_timestamp is not None:
+            msg.start_of_slot_timestamp = int(metadata.start_of_slot_timestamp)
+
+        if metadata.base_channel_frequency is not None:
+            msg.base_channel_frequency = metadata.base_channel_frequency
+
+        if metadata.time_slot is not None:
+            msg.time_slot = int(metadata.time_slot)
+
+        if metadata.number_of_channels is not None:
+            msg.number_of_channels = metadata.number_of_channels
+        
+        if metadata.channel_spacing is not None:
+            msg.channel_spacing = metadata.channel_spacing
+        if metadata.asn is not None:
+            msg.asn = int(metadata.asn)
         return msg
 
 

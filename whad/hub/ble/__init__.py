@@ -1146,7 +1146,7 @@ class BleDomain(Registry):
             ediv=ediv
         )
 
-@pb_bind(ProtocolHub, name="btmesh", version=1)
+@pb_bind(ProtocolHub, name="btmesh", version=3)
 class BTMeshDomain(BleDomain):
     NAME = 'btmesh'
     VERSIONS = {}

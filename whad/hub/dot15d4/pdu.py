@@ -43,6 +43,40 @@ class SendPdu(PbMessageWrapper):
         )
         return msg
 
+
+@pb_bind(Dot15d4Domain, 'send_in_slot', 3)
+class SendInSlotPdu(PbMessageWrapper):
+    """TSCH Send in Slot Dot15d4 PDU message class
+    """
+    slot = PbFieldInt('dot15d4.send_in_slot.slot')
+    wait_offset = PbFieldInt('dot15d4.send_in_slot.wait_offset')
+    pdu = PbFieldBytes('dot15d4.send_in_slot.pdu')
+
+    @dissect_failsafe
+    def to_packet(self):
+        """Convert message to the corresponding scapy packet
+        """
+        return Dot15d4(self.pdu)
+
+    @staticmethod
+    def from_packet(packet, slot: int, wait_offset : int = 0):
+        """Convert a scapy packet to a SendPdu message
+        """
+        if Dot15d4 in packet:
+            pdu = bytes(packet[Dot15d4])
+        elif Dot15d4FCS in packet:
+            pdu = bytes(packet[Dot15d4FCS])[:-2]
+        else:
+            return None
+
+        msg = SendInSlotPdu(
+            slot=slot,
+            wait_offset=wait_offset, 
+            pdu=pdu
+        )
+        return msg
+
+
 @pb_bind(Dot15d4Domain, 'send_raw', 1)
 class SendRawPdu(PbMessageWrapper):
     """Send Dot15d4 raw PDU message class
@@ -108,6 +142,24 @@ class SendRawPdu(PbMessageWrapper):
 
         return msg
 
+
+
+@pb_bind(Dot15d4Domain, 'discovered_communication', 3)
+class DiscoveredCommunication(PbMessageWrapper):
+    """Dot15d4 discovered communication notification class with TSCH extension
+    """
+    time_slot = PbFieldInt('dot15d4.discovered_communication.time_slot')
+    channel_offset = PbFieldBytes('dot15d4.discovered_communication.channel_offset')
+    pdu = PbFieldBytes('dot15d4.discovered_communication.pdu')
+
+    @dissect_failsafe
+    def to_packet(self):
+        """Convert message to its scapy packet representation
+        """
+        # Create packet
+        packet = Dot15d4(bytes(self.pdu))
+
+        return packet
 
 @pb_bind(Dot15d4Domain, 'pdu', 3)
 class PduReceivedV3(PbMessageWrapper):
@@ -274,12 +326,12 @@ class RawPduReceivedV3(PbMessageWrapper):
     timestamp = PbFieldInt('dot15d4.raw_pdu.timestamp', optional=True)
     fcs_validity = PbFieldBool('dot15d4.raw_pdu.fcs_validity', optional=True)
     lqi = PbFieldInt('dot15d4.raw_pdu.lqi', optional=True)
-    asn = PbFieldInt('dot15d4.pdu.asn', optional=True)
-    start_of_slot_timestamp = PbFieldInt('dot15d4.pdu.start_of_slot_timestamp', optional=True)
-    time_slot = PbFieldInt('dot15d4.pdu.time_slot', optional=True)
-    base_channel_frequency = PbFieldInt('dot15d4.pdu.base_channel_frequency', optional=True)
-    number_of_channels = PbFieldInt('dot15d4.pdu.number_of_channels', optional=True)
-    channel_spacing = PbFieldInt('dot15d4.pdu.channel_spacing', optional=True)
+    asn = PbFieldInt('dot15d4.raw_pdu.asn', optional=True)
+    start_of_slot_timestamp = PbFieldInt('dot15d4.raw_pdu.start_of_slot_timestamp', optional=True)
+    time_slot = PbFieldInt('dot15d4.raw_pdu.time_slot', optional=True)
+    base_channel_frequency = PbFieldInt('dot15d4.raw_pdu.base_channel_frequency', optional=True)
+    number_of_channels = PbFieldInt('dot15d4.raw_pdu.number_of_channels', optional=True)
+    channel_spacing = PbFieldInt('dot15d4.raw_pdu.channel_spacing', optional=True)
 
     @dissect_failsafe
     def to_packet(self):
@@ -287,7 +339,7 @@ class RawPduReceivedV3(PbMessageWrapper):
         """
         try:
             # Create packet
-            #print('converting %s' % (self.pdu + bytes(pack(">H", self.fcs))).hex())
+            
             packet = Dot15d4FCS(bytes(self.pdu) + bytes(pack("<H", self.fcs)))
 
             # Set packet metadata
