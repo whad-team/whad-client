@@ -59,7 +59,7 @@ def sniff_adv():
     """Create a SniffAdv protobuf message
     """
     msg = Message()
-    msg.ble.sniff_adv.use_extended_adv = False
+    msg.ble.sniff_adv.use_ext_adv = False
     msg.ble.sniff_adv.channel = 2
     msg.ble.sniff_adv.bd_address = BD_ADDRESS_DEFAULT
     return msg
@@ -74,14 +74,14 @@ class TestSniffAdv(object):
         parsed_obj = SniffAdv.parse(1, sniff_adv)
         assert isinstance(parsed_obj, SniffAdv)
         assert parsed_obj.channel == 2
-        assert parsed_obj.use_extended_adv == False
+        assert parsed_obj.use_ext_adv == False
         assert parsed_obj.bd_address == BD_ADDRESS_DEFAULT
 
     def test_crafting(self):
         """Check SniffAdv crafting.
         """
-        msg = SniffAdv(use_extended_adv=True, channel=37, bd_address=BD_ADDRESS_DEFAULT)
-        assert msg.use_extended_adv == True
+        msg = SniffAdv(use_ext_adv=True, channel=37, bd_address=BD_ADDRESS_DEFAULT)
+        assert msg.use_ext_adv == True
         assert msg.channel == 37
         assert msg.bd_address == BD_ADDRESS_DEFAULT
 

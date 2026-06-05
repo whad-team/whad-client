@@ -9,7 +9,7 @@ from whad.hub.ble import BleDomain
 class SniffAdv(PbMessageWrapper):
     """BLE advertisement sniffing message class
     """
-    use_extended_adv = PbFieldBool('ble.sniff_adv.use_extended_adv')
+    use_ext_adv = PbFieldBool('ble.sniff_adv.use_ext_adv')
     channel = PbFieldInt('ble.sniff_adv.channel')
     bd_address = PbFieldBytes('ble.sniff_adv.bd_address')
 
