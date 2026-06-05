@@ -2,7 +2,7 @@ from scapy.packet import Packet, bind_layers, split_layers
 from scapy.fields import Field, ByteEnumField, StrLenField, StrFixedLenField, IntField, XShortField, LEShortField, \
     FieldLenField, StrLenField, ConditionalField, PacketField, XByteField, XIntField,  SignedShortField, SignedByteField, \
     XShortEnumField, BitEnumField, BitField, ByteField, ShortField, XShortField, PacketListField, FieldListField, IEEEFloatField, \
-    ThreeBytesField
+    ThreeBytesField, StrField
 #from whad.scapy.layers.wirelesshart_db import EXPANDED_DEVICE_TYPES, MANUFACTURERS_ID_CODES
 from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS, Dot15d4Data, MultipleTypeField
 from scapy.config import conf
@@ -14,7 +14,7 @@ import os.path
 import json
 
 def get_db(dbname):
-    name = os.path.realpath("{}/ressources/databases/{}.json".format(os.path.dirname(__file__) + "../../../", dbname))
+    name = os.path.realpath("{}/resources/databases/{}.json".format(os.path.dirname(__file__) + "../../../", dbname))
     with open(name, "r") as f:
         return json.loads(f.read())
 
@@ -53,7 +53,7 @@ class WirelessHart_DataLink_Hdr(Packet):
 
     
     def post_build(self,p,pay):
-            return p[0:1] + p[5:] + pay + p[1:5]
+            return p[0:1] + pay + p[1:5]
     
     def post_dissect(self, s):
         """Override layer post_dissect() function to reset raw packet cache.
@@ -216,10 +216,11 @@ class WirelessHart_Network_Security_SubLayer_Hdr(Packet):
             [
                 (XByteField("counter", None), lambda p:p.security_types == 0),
             ],
-            XIntField("counter", None)
-        ),
+            XIntField("counter", None),
+        ), 
         XIntField("nwk_mic", None)
-]
+
+    ]
     
 class WirelessHart_Command_Hdr(Packet):
     name = "Wireless Hart Command header"
@@ -926,78 +927,13 @@ bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Write_Timetable_Resp
 bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Vendor_Specific_Dust_Networks_Ping_Request, command_number=0xfc04)
 bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Vendor_Specific_Dust_Networks_Ping_Response, command_number=0xfc05)
 
+# Monkey patch to add Wireless Hart support in Dot15d4 layer
 old_guess_payload_class = Dot15d4Data.guess_payload_class
 
 def new_guess_payload_class(self, payload):
-    if conf.dot15d4_protocol == "wirelesshart":
+    if conf.dot15d4_protocol in ("wihart", "wirelesshart"):
         return WirelessHart_DataLink_Hdr
     else:
         return old_guess_payload_class(self, payload)
 
 Dot15d4Data.guess_payload_class = new_guess_payload_class
-
-from Cryptodome.Cipher import AES
-from copy import copy
-
-conf.dot15d4_protocol = "wirelesshart"
-
-def compute_dlmic(pkt, key, asn):
-    data = bytes(pkt)[:-6]
-    nonce  = pack('>Q', asn)[-5:] + pack('>Q', pkt.src_addr)
-
-    cipher = AES.new(key, AES.MODE_CCM, nonce=nonce, mac_len=4)
-    cipher.update(data) # not encrypted but authenticated : full DLPDU (from 0x41 to the end of payload - just before MIC and empty encryption data)
-    X1= cipher.encrypt(b"")
-    tag = cipher.digest()
-    return tag
-
-def decrypt_nwk(pkt, key):
-    mic = pack(">I", pkt.nwk_mic)
-    
-    encrypted_pkt = copy(pkt)
-    encrypted_pkt.counter = 0
-    encrypted_pkt.ttl = 0
-    encrypted_pkt.nwk_mic = 0
-    
-    auth = bytes(encrypted_pkt[WirelessHart_Network_Hdr])
-    encrypted_payload = bytes(encrypted_pkt[WirelessHart_Network_Security_SubLayer_Hdr][1:])
-    auth = auth[:len(auth) - len(encrypted_payload)]
-    
-    try:
-        if pkt.security_types == 1:
-            if pkt.nwk_src_addr == 0xf980:
-                addr = pkt.nwk_dest_addr
-                start_byte = b"\x01"
-            else:
-                addr = pkt.nwk_src_addr
-                start_byte = b"\x00"
-            nonce = start_byte + pack('>I', pkt.counter) + pack('>Q', addr)
-        else:
-
-            addr = pkt.nwk_src_addr
-            start_byte = b"\x00"
-            #addr = pkt.nwk_src_addr
-            #start_byte = b"\x00"
-            nonce = start_byte + pack('>I', pkt.counter) + pack('>Q', addr)
-
-        '''
-        print("[i] Decryption (NWK)")
-        print("    * key  : ", key.hex())
-        print("    * data : ", encrypted_payload.hex())
-        print("    * auth : ", auth.hex())
-        print("    * nonce: ", nonce.hex())
-        '''
-        cipher = AES.new(key, AES.MODE_CCM, nonce=nonce, mac_len=4)
-        cipher.update(auth)
-        decrypted = cipher.decrypt_and_verify(encrypted_payload, received_mac_tag=mic)
-
-        print("[i] Decryption success ! ({})".format(key.hex()))
-        print("    * decr:  ", decrypted.hex())
-        print()
-        return decrypted
-    
-    except ValueError:
-        #print("[e] Decryption failure - incorrect MIC (recv:", mic.hex(), ")")
-        #print(  repr(pkt))
-        return None
-        

@@ -20,14 +20,14 @@ from whad.cli.app import CommandLineApp
 from whad.device.connector import Connector
 from whad.helpers import message_filter, is_message_type
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
-
+from whad.dot15d4.utils.phy import ChannelMap
+from whad.dot15d4.utils.tsch import Network, Superframe, Link
 
 # WHAD Protocol hub
 from whad.hub.generic.cmdresult import Success, CommandResult
 from whad.hub.dot15d4 import NodeAddress, Commands, NodeAddressType, PduReceived, \
-    RawPduReceived, EnergyDetectionSample
+    RawPduReceived, EnergyDetectionSample, LinkOptions, LinkType
 from whad.hub.events import JammedEvt
-
 logger = logging.getLogger(__name__)
 
 class Dot15d4(Connector):
@@ -52,6 +52,12 @@ class Dot15d4(Connector):
         self.__can_send = None
         self.__can_send_raw = None
 
+        # TSCH mode cache
+        self.__can_use_tsch = None
+
+        # TSCH Links and superframes
+        self.__tsch_network = Network()
+        
         # Open device and make sure it is compatible
         self.device.open()
         self.device.discover()
@@ -131,6 +137,26 @@ class Dot15d4(Connector):
             (commands & (1 << Commands.Start))>0 and
             (commands & (1 << Commands.Stop))>0
         )
+
+
+    def can_use_tsch(self) -> bool:
+        """
+        Determine if the device implements Time-Slotted Channel Hopping.
+        """
+        if self.__can_use_tsch is None:
+            commands = self.device.get_domain_commands(Domain.Dot15d4)
+
+            self.__can_use_tsch = (
+                (commands & (1 << Commands.ConfigureTSCH)) > 0 and
+                (commands & (1 << Commands.AddLink)) > 0 and
+                (commands & (1 << Commands.DeleteLink)) > 0 and
+                (commands & (1 << Commands.UpdateSuperframe)) > 0 and
+                (commands & (1 << Commands.DeleteSuperframe)) > 0 and
+                (commands & (1 << Commands.DeleteSuperframe)) > 0 and
+                (commands & (1 << Commands.SetChannelMap)) > 0 and
+                (commands & (1 << Commands.SendInSlot)) > 0
+            )
+        return self.__can_use_tsch
 
     def can_send(self) -> bool:
         """
@@ -323,6 +349,63 @@ class Dot15d4(Connector):
         # Failed at sending packet.
         return False
 
+
+    def send_in_slot(self, pdu: Union[Packet, bytes, Dot15d4NoFCS, Dot15d4FCS], slot : int = 0xFFFFFFFF, wait_offset : int = 2200) -> bool:
+        """
+        Send 802.15.4 packet on a given time slot.
+
+        :param pdu: 802.15.4 packet to send
+        :type pdu: scapy.layers.dot15d4.Dot15d4, scapy.layers.dot15d4.Dot15d4FCS
+        :param slot: Time slot where the packet should be transferred
+        :type slot: int
+        :param wait_offset: Duration before transmission of the frame (from the start of slot)
+        :type wait_offset: int
+        :return: `True` if packet has been correctly sent, `False` otherwise.
+        :rtype: bool
+        """
+        if self.can_send() and self.can_use_tsch():
+            metadata = Dot15d4Metadata()
+            metadata.raw = False
+            #metadata.channel = channel
+
+            # If PDU is provided as bytes, wrap it into a Raw packet
+            if isinstance(pdu, bytes):
+                pdu = Raw(pdu)
+
+            if self.support_raw_pdu():
+                metadata.raw = True
+
+                if Dot15d4FCS not in pdu:
+                    # Compute FCS if required by the hardware
+                    packet = Dot15d4FCS(raw(pdu) + Dot15d4FCS().compute_fcs(raw(pdu)))
+                else:
+                    packet = pdu
+
+            elif Dot15d4FCS in pdu:
+                # Remove FCS if hardware cannot set it
+                packet = Dot15d4NoFCS(raw(pdu)[:-2])
+            else:
+                packet = pdu
+
+            if hasattr(packet, "reserved"):
+                packet.reserved = packet.reserved
+
+            # Set metadata
+            packet.metadata = metadata
+            
+            # Create a SendInSlotPdu message
+            msg = self.hub.dot15d4.create_send_in_slot_pdu(
+                slot=slot, 
+                wait_offset=wait_offset,
+                pdu=bytes(packet)
+            )
+            
+            resp = self.send_command(msg, message_filter(CommandResult))
+            return isinstance(resp, Success)
+
+        else:
+            return False
+
     def perform_ed_scan(self, channel:int = 11) -> bool:
         """
         Perform an Energy Detection scan.
@@ -356,6 +439,202 @@ class Dot15d4(Connector):
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
+    def enable_tsch(self) -> bool:
+        """
+        Enable Time-Slotted Channel Hopping mode.
+        
+        :return: Boolean indicating if the TSCH mode has been successfully enabled.
+        :rtype: `bool`
+        """
+        
+        if not self.can_use_tsch():
+            return False
+
+
+        # Create a ConfigureTSCH message
+        msg = self.hub.dot15d4.create_config_tsch(enabled=True)
+
+        resp = self.send_command(msg, message_filter(CommandResult))
+        return isinstance(resp, Success)
+        
+    def disable_tsch(self) -> bool:
+        """
+        Disable Time-Slotted Channel Hopping mode.
+        
+        :return: Boolean indicating if the TSCH mode has been successfully disabled.
+        :rtype: `bool`
+        """
+        if not self.can_use_tsch():
+            return False
+
+        # Create a ConfigureTSCH message
+        msg = self.hub.dot15d4.create_config_tsch(enabled=False)
+        
+        self.__tsch_network.clear()
+
+        resp = self.send_command(msg, message_filter(CommandResult))
+        return isinstance(resp, Success)
+        
+    def add_link(self, superframe_id: int, source: int, time_slot: int, \
+            channel_offset: int, neighbor: int, options: LinkOptions, \
+            link_type : LinkType) -> bool:
+        """Add a new TSCH link, associated with an existing superframe.
+        If a link already exists, it must be deleted prior to executing this command. 
+
+        :param superframe_id: Identifier of the associated superframe
+        :type superframe_id: int
+        :param source: Source address associated with the link
+        :type source: int
+        :param time_slot:Time slot of the link to add
+        :type time_slot: int
+        :param channel_offset: Channel Offset associated with the link to add
+        :type channel_offset: int
+        :param neighbor: Neighbor address associated with the link
+        :type neighbor: int
+        :param options: Options of the link to add
+        :type options: `LinkOptions`
+        :param link_type: Type of the link to add
+        :type link_type: `LinkType`
+        :return: Boolean indicating if the link has been successfully added
+        :rtype: `bool`
+        """
+        if not self.can_use_tsch():
+            return False
+            
+        
+        # Create a AddLink message
+        msg = self.hub.dot15d4.create_add_link(
+            superframe_id,
+            source,
+            time_slot,
+            channel_offset,
+            neighbor,
+            options,
+            link_type
+        )
+        resp = self.send_command(msg, message_filter(CommandResult))
+
+        if isinstance(resp, Success):
+            self.__tsch_network.add_link(superframe_id, source, time_slot, channel_offset, neighbor, options, link_type)
+            print(self.network)
+            return True
+
+        return False
+
+    def delete_link(self, superframe_id: int,time_slot: int, channel_offset: int) -> bool:
+        """Delete an existing TSCH link, associated with an existing superframe.
+
+        :param superframe_id: Identifier of the associated superframe
+        :type superframe_id: int
+        :param time_slot:Time slot of the link to delete
+        :type time_slot: int
+        :param channel_offset: Channel Offset associated with the link to delete
+        :type channel_offset: int
+        :return: Boolean indicating if the link has been successfully deleted
+        :rtype: `bool`
+        """
+        if not self.can_use_tsch():
+            return False
+
+        # Create a DelLink message
+        msg = self.hub.dot15d4.create_del_link(
+            superframe_id=superframe_id, 
+            channel_offset=channel_offset, 
+            time_slot=time_slot
+        )
+        resp = self.send_command(msg, message_filter(CommandResult))
+        if isinstance(resp, Success):
+            self.__tsch_network.remove_link(superframe_id, time_slot, channel_offset)
+            return True
+        return False
+        
+    def update_superframe(self, superframe_id: int, number_of_slots: int, flags: int, asn: int) -> bool:
+        """
+        Add or update a TSCH superframe.
+
+        :param superframe_id: Identifier of the superframe
+        :type superframe_id: int
+        :param number_of_slots: Number of slots available in the superframe
+        :type number_of_slots: int
+        :param flags: Flags associated with the superframe
+        :type flags: int
+        :param asn: Absolute Slot Number indicating the superframe addition or update
+        :type asn: int
+        :return: boolean indicating if the operation was successful
+        :rtype: bool
+        """
+        if not self.can_use_tsch():
+            return False
+
+        msg = self.hub.dot15d4.create_update_superframe(
+            superframe_id = superframe_id, 
+            number_of_slots = number_of_slots, 
+            flags = flags,
+            asn = asn
+        )
+        resp = self.send_command(msg, message_filter(CommandResult))
+        if isinstance(resp, Success):
+            self.__tsch_network.add_or_update_superframe(superframe_id, number_of_slots, flags, asn)
+            return True
+        return False
+
+
+    def delete_superframe(self, superframe_id: int) -> bool:
+        """
+        Delete a TSCH superframe.
+
+        :param superframe_id: Identifier of the superframe
+        :type superframe_id: int
+        :return: boolean indicating if the operation was successful
+        :rtype: bool
+        """
+        if not self.can_use_tsch():
+            return False
+
+        msg = self.hub.dot15d4.create_delete_superframe(
+            superframe_id = superframe_id
+        )
+        resp = self.send_command(msg, message_filter(CommandResult))
+        if isinstance(resp, Success):
+            self.__tsch_network.remove_superframe(superframe_id)
+            return True
+            
+        return False
+        
+    def set_channel_map(self, channels : Union[list, int, bytes, ChannelMap] = [11]) -> bool:
+        """
+        Configure the TSCH channel map.
+
+        :param channels: Channel map to use
+        :type channels: Union[list, int, bytes, `ChannelMap`]
+        :return: boolean indicating if the operation was successful
+        :rtype: bool
+        """
+        if not self.can_use_tsch():
+            return False
+
+        if isinstance(channels, ChannelMap):
+            channel_map = channels
+        else:
+            try:
+                channel_map = ChannelMap(channels=channels)
+            except ValueError as e:
+                # Invalid channel map
+                return False
+        
+        msg = self.hub.dot15d4.create_set_channel_map(
+            channel_map = channel_map.value
+        )
+        resp = self.send_command(msg, message_filter(CommandResult))
+        return isinstance(resp, Success)
+
+    @property
+    def network(self) -> Network:
+        """
+        Return a TSCH Network (if available)
+        """
+        return self.__tsch_network
+        
     def on_generic_msg(self, message):
         """
         Generic message handler.
@@ -382,6 +661,10 @@ class Dot15d4(Connector):
         """
         if not self.__ready:
             return
+
+        if self.can_use_tsch() and hasattr(packet.metadata, 'asn'):
+            self.__tsch_network.asn = packet.metadata.asn
+            print("Update: ", self.__tsch_network.asn)
 
         # Dispatch packet.
         if packet.metadata.raw:
