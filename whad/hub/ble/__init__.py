@@ -604,7 +604,7 @@ class BleDomain(Registry):
         :return: instance of ScanMode
         :rtype: ScanMode
         """
-        return BleDomain.bound('scan_mode', self.proto_version)(
+        return BleDomain.build('scan_mode', self.proto_version,
             active=active,
             interval=interval,
             use_ext_adv=use_ext_adv

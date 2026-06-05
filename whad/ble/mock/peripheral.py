@@ -14,7 +14,7 @@ from whad.device.mock import MockDevice
 from whad.exceptions import WhadDeviceDisconnected, WhadDeviceNotReady
 
 from whad.hub.ble.address import SetBdAddress
-from whad.hub.ble.mode import PeriphMode, PeriphModeV3, BleStart, BleStop
+from whad.hub.ble.mode import PeriphMode, BleStart, BleStop
 from whad.hub.ble.connect import Connected
 from whad.hub.ble import BDAddress, Commands, Direction, AdvType, ChannelMap
 from whad.hub.ble.pdu import BlePduReceived, SetAdvData, SendBlePdu, BlePduReceived
@@ -280,7 +280,7 @@ class PeripheralMock(MockDevice):
         self.__client.find_by_type_value(start_handle, end_handle, attr_type, attr_value)
         return self.wait_procedure()
 
-    @MockDevice.route(PeriphMode,PeriphModeV3)
+    @MockDevice.route(PeriphMode)
     def on_periph_mode(self, message: PeriphMode):
         """BLE Peripheral mode handler, supports all versions of PeriphMode.
 
