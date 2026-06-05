@@ -317,7 +317,7 @@ class Dot15d4Domain(Registry):
         :type address: NodeAddress
         :return: instance of `SetNodeAddress`
         """
-        return Dot15d4Domain.bound('set_node_addr', self.proto_version)(
+        return Dot15d4Domain.build('set_node_addr', self.proto_version,
             address=address.address,
             addr_type=address.address_type
         )
@@ -329,7 +329,7 @@ class Dot15d4Domain(Registry):
         :type channel: int
         :return: instance of `SniffMode`
         """
-        return Dot15d4Domain.bound('sniff', self.proto_version)(
+        return Dot15d4Domain.build('sniff', self.proto_version,
             channel=channel
         )
 
@@ -340,7 +340,7 @@ class Dot15d4Domain(Registry):
         :type channel: int
         :return: instance of `JamMode`
         """
-        return Dot15d4Domain.bound('jam', self.proto_version)(
+        return Dot15d4Domain.build('jam', self.proto_version,
             channel=channel
         )
 
@@ -351,7 +351,7 @@ class Dot15d4Domain(Registry):
         :type channel: int
         :return: instance of `EnergyDetectionMode`
         """
-        return Dot15d4Domain.bound('ed', self.proto_version)(
+        return Dot15d4Domain.build('ed', self.proto_version,
             channel=channel
         )
 
@@ -362,7 +362,7 @@ class Dot15d4Domain(Registry):
         :type channel: int
         :return: instance of `EndDeviceMode`
         """
-        return Dot15d4Domain.bound('end_device', self.proto_version)(
+        return Dot15d4Domain.build('end_device', self.proto_version,
             channel=channel
         )
 
@@ -373,7 +373,7 @@ class Dot15d4Domain(Registry):
         :type channel: int
         :return: instance of `RouterMode`
         """
-        return Dot15d4Domain.bound('router', self.proto_version)(
+        return Dot15d4Domain.build('router', self.proto_version,
             channel=channel
         )
 
@@ -384,7 +384,7 @@ class Dot15d4Domain(Registry):
         :type channel: int
         :return: instance of `CoordMode`
         """
-        return Dot15d4Domain.bound('coordinator', self.proto_version)(
+        return Dot15d4Domain.build('coordinator', self.proto_version,
             channel=channel
         )
 
@@ -393,7 +393,7 @@ class Dot15d4Domain(Registry):
 
         :return: instance of `MitmMode`
         """
-        return Dot15d4Domain.bound('mitm', self.proto_version)(
+        return Dot15d4Domain.build('mitm', self.proto_version,
             role=role
         )
 
@@ -402,14 +402,14 @@ class Dot15d4Domain(Registry):
 
         :return: instance of `Start`
         """
-        return Dot15d4Domain.bound('start', self.proto_version)()
+        return Dot15d4Domain.build('start', self.proto_version)
 
     def create_stop(self) -> HubMessage:
         """Create a Stop message
 
         :return: instance of `Stop`
         """
-        return Dot15d4Domain.bound('stop', self.proto_version)()
+        return Dot15d4Domain.build('stop', self.proto_version)
 
     def create_send_pdu(self, channel: int, pdu: bytes) -> HubMessage:
         """Create a SendPdu message
@@ -420,7 +420,7 @@ class Dot15d4Domain(Registry):
         :type pdu: bytes
         :return: instance of `SendPdu`
         """
-        return Dot15d4Domain.bound('send', self.proto_version)(
+        return Dot15d4Domain.build('send', self.proto_version,
             channel=channel,
             pdu=pdu
         )
@@ -436,7 +436,7 @@ class Dot15d4Domain(Registry):
         :type fcs: int
         :return: instance of `SendPdu`
         """
-        return Dot15d4Domain.bound('send_raw', self.proto_version)(
+        return Dot15d4Domain.build('send_raw', self.proto_version,
             channel=channel,
             pdu=pdu,
             fcs=fcs
@@ -467,7 +467,7 @@ class Dot15d4Domain(Registry):
         :type timestamp: int
         :return: instance of `Jammed`
         """
-        return Dot15d4Domain.bound('jammed', self.proto_version)(
+        return Dot15d4Domain.build('jammed', self.proto_version,
             timestamp=timestamp
         )
 
@@ -480,7 +480,7 @@ class Dot15d4Domain(Registry):
         :type sample: int
         :return: instance of `EnergyDetectionSample`
         """
-        return Dot15d4Domain.bound('ed_sample', self.proto_version)(
+        return Dot15d4Domain.build('ed_sample', self.proto_version,
             timestamp=timestamp,
             sample=sample
         )
@@ -507,7 +507,7 @@ class Dot15d4Domain(Registry):
         :return: instance of `RawPduReceived`
         """
         # Create our RawPduReceived message with mandatory fields
-        msg = Dot15d4Domain.bound('raw_pdu', self.proto_version)(
+        msg = Dot15d4Domain.build('raw_pdu', self.proto_version,
             channel=channel,
             pdu=pdu,
             fcs=fcs
@@ -546,7 +546,7 @@ class Dot15d4Domain(Registry):
         :return: instance of `RawPduReceived`
         """
         # Create our PduReceived message with mandatory fields
-        msg = Dot15d4Domain.bound('pdu', self.proto_version)(
+        msg = Dot15d4Domain.build('pdu', self.proto_version,
             channel=channel,
             pdu=pdu,
         )

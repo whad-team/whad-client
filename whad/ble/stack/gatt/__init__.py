@@ -15,7 +15,7 @@ from whad.ble.exceptions import HookReturnValue, HookReturnAuthentRequired,\
     HookReturnNotFound, ConnectionLostException
 from whad.ble.stack.att.constants import BleAttOpcode, BleAttErrorCode, ReadAccess, \
     WriteAccess, Authentication, Authorization, Encryption
-from whad.ble.stack.att.exceptions import InsufficientEncryptionError, InsufficientAuthenticationError, InsufficientAuthorizationError, error_response_to_exc, AttErrorCode, AttError
+from whad.ble.stack.att.exceptions import InsufficientEncryptionError, InsufficientAuthenticationError, InsufficientAuthorizationError, ReadNotPermittedError, error_response_to_exc, AttErrorCode, AttError
 from whad.ble.stack.gatt.message import *
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.ble.profile import GenericProfile
@@ -866,8 +866,11 @@ class GattClient(GattLayer):
         @return Characteristic descriptor
         @rtype CharacteristicDescriptor
         """
-        # Read descriptor value
-        desc_value = self.read(handle)
+        try:
+            # Read descriptor value
+            desc_value = self.read(handle)
+        except ReadNotPermittedError:
+            desc_value = b''
 
         # Return descriptor object based on value and UUID
         return Descriptor.from_uuid(characteristic, handle,

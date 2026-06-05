@@ -60,8 +60,8 @@ class Start(PbMessageWrapper):
     """Dot15d4 start mode message class
     """
 
-    def __init__(self, message: Message = None):
-        super().__init__(message=message)
+    def __init__(self, version: int, message: Message = None):
+        super().__init__(version, message=message)
         self.message.dot15d4.start.CopyFrom(StartCmd())
 
 @pb_bind(Dot15d4Domain, 'stop', 1)
@@ -69,8 +69,8 @@ class Stop(PbMessageWrapper):
     """Dot15d4 stop mode message class
     """
 
-    def __init__(self, message: Message = None):
-        super().__init__(message=message)
+    def __init__(self, version: int, message: Message = None):
+        super().__init__(version, message=message)
         self.message.dot15d4.stop.CopyFrom(StopCmd())
 
 @pb_bind(Dot15d4Domain, 'jammed', 1)
@@ -86,12 +86,12 @@ class Jammed(PbMessageWrapper):
         return JammedEvt(
             timestamp=self.timestamp
         )
-    
+
     @staticmethod
     def from_event(event):
         """Convert an event into a message.
         """
-        return Jammed(
+        return Jammed.build(1,
             timestamp=event.timestamp
         )
 

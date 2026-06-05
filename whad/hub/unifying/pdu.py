@@ -28,7 +28,7 @@ class SendPdu(PbMessageWrapper):
     def from_packet(packet, retr_count: int = 1):
         """Convert scapy packet to SendPdu message.
         """
-        return SendPdu(
+        return SendPdu.build(1,
             channel=packet.metadata.channel,
             pdu=bytes(packet),
             retr_count=retr_count
@@ -56,7 +56,7 @@ class SendRawPdu(PbMessageWrapper):
     def from_packet(packet, retr_count: int = 1):
         """Convert scapy packet to SendPdu message.
         """
-        return SendRawPdu(
+        return SendRawPdu.build(1,
             channel=packet.metadata.channel,
             pdu=bytes(packet),
             retr_count=retr_count
@@ -102,7 +102,7 @@ class PduReceived(PbMessageWrapper):
     def from_packet(packet):
         """Convert scapy packet to PduReceived message
         """
-        msg = PduReceived(
+        msg = PduReceived.build(1,
             channel=packet.metadata.channel,
             pdu=bytes(packet)
         )
@@ -165,7 +165,7 @@ class RawPduReceived(PbMessageWrapper):
         # Force packet preamble to 0xAA
         packet.preamble = 0xAA
 
-        msg = RawPduReceived(
+        msg = RawPduReceived.build(1,
             channel=packet.metadata.channel,
             pdu=bytes(packet)
         )

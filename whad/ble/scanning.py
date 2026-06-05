@@ -118,9 +118,9 @@ class AdvertisingDevice:
         short_name = None
         for record in self.ad_records:
             if isinstance(record, AdvShortenedLocalName):
-                short_name = record.name.decode('utf-8')
+                short_name = record.name.decode('utf-8', errors='replace')
             elif isinstance(record, AdvCompleteLocalName):
-                complete_name = record.name.decode('utf-8')
+                complete_name = record.name.decode('utf-8', errors='replace')
 
         # Return discovered name (if any)
         if complete_name is not None:

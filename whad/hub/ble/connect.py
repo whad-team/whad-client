@@ -2,7 +2,7 @@
 """
 from whad.protocol.whad_pb2 import Message
 from whad.hub.message import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper
-from whad.hub.ble import BleDomain
+from whad.hub.ble import BleDomain, BleCsa
 from whad.hub.events import ConnectionEvt, DisconnectionEvt, DesyncEvt, SyncEvt
 
 @pb_bind(BleDomain, 'connect', 1)
@@ -16,6 +16,9 @@ class ConnectTo(PbMessageWrapper):
     hop_interval = PbFieldInt('ble.connect.hop_interval', optional=True)
     hop_increment = PbFieldInt('ble.connect.hop_increment', optional=True)
     crc_init = PbFieldInt('ble.connect.crc_init', optional=True)
+
+    # Introduced in version 3
+    csa = PbFieldInt('ble.connect.csa', min_version=3, default=BleCsa.CSA1)
 
 @pb_bind(BleDomain, 'disconnect', 1)
 class Disconnect(PbMessageWrapper):
@@ -49,7 +52,7 @@ class Synchronized(PbMessageWrapper):
 
     @staticmethod
     def from_event(event):
-        return Synchronized(
+        return Synchronized(1,
             access_address=event.access_address,
             crc_init=event.crc_init,
             hop_interval=event.hop_interval,
@@ -85,7 +88,7 @@ class Connected(PbMessageWrapper):
 
     @staticmethod
     def from_event(event):
-        return Connected(
+        return Connected(1,
             initiator=event.initiator,
             advertiser=event.advertiser,
             access_address=event.access_address,
@@ -111,10 +114,10 @@ class Disconnected(PbMessageWrapper):
             conn_handle=self.conn_handle,
             reason=self.reason
         )
-    
+
     @staticmethod
     def from_event(event):
-        return Disconnected(
+        return Disconnected(1,
             conn_handle=event.conn_handle,
             reason=event.reason
         )
@@ -134,9 +137,9 @@ class Desynchronized(PbMessageWrapper):
         return DesyncEvt(
             access_address=self.access_address,
         )
-    
+
     @staticmethod
     def from_event(event):
-        return Desynchronized(
+        return Desynchronized(1,
             access_address=event.access_address,
         )

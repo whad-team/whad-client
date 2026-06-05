@@ -187,7 +187,7 @@ class EsbDomain(Registry):
         :type node_address: EsbNodeAddress
         :return: instance of `SetNodeAddress`
         """
-        return EsbDomain.bound('set_node_addr', self.proto_version)(
+        return EsbDomain.build('set_node_addr', self.proto_version,
             address=node_address.value
         )
 
@@ -196,7 +196,7 @@ class EsbDomain(Registry):
 
         :return: instance of `Start` message
         """
-        return EsbDomain.bound('start', self.proto_version)()
+        return EsbDomain.build('start', self.proto_version)
 
 
     def create_stop(self) -> HubMessage:
@@ -204,7 +204,7 @@ class EsbDomain(Registry):
 
         :return: instance of `Stop` message
         """
-        return EsbDomain.bound('stop', self.proto_version)()
+        return EsbDomain.build('stop', self.proto_version)
 
 
     def create_jam_mode(self, channel: int) -> HubMessage:
@@ -214,7 +214,7 @@ class EsbDomain(Registry):
         :type channel: int
         :return: instance of `JamMode`
         """
-        return EsbDomain.bound('jam', self.proto_version)(
+        return EsbDomain.build('jam', self.proto_version,
             channel=channel
         )
 
@@ -229,7 +229,7 @@ class EsbDomain(Registry):
         :type show_acks: bool, optional
         :return: instance of `SniffMode`
         """
-        return EsbDomain.bound('sniff', self.proto_version)(
+        return EsbDomain.build('sniff', self.proto_version,
             address=address.value,
             channel=channel,
             show_acks=show_acks
@@ -242,7 +242,7 @@ class EsbDomain(Registry):
         :type timestamp: int
         :return: instance of `Jammed`
         """
-        return EsbDomain.bound('jammed', self.proto_version)(
+        return EsbDomain.build('jammed', self.proto_version,
             timestamp=timestamp
         )
 
@@ -253,7 +253,7 @@ class EsbDomain(Registry):
         :type channel: int
         :return: instance of `PrxMode`
         """
-        return EsbDomain.bound('prx', self.proto_version)(
+        return EsbDomain.build('prx', self.proto_version,
             channel=channel
         )
 
@@ -264,7 +264,7 @@ class EsbDomain(Registry):
         :type channel: int
         :return: instance of `PtxMode`
         """
-        return EsbDomain.bound('ptx', self.proto_version)(
+        return EsbDomain.build('ptx', self.proto_version,
             channel=channel
         )
 
@@ -279,7 +279,7 @@ class EsbDomain(Registry):
         :type retr_count: int
         :return: instance of `SendPdu`
         """
-        return EsbDomain.bound('send', self.proto_version)(
+        return EsbDomain.build('send', self.proto_version,
             channel=channel,
             pdu=pdu,
             retr_count=retr_count
@@ -296,7 +296,7 @@ class EsbDomain(Registry):
         :type retr_count: int
         :return: instance of `SendPdu`
         """
-        return EsbDomain.bound('send_raw', self.proto_version)(
+        return EsbDomain.build('send_raw', self.proto_version,
             channel=channel,
             pdu=pdu,
             retr_count=retr_count
@@ -321,7 +321,7 @@ class EsbDomain(Registry):
         :return: instance of `PduReceived`
         """
         # Create our base message
-        msg = EsbDomain.bound('pdu', self.proto_version)(
+        msg = EsbDomain.build('pdu', self.proto_version,
             channel=channel,
             pdu=pdu
         )
@@ -359,7 +359,7 @@ class EsbDomain(Registry):
         :return: instance of `PduReceived`
         """
         # Create our base message
-        msg = EsbDomain.bound('raw_pdu', self.proto_version)(
+        msg = EsbDomain.build('raw_pdu', self.proto_version,
             channel=channel,
             pdu=pdu
         )

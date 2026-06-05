@@ -137,7 +137,7 @@ class UnifyingDomain(Registry):
         :type node_address: EsbNodeAddress
         :return: instance of `SetNodeAddress`
         """
-        return UnifyingDomain.bound('set_node_addr', self.proto_version)(
+        return UnifyingDomain.build('set_node_addr', self.proto_version,
             address=node_address.value
         )
 
@@ -146,7 +146,7 @@ class UnifyingDomain(Registry):
 
         :return: instance of `Start` message
         """
-        return UnifyingDomain.bound('start', self.proto_version)()
+        return UnifyingDomain.build('start', self.proto_version)
 
 
     def create_stop(self) -> HubMessage:
@@ -154,7 +154,7 @@ class UnifyingDomain(Registry):
 
         :return: instance of `Stop` message
         """
-        return UnifyingDomain.bound('stop', self.proto_version)()
+        return UnifyingDomain.build('stop', self.proto_version)
 
 
     def create_jam_mode(self, channel: int) -> HubMessage:
@@ -164,7 +164,7 @@ class UnifyingDomain(Registry):
         :type channel: int
         :return: instance of `JamMode`
         """
-        return UnifyingDomain.bound('jam', self.proto_version)(
+        return UnifyingDomain.build('jam', self.proto_version,
             channel=channel
         )
 
@@ -179,7 +179,7 @@ class UnifyingDomain(Registry):
         :type show_acks: bool, optional
         :return: instance of `SniffMode`
         """
-        return UnifyingDomain.bound('sniff', self.proto_version)(
+        return UnifyingDomain.build('sniff', self.proto_version,
             address=address.value,
             channel=channel,
             show_acks=show_acks
@@ -192,7 +192,7 @@ class UnifyingDomain(Registry):
         :type timestamp: int
         :return: instance of `Jammed`
         """
-        return UnifyingDomain.bound('jammed', self.proto_version)(
+        return UnifyingDomain.build('jammed', self.proto_version,
             timestamp=timestamp
         )
 
@@ -203,7 +203,7 @@ class UnifyingDomain(Registry):
         :type channel: int
         :return: instance of `DongleMode`
         """
-        return UnifyingDomain.bound('dongle', self.proto_version)(
+        return UnifyingDomain.build('dongle', self.proto_version,
             channel=channel
         )
 
@@ -214,7 +214,7 @@ class UnifyingDomain(Registry):
         :type channel: int
         :return: instance of `KeyboardMode`
         """
-        return UnifyingDomain.bound('keyboard', self.proto_version)(
+        return UnifyingDomain.build('keyboard', self.proto_version,
             channel=channel
         )
 
@@ -225,7 +225,7 @@ class UnifyingDomain(Registry):
         :type channel: int
         :return: instance of `MouseMode`
         """
-        return UnifyingDomain.bound('mouse', self.proto_version)(
+        return UnifyingDomain.build('mouse', self.proto_version,
             channel=channel
         )
 
@@ -234,7 +234,7 @@ class UnifyingDomain(Registry):
 
         :return: instance of `SniffPairing`
         """
-        return UnifyingDomain.bound('sniff_pairing', self.proto_version)()
+        return UnifyingDomain.build('sniff_pairing', self.proto_version)
 
     def create_send_pdu(self, channel: int, pdu: bytes, retr_count: int = 0):
         """Create a SendPdu message
@@ -247,7 +247,7 @@ class UnifyingDomain(Registry):
         :type retr_count: int
         :return: instance of `SendPdu`
         """
-        return UnifyingDomain.bound('send', self.proto_version)(
+        return UnifyingDomain.build('send', self.proto_version,
             channel=channel,
             pdu=pdu,
             retr_count=retr_count
@@ -264,7 +264,7 @@ class UnifyingDomain(Registry):
         :type retr_count: int
         :return: instance of `SendPdu`
         """
-        return UnifyingDomain.bound('send_raw', self.proto_version)(
+        return UnifyingDomain.build('send_raw', self.proto_version,
             channel=channel,
             pdu=pdu,
             retr_count=retr_count
@@ -289,7 +289,7 @@ class UnifyingDomain(Registry):
         :return: instance of `PduReceived`
         """
         # Create our base message
-        msg = UnifyingDomain.bound('pdu', self.proto_version)(
+        msg = UnifyingDomain.build('pdu', self.proto_version,
             channel=channel,
             pdu=pdu
         )
@@ -327,7 +327,7 @@ class UnifyingDomain(Registry):
         :return: instance of `PduReceived`
         """
         # Create our base message
-        msg = UnifyingDomain.bound('raw_pdu', self.proto_version)(
+        msg = UnifyingDomain.build('raw_pdu', self.proto_version,
             channel=channel,
             pdu=pdu
         )

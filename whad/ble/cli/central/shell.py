@@ -446,9 +446,12 @@ class BleCentralShell(InteractiveShell):
         self.__target_bd = None
         if self.__target is not None:
 
-            # detach wireshark
             if self.__wireshark is not None:
+                # Detach wireshark if used
                 self.__wireshark.detach()
+
+                # Consider no wireshark has been launched
+                self.__wireshark = None
 
             self.__target = None
 
@@ -471,9 +474,10 @@ class BleCentralShell(InteractiveShell):
             self.__target.disconnect()
             self.__target_bd = None
 
-            # detach wireshark
+            # detach and close wireshark
             if self.__wireshark is not None:
                 self.__wireshark.detach()
+                self.__wireshark = None
         else:
             self.warning("not connected to a device, aborted.")
 

@@ -124,5 +124,5 @@ class ChannelMap(object):
         return self.__map.to_bytes(5, 'little', signed=False)
 
 # Default channel map
-DefaultChannelMap = ChannelMap(channels=[38])
+DefaultChannelMap = ChannelMap(channels=range(38))
 

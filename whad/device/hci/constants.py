@@ -15,6 +15,7 @@ class HCIInternalState(IntEnum):
     ADVERTISING=2
     CENTRAL = 3
     PERIPHERAL = 4
+    EXT_ADVERTISING = 5
 
 class HCIConnectionState(IntEnum):
     """Host/controller interface connection state

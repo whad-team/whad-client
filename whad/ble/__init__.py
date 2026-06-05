@@ -7,6 +7,7 @@ from whad.ble.stack.gatt import GattClient, GattServer
 from whad.common.triggers import ManualTrigger, ConnectionEventTrigger, ReceptionTrigger
 from whad.hub.ble.bdaddr import BDAddress
 from whad.hub.ble.chanmap import ChannelMap
+from whad.hub.ble import BlePhy as PHY, BleCsa as CSA
 
 from whad.ble.profile.attribute import UUID
 from whad.ble.profile import (
@@ -24,7 +25,10 @@ from whad.ble.profile.advdata import (
 )
 from whad.ble.profile.services import BatteryService, DeviceInformationService, GapService, HeartRateService
 from whad.ble.connector.base import BLE
-from whad.ble.connector import Central, Peripheral, Sniffer, Hijacker, Injector, Scanner, PeripheralClient, Advertiser
+from whad.ble.connector import (
+    Central, Peripheral, Sniffer, Hijacker, Injector, Scanner, PeripheralClient, Scanner, PeripheralClient,
+    Advertiser
+)
 from whad.ble.utils.phy import PHYS
 
 def is_bdaddr_valid(bd_addr):
@@ -38,6 +42,8 @@ __all__ = [
     'GattServer',
     'BDAddress',
     'UUID',
+    'PHY',
+    'CSA',
     'Profile',
     'read',
     'write',
@@ -95,4 +101,5 @@ __all__ = [
     'CharacteristicDescriptor',
     'CharacteristicUserDescriptionDescriptor',
     'ReportReferenceDescriptor',
+    'Advertiser'
 ]

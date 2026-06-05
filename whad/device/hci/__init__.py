@@ -36,7 +36,9 @@ from whad.scapy.layers.bluetooth import (
     HCI_Cmd_LE_Write_Suggested_Default_Data_Length, HCI_Cmd_LE_Read_Suggested_Default_Data_Length,
     HCI_Cmd_LE_Complete_Suggested_Default_Data_Length, HCI_Cmd_Write_Simple_Pairing_Mode,
     HCI_Cmd_Write_Default_Link_Policy_Settings, HCI_Cmd_LE_Read_Advertising_Physical_Channel_Tx_Power,
-    HCI_Cmd_Complete_LE_Advertising_Tx_Power_Level, HCI_Cmd_Write_Class_Of_Device
+    HCI_Cmd_Complete_LE_Advertising_Tx_Power_Level, HCI_Cmd_Write_Class_Of_Device,
+    BTLE_EXT_ADV,
+    HCI_Cmd_LE_Set_Extended_Advertising_Parameters
 )
 
 # Whad custom layers
@@ -454,7 +456,6 @@ class Hci(VirtualDevice):
 
 
         except (BrokenPipeError, OSError) as err:
-            print(err)
             logger.error("Error, waiting...")
             sleep(1)
 
@@ -1255,7 +1256,7 @@ class Hci(VirtualDevice):
 
     @req_cmd("le_set_advertising_parameters")
     def set_advertising_parameters(self, interval_min: int = 0x0020, interval_max: int = 0x4000,
-                                   adv_type=0, oatype: int = 0, datype: int = 0,
+                                   adv_type=0,  oatype: int = 0,datype: int = 0,
                                    daddr:str = "00:00:00:00:00:00", channel_map: int = 0x7,
                                    filter_policy: str = "all:all", from_queue: bool = True) -> bool:
         """Configure the HCI LE advertising parameters.
@@ -1284,6 +1285,39 @@ class Hci(VirtualDevice):
         if from_queue:
             return response.status == 0x00
         return True
+
+    @req_cmd("le_set_extended_advertising_parameters")
+    def set_extended_advertising_parameters(self, interval_min: int = 0x0020, interval_max: int = 0x4000,
+                                            ext_adv_type: int = 0x00, pri_phy: int = 1, sec_phy: int = 1, oatype: int = 0, datype: int = 0,
+                                            daddr:str = "00:00:00:00:00:00", channel_map: int = 0x7,
+                                            filter_policy: str = "all:all", from_queue: bool = True,
+                                            sid: int = 0x00, scan_req_notif: bool = False, adv_handle: int = 0x00) -> bool:
+        """Configure HCI LE extended advertising parameters."""
+        # Wait for a response and update result accordingly.
+        logger.debug("[%s] Setting HCI LE Extended Advertising Parameters (blocking:%s) ...",
+                    self.interface, from_queue)
+        response = self._write_command(HCI_Cmd_LE_Set_Extended_Advertising_Parameters(
+            interval_min = interval_min,
+            interval_max = interval_max,
+            adv_type=adv_type,
+            oatype=0 if self._bd_address_type == AddressType.PUBLIC else 1,
+            datype=0,
+            daddr="00:00:00:00:00:00",
+            channel_map=channel_map,
+            filter_policy="all:all"
+        ), from_queue=from_queue)
+
+        # Cache parameters
+        self.__adv_inter_min = interval_min
+        self.__adv_inter_max = interval_max
+        self.__adv_channel_map = channel_map
+        self.__adv_type = adv_type
+
+        # Process response if required
+        if from_queue:
+            return response.status == 0x00
+        return True
+
 
     @req_cmd("le_set_advertising_enable")
     def _set_advertising_mode(self, enable=True, from_queue=True):
@@ -1678,7 +1712,6 @@ class Hci(VirtualDevice):
             logger.debug("HCI adapter does not support BD address spoofing")
             self._send_whad_command_result(CommandResult.ERROR)
 
-
     def _on_whad_ble_adv_mode(self, message):
         """ Called to put the device in advertising mode only,
         with the provided advertising parameters.
@@ -1695,37 +1728,72 @@ class Hci(VirtualDevice):
         if channels.has(39):
             chanmap |= 4
 
-        # Determine advertising type based on selected adv_type
-        hci_adv_type = 0
-        if message.adv_type == AdvType.ADV_NONCONN_IND:
-            hci_adv_type = 3
-        elif message.adv_type == AdvType.ADV_SCAN_IND:
-            hci_adv_type = 2
-        elif message.adv_type == AdvType.ADV_DIRECT_IND:
-            hci_adv_type = 1
+        if message.adv_type == AdvType.ADV_EXT_IND:
+            # Extended advertising has been selected.
+            # We first make sure we have at least one entry defined in the provided
+            # ext_pdus field.
+            if len(message.ext_pdus) > 0:
+                # First PDU shall define the first extended PDU to be sent on the primary
+                # channel. The adv_mode field specifies if this device is connectable or
+                # scannable, so we use it to determine the expected ADV type used.
+                pri_ext_pdu = message.ext_pdus[0]
+                pdu = BTLE_EXT_ADV(pri_ext_pdu.adv_data)
 
-        # Accept an AdvMode message only if we are idling (not started)
-        logger.debug("Received WHAD BLE set_adv_mode message")
-        if not self.__started:
-            if len(message.adv_data) > 0:
-                success = success and self._set_advertising_data(message.adv_data)
-                self._cached_adv_data = message.adv_data
-            if len(message.scanrsp_data) > 0:
-                success = success and self._set_scan_response_data(message.scanrsp_data)
-                self._cached_scan_response_data = message.scanrsp_data
-            if not self._advertising:
-                success = success and self.set_advertising_parameters(message.inter_min, message.inter_max,
-                                           hci_adv_type, channel_map=chanmap)
-            else:
-                success = False
+                # Accept this message only if not started
+                if not self.__started:
+                    success = success and self._set_extended_advertising_data(message.ext_pdus)
+                    self._cached_adv_data = message.ext_pdus
+                if not self._advertising:
+                    """
+                    TODO: handle extended advertising with HCI.
+                    success = success and self._set_extended_advertising_parameters(message.inter_min, message.inter_max,
+                                                                                    hci_ext_adv_type, pri_phy, sec_phy,
+                                                                                    channel_map=chanmap, adv_sid)
+                    """
+                else:
+                    success = False
 
-            if success:
-                self.__internal_state = HCIInternalState.ADVERTISING
-                self._send_whad_command_result(CommandResult.SUCCESS)
+                if success:
+                    self.__internal_state = HCIInternalState.EXT_ADVERTISING
+                    self._send_whad_command_result(CommandResult.SUCCESS)
+                else:
+                    self._send_whad_command_result(CommandResult.ERROR)
             else:
+                # Error: no extended advertising PDU found.
+                logger.debug("No extedended advertising PDUs provided!")
                 self._send_whad_command_result(CommandResult.ERROR)
         else:
-            self._send_whad_command_result(CommandResult.WRONG_MODE)
+            # Determine advertising type based on selected adv_type
+            hci_adv_type = 0
+            if message.adv_type == AdvType.ADV_NONCONN_IND:
+                hci_adv_type = 3
+            elif message.adv_type == AdvType.ADV_SCAN_IND:
+                hci_adv_type = 2
+            elif message.adv_type == AdvType.ADV_DIRECT_IND:
+                hci_adv_type = 1
+
+            # Accept an AdvMode message only if we are idling (not started)
+            logger.debug("Received WHAD BLE set_adv_mode message")
+            if not self.__started:
+                if len(message.adv_data) > 0:
+                    success = success and self._set_advertising_data(message.adv_data)
+                    self._cached_adv_data = message.adv_data
+                if len(message.scanrsp_data) > 0:
+                    success = success and self._set_scan_response_data(message.scanrsp_data)
+                    self._cached_scan_response_data = message.scanrsp_data
+                if not self._advertising:
+                    success = success and self.set_advertising_parameters(message.inter_min, message.inter_max,
+                                               hci_adv_type, channel_map=chanmap)
+                else:
+                    success = False
+
+                if success:
+                    self.__internal_state = HCIInternalState.ADVERTISING
+                    self._send_whad_command_result(CommandResult.SUCCESS)
+                else:
+                    self._send_whad_command_result(CommandResult.ERROR)
+            else:
+                self._send_whad_command_result(CommandResult.WRONG_MODE)
 
     def _on_whad_ble_set_adv_data(self, message):
         """Handle advertising data update. """

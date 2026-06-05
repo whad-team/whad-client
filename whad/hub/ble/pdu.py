@@ -1,12 +1,17 @@
 """WHAD Protocol BLE pdu messages abstraction layer.
 """
 import struct
+from typing import Generator
+
 from scapy.compat import raw
-from scapy.layers.bluetooth4LE import BTLE, BTLE_DATA, BTLE_CTRL, BTLE_ADV, BTLE_ADV_IND, \
-    BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP, BTLE_RF
-from whad.hub.message import AbstractPacket, pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper, \
-    PbFieldBool, dissect_failsafe
-from whad.hub.ble import Direction, AdvType, AddressType, BDAddress, BleDomain, BLEMetadata
+from scapy.layers.bluetooth4LE import (
+    BTLE, BTLE_DATA, BTLE_CTRL, BTLE_ADV, BTLE_ADV_IND, BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND,
+    BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP
+)
+from whad.hub.message import (
+    pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper, PbFieldBool, PbFieldArray, dissect_failsafe
+)
+from whad.hub.ble import Direction, AdvType, AddressType, BDAddress, BleDomain, BLEMetadata, BlePhy, ExtAdvPdu, AuxPtr
 
 from struct import pack
 
@@ -53,6 +58,42 @@ class SetAdvData(PbMessageWrapper):
     adv_data = PbFieldBytes("ble.set_adv_data.adv_data")
     scanrsp_data = PbFieldBytes("ble.set_adv_data.scanrsp_data")
 
+@pb_bind(BleDomain, "set_ext_adv_pdus", 3)
+class SetExtAdvPdus(PbMessageWrapper):
+    """BLE set extended advertising pdus message class.
+    """
+    ext_pdus = PbFieldArray('ble.set_ext_adv_pdus.pdus')
+
+    def add_pdu(self, pdu: ExtAdvPdu):
+        """Add an extended advertising PDU.
+
+        :param pdu: Extended advertising PDU to add.
+        :type  pdu: ExtAdvPdu
+        """
+        extpdu = self.message.ble.set_ext_adv_pdus.pdus.add()
+        print(extpdu)
+        extpdu.adv_data = pdu.adv_data
+        if pdu.auxptr is not None:
+            extpdu.aux_ptr.channel = pdu.auxptr.channel
+            extpdu.aux_ptr.ca = pdu.auxptr.ca
+            extpdu.aux_ptr.offset_units = pdu.auxptr.units
+            extpdu.aux_ptr.offset = pdu.auxptr.offset
+            extpdu.aux_ptr.phy = pdu.auxptr.phy
+
+    def pdus(self) -> Generator[ExtAdvPdu, None, None]:
+        """Enumerate this message's extended advertising PDUs."""
+        for pdu in self.ext_pdus:
+            if pdu.HasField('aux_ptr'):
+                yield ExtAdvPdu(pdu.adv_data, AuxPtr(
+                    pdu.aux_ptr.channel,
+                    pdu.aux_ptr.ca,
+                    pdu.aux_ptr.offset_units,
+                    pdu.aux_ptr.offset,
+                    pdu.aux_ptr.phy
+                ))
+            else:
+                yield ExtAdvPdu(pdu.adv_data)
+
 @pb_bind(BleDomain, "send_raw_pdu", 1)
 class SendBleRawPdu(PbMessageWrapper):
     """BLE send raw PDU message class
@@ -64,11 +105,13 @@ class SendBleRawPdu(PbMessageWrapper):
     crc = PbFieldInt("ble.send_raw_pdu.crc")
     encrypt = PbFieldBool("ble.send_raw_pdu.encrypt")
 
+    # Introduced in protocol v3
+    phy = PbFieldInt('ble.send_raw_pdu.phy', min_version=3, default=BlePhy.LE_1M)
+
     @dissect_failsafe
     def to_packet(self):
         """Convert message to the corresponding Scapy packet
         """
-        print(self)
         packet = BTLE(access_addr=self.access_address, crc=self.crc)/self.pdu
 
         # Set packet metadata
@@ -77,6 +120,7 @@ class SendBleRawPdu(PbMessageWrapper):
         packet.metadata.encrypt = self.encrypt
         packet.metadata.direction = self.direction
         packet.metadata.raw = True
+        packet.metadata.phy = self.phy
 
         return packet
 
@@ -97,13 +141,14 @@ class SendBleRawPdu(PbMessageWrapper):
         else:
             return None
 
-        return SendBleRawPdu(
+        return SendBleRawPdu.build(1,
             direction=direction,
             pdu=pdu,
             conn_handle=connection_handle,
             access_address=BTLE(raw(packet)).access_addr,
             crc=BTLE(raw(packet)).crc,
-            encrypt=encrypt
+            encrypt=encrypt,
+            phy=packet.metadata.phy
         )
 
 @pb_bind(BleDomain, "send_pdu", 1)
@@ -114,6 +159,9 @@ class SendBlePdu(PbMessageWrapper):
     conn_handle = PbFieldInt("ble.send_pdu.conn_handle")
     pdu = PbFieldBytes("ble.send_pdu.pdu")
     encrypt = PbFieldBool("ble.send_pdu.encrypt")
+
+    # Introduced in version 3, default to LE_1M for versions 1 & 2.
+    phy = PbFieldInt('ble.send_pdu.phy', min_version=3, default=BlePhy.LE_1M)
 
     @dissect_failsafe
     def to_packet(self):
@@ -127,8 +175,9 @@ class SendBlePdu(PbMessageWrapper):
         packet.metadata.encrypt = self.encrypt
         packet.metadata.direction = self.direction
         packet.metadata.raw = False
+        packet.metadata.phy = self.phy
 
-        return packet 
+        return packet
 
     @staticmethod
     def from_packet(packet, encrypt=False):
@@ -148,14 +197,13 @@ class SendBlePdu(PbMessageWrapper):
             return None
 
         # Create a SendPdu message
-        return SendBlePdu(
+        return SendBlePdu(1,
             direction=direction,
             conn_handle=connection_handle,
             pdu=pdu,
-            encrypt=encrypt
+            encrypt=encrypt,
+            phy=packet.metadata.phy
         )
-
-
 
 @pb_bind(BleDomain, "adv_pdu", 1)
 class BleAdvPduReceived(PbMessageWrapper):
@@ -203,7 +251,7 @@ class BleAdvPduReceived(PbMessageWrapper):
             for adv_class in SCAPY_CORR_ADV_INV:
                 if  packet.haslayer(adv_class):
                     adv_data = b''.join([bytes(x) for x in packet.getlayer(adv_class).data])
-                    return BleAdvPduReceived(
+                    return BleAdvPduReceived.build(1,
                         adv_type=SCAPY_CORR_ADV_INV[adv_class],
                         rssi=packet.metadata.rssi if packet.metadata is not None else 0,
                         bd_address=BDAddress(packet.AdvA).value,
@@ -242,7 +290,7 @@ class BlePduReceived(PbMessageWrapper):
     def from_packet(packet):
         """Convert packet into BlePduReceived message
         """
-        return BlePduReceived(
+        return BlePduReceived.build(1,
             pdu=bytes(packet),
             direction=packet.metadata.direction,
             conn_handle=packet.metadata.connection_handle,
@@ -268,6 +316,9 @@ class BleRawPduReceived(PbMessageWrapper):
     processed = PbFieldBool("ble.raw_pdu.processed")
     decrypted = PbFieldBool("ble.raw_pdu.decrypted")
 
+    # Introduced in protocol v3
+    phy = PbFieldInt('ble.raw_pdu.phy', min_version=3, default=BlePhy.LE_1M)
+
     @dissect_failsafe
     def to_packet(self):
         """Convert message into its corresponding Scapy packet
@@ -281,6 +332,9 @@ class BleRawPduReceived(PbMessageWrapper):
         packet.metadata.channel = self.channel
         packet.metadata.processed = self.processed
         packet.metadata.raw = True
+
+        # In versions < 3, phy defaults to LE_1M
+        packet.metadata.phy = self.phy
 
         if self.rssi is not None:
             packet.metadata.rssi = self.rssi
@@ -309,7 +363,7 @@ class BleRawPduReceived(PbMessageWrapper):
             else:
                 return None
 
-            return BleRawPduReceived(
+            return BleRawPduReceived.build(1,
                 pdu=pdu,
                 access_address=BTLE(raw(packet)).access_addr,
                 crc=BTLE(raw(packet)).crc,
@@ -321,7 +375,8 @@ class BleRawPduReceived(PbMessageWrapper):
                 crc_validity=packet.metadata.is_crc_valid,
                 relative_timestamp=packet.metadata.relative_timestamp,
                 decrypted=packet.metadata.decrypted,
-                processed=packet.metadata.processed
+                processed=packet.metadata.processed,
+                phy=packet.metadata.phy
             )
 
         return None

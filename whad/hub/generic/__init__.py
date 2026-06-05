@@ -45,56 +45,56 @@ class Generic(Registry):
     def create_error(self) -> HubMessage:
         """Create a generic error message.
         """
-        return Generic.bound('cmd_result_error', self.proto_version)()
+        return Generic.build('cmd_result_error', self.proto_version)
 
     def create_success(self) -> HubMessage:
         """Create a generic success result.
         """
-        return Generic.bound('cmd_result_success', self.proto_version)()
+        return Generic.build('cmd_result_success', self.proto_version)
 
     def create_param_error(self) -> HubMessage:
         """Create a parameter error message.
         """
-        return Generic.bound('cmd_result_param_error', self.proto_version)()
+        return Generic.build('cmd_result_param_error', self.proto_version)
 
     def create_disconnected(self) -> HubMessage:
         """Create a disconnected error message.
         """
-        return Generic.bound('cmd_result_disconnected', self.proto_version)()
+        return Generic.build('cmd_result_disconnected', self.proto_version)
 
     def create_wrong_mode(self) -> HubMessage:
         """Create a wrong mode error message.
         """
-        return Generic.bound('cmd_result_wrong_mode', self.proto_version)()
+        return Generic.build('cmd_result_wrong_mode', self.proto_version)
 
     def create_unsupported_domain(self) -> HubMessage:
         """Create an unsupported domain error message.
         """
-        return Generic.bound('cmd_result_unsupported_domain', self.proto_version)()
+        return Generic.build('cmd_result_unsupported_domain', self.proto_version)
 
     def create_busy(self) -> HubMessage:
         """Create a busy error message.
         """
-        return Generic.bound('cmd_result_busy', self.proto_version)()
+        return Generic.build('cmd_result_busy', self.proto_version)
 
     def create_debug(self, level: int, message: bytes) -> HubMessage:
         """Create a debug message.
         """
-        return Generic.bound('debug', self.proto_version)(
+        return Generic.build('debug', self.proto_version,
             debug_level=level, debug_msg=message
         )
 
     def create_verbose(self, message: bytes) -> HubMessage:
         """Create a verbose message.
         """
-        return Generic.bound('verbose', self.proto_version)(
+        return Generic.build('verbose', self.proto_version,
             data=message
         )
 
     def create_progress(self, value: int) -> HubMessage:
         """Create a progress message.
         """
-        return Generic.bound('progress', self.proto_version)(
+        return Generic.build('progress', self.proto_version,
             value=value
         )
 

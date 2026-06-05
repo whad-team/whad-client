@@ -17,7 +17,7 @@ class TestPhyDomainFactory(object):
     @pytest.fixture
     def factory(self):
         return PhyDomain(1)
-    
+
     def test_set_ask_mod(self, factory: PhyDomain):
         """Check creation of SetAskMod message
         """
@@ -44,7 +44,7 @@ class TestPhyDomainFactory(object):
         msg = factory.create_set_gfsk_mod(125000)
         assert isinstance(msg, SetGfskMod)
         assert msg.deviation == 125000
-    
+
     def test_set_msk_mod(self, factory: PhyDomain):
         """Check creation of SetMskMod message
         """

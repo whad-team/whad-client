@@ -133,7 +133,7 @@ class PeripheralMock(MockDevice):
             self.__conn_handle = randint(1, 100)
 
             # Add a Connected message to the connector received message queue
-            msg = Connected(
+            msg = Connected.build(ProtocolHub.LAST_VERSION,
                 initiator=initiator.value,
                 advertiser=self.__bdaddr.value,
                 access_address=0,
@@ -157,7 +157,7 @@ class PeripheralMock(MockDevice):
         """Convert L2CAP PDUs to a list of BlePduReceived messages."""
         messages = []
         for pdu in pdus:
-            messages.append(BlePduReceived(
+            messages.append(BlePduReceived.build(ProtocolHub.LAST_VERSION,
                 conn_handle=self.__conn_handle,
                 direction=Direction.MASTER_TO_SLAVE,
                 pdu=bytes(pdu),
@@ -340,7 +340,7 @@ class PeripheralMock(MockDevice):
                 # Convert response PDUs into BlePduReceived messages and add them
                 # to the messages sent back to the connector
                 for answer in answers:
-                    result.append(BlePduReceived(
+                    result.append(BlePduReceived.build(ProtocolHub.LAST_VERSION,
                         conn_handle=send_pdu.conn_handle,
                         direction=Direction.MASTER_TO_SLAVE,
                         pdu=bytes(answer),
