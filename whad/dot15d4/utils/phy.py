@@ -2,6 +2,43 @@
 This module provides some helpers functions and constants related to 802.15.4 physical layer.
 '''
 from whad.phy import OQPSKModulationScheme, PhysicalLayer, Endianness
+from struct import pack, unpack
+
+class ChannelMap:
+    def __init__(self, channels=[]):
+        # This is an integer channel map directly
+        if isinstance(channels, int):
+            if channels >= 0 and channels <= 0xFFFF:
+                self.channel_map = pack('<H', channels)
+            else:
+                raise ValueError()
+
+        elif isinstance(channels, bytes):
+            if len(channels) == 2:
+                self.channel_map = channels
+            else:
+                raise ValueError()
+
+        elif isinstance(channels, list):
+            bitmap_str = "".join(['1' if i in channels else '0' for i in range(11, 27)])[::-1]
+            self.channel_map = pack('<H',int(bitmap_str,2))
+
+        else:
+            raise ValueError()
+
+    @property
+    def bytes(self):
+        return self.channel_map
+
+    @property
+    def value(self):
+        return  unpack('<H', self.channel_map)[0]
+
+    @property
+    def list(self):
+        chm = self.value
+        bitmap_str = "{:016b}".format(chm)[::-1]
+        return [idx+11 for idx, bit in enumerate(bitmap_str) if bit == '1']
 
 def frequency_to_channel(frequency):
     '''

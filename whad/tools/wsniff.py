@@ -14,7 +14,7 @@ from prompt_toolkit import print_formatted_text, HTML
 
 from whad.ble.sniffing import SynchronizationEvent, SynchronizationProgressEvent, SniffingEvent
 from whad.cli.app import CommandLineDualOutputApp, run_app
-from whad.cli.ui import error, warning, display_packet
+from whad.cli.ui import error, warning, display_packet, display_event
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 from whad.common.monitors import WiresharkMonitor, PcapWriterMonitor
 from whad.device.unix import UnixSocketServer, UnixConnector
@@ -61,8 +61,9 @@ class WhadSniffOutputPipe(Bridge):
             pkt = message.to_packet()
             if pkt is not None:
                 pkt = self.input.process_packet(pkt)
-                msg = message.from_packet(pkt)
-                super().on_outbound(msg)
+                if pkt is not None:
+                    msg = message.from_packet(pkt)
+                    super().on_outbound(msg)
         else:
             logger.debug('[wsniff][input-pipe] forward default outbound message %s', message)
             # Forward other messages
@@ -230,6 +231,8 @@ class WhadSniffApp(CommandLineDualOutputApp):
                     else:
                         # Start the sniffer
                         sniffer.start()
+
+                        sniffer.add_event_listener(display_event)
                         # Iterates over the packet stream and display packets
                         for pkt in sniffer.sniff():
                             display_packet(

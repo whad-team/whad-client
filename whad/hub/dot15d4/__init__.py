@@ -2,6 +2,7 @@
 """
 from typing import List
 from dataclasses import dataclass, field, fields
+from enum import IntEnum
 
 from scapy.config import conf
 from scapy.layers.dot15d4 import Dot15d4FCS
@@ -9,13 +10,19 @@ from scapy.layers.dot15d4 import Dot15d4FCS
 from whad.scapy.layers.dot15d4tap import Dot15d4TAP_Hdr, Dot15d4TAP_TLV_Hdr,\
     Dot15d4TAP_Received_Signal_Strength, Dot15d4TAP_Channel_Assignment, \
     Dot15d4TAP_Channel_Center_Frequency, Dot15d4TAP_Link_Quality_Indicator, \
-    Dot15d4TAP_FCS_Type
+    Dot15d4TAP_FCS_Type, Dot15d4TAP_Absolute_Slot_Number, Dot15d4TAP_Start_Of_Slot_Timestamp, \
+    Dot15d4TAP_Timeslot_Length, Dot15d4TAP_Channel_Plan
 
-from whad.protocol.dot15d4.dot15d4_pb2 import Dot15d4MitmRole, AddressType
+from whad.protocol.dot15d4.dot15d4_pb2 import Dot15d4MitmRole, AddressType, \
+    LinkType as Dot15d4LinkType, LinkOptions as Dot15d4LinkOptions
 from whad.hub.registry import Registry
 from whad.hub.message import HubMessage, pb_bind
 from whad.hub.metadata import Metadata, channel_to_frequency
 from whad.hub import ProtocolHub
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 class Commands:
     """Dot15d4 commands
@@ -51,6 +58,24 @@ class NodeAddressType:
     """
     SHORT=AddressType.SHORT
     EXTENDED=AddressType.EXTENDED
+
+
+class LinkOptions(IntEnum):
+    """Dot15d4 TSCH Link Options
+    """
+    UNKNOWN = Dot15d4LinkOptions.UNKNOWN
+    SHARED = Dot15d4LinkOptions.SHARED
+    RECEIVE = Dot15d4LinkOptions.RECEIVE
+    TRANSMIT = Dot15d4LinkOptions.TRANSMIT
+    
+class LinkType(IntEnum):
+    """Dot15d4 TSCH Link Type
+    """
+    NORMAL = Dot15d4LinkType.NORMAL
+    DISCOVERY = Dot15d4LinkType.DISCOVERY
+    BROADCAST = Dot15d4LinkType.BROADCAST
+    JOIN = Dot15d4LinkType.JOIN
+
 
 class NodeAddress(object):
     """IEEE 802.15.4 Node address.
@@ -155,7 +180,7 @@ class Dot15d4Metadata(Metadata):
         lqi = 200
         channel = 15
 
-        asn : int = None
+        asn = None
         start_of_slot_timestamp = None
         time_slot  = None
         base_channel_frequency = None
@@ -180,7 +205,7 @@ class Dot15d4Metadata(Metadata):
                 elif Dot15d4TAP_Channel_Plan in layer:
                     base_channel_frequency =int(layer.base_channel_frequency)
                     number_of_channels = int(layer.number_of_channels)
-                    channel_spacing = int(layer.number_of_channels)
+                    channel_spacing = int(layer.channel_spacing)
                 else:
                     pass
 
@@ -189,7 +214,7 @@ class Dot15d4Metadata(Metadata):
             lqi = lqi,
             channel = channel,
             timestamp = int(100000 * pkt.time), 
-            asn = int(asn), 
+            asn = asn, 
             start_of_slot_timestamp = start_of_slot_timestamp,
             time_slot = time_slot, 
             base_channel_frequency = base_channel_frequency, 
@@ -201,7 +226,7 @@ def generate_dot15d4_metadata(message: HubMessage) -> Dot15d4Metadata:
     """Generate a Dot15d4Metadata object from a WHAD message.
     """
     metadata = Dot15d4Metadata()
-
+    
     if message.lqi is not None:
         metadata.lqi = message.lqi
     if message.rssi is not None:
@@ -417,6 +442,24 @@ class Dot15d4Domain(Registry):
             fcs=fcs
         )
 
+
+    def create_send_in_slot_pdu(self, slot: int, wait_offset : int, pdu: bytes) -> HubMessage:
+        """Create a SendInSlotPdu message
+
+        :param slot: Slot to use for transmission
+        :type slot: int
+        :param wait_offset: Offset before PDU transmission after slot start
+        :type wait_offset: int
+        :param pdu: PDU to send
+        :type pdu: bytes
+        :return: instance of `SendPdu`
+        """
+        return Dot15d4Domain.bound('send_in_slot', self.proto_version)(
+            slot=slot,
+            wait_offset=wait_offset,
+            pdu=pdu
+        )
+
     def create_jammed(self, timestamp: int) -> HubMessage:
         """Create a jammed notification.
 
@@ -521,16 +564,161 @@ class Dot15d4Domain(Registry):
         # Return the generated message
         return msg
 
-@pb_bind(ProtocolHub, name="wirelesshart", version=3)
+
+    def create_config_tsch(self, enabled : bool) -> HubMessage:
+        """Create a Configure TSCH message.
+
+        :param enabled: Boolean indicating if TSCH must be enabled
+        :type enabled: bool
+        :return: instance of `ConfigureTSCH`
+        """
+        if self.proto_version < 3:
+            logger.warning("[core::hub::dot15d4] TSCH mode not supported by this hardware !")
+            
+        return Dot15d4Domain.bound('config_tsch', self.proto_version)(
+            enabled=enabled
+        )
+
+
+    def create_add_link(self,superframe_id: int, source: int, time_slot: int, \
+                             channel_offset: int, neighbor: int, options: LinkOptions, \
+                             link_type : LinkType) -> HubMessage:
+        """Create a Add Link message.
+
+        :param superframe_id: Identifier of the associated superframe
+        :type superframe_id: int
+        :param source: Source address of the link
+        :type source: int
+        :param time_slot: Time slot associated with the link
+        :type time_slot: int        
+        :param channel_offset: Channel offset associated with the link
+        :type channel_offset: int
+        :param neighbor: Neighbor address associated with the link
+        :type neighbor: int
+        :param options: Options of the link
+        :type options: `LinkOptions`
+        :param link_type: Type of the link
+        :type link_type: `LinkType`
+        :return: instance of `AddLink`
+        """
+        if self.proto_version < 3:
+            logger.warning("[core::hub::dot15d4] TSCH mode not supported by this hardware !")
+            
+
+        if source < 0 or source > 0xFFFF: 
+            logger.error("invalid source address, must be between 0 & 0xFFFF (16-bit short format).")
+            raise ValueError()
+
+
+        if neighbor < 0 or neighbor > 0xFFFF: 
+            logger.error("invalid neighbor address, must be between 0 & 0xFFFF (16-bit short format).")
+            raise ValueError()
+
+        if not isinstance(link_type, (LinkType,int)):
+            logger.error("invalid Link Type provided")
+            
+        if not isinstance(options,(LinkOptions,int)):
+            logger.error("invalid Link Options provided")
+
+        return Dot15d4Domain.bound('add_link', self.proto_version)(
+            superframe_id=superframe_id, 
+            src=source, 
+            time_slot=time_slot, 
+            channel_offset=channel_offset, 
+            neighbor=neighbor, 
+            options=options, 
+            link_type=link_type
+        )
+
+    def create_del_link(self,superframe_id: int, time_slot: int, channel_offset: int)-> HubMessage:
+        """Create a Delete Link message.
+
+        :param superframe_id: Identifier of the associated superframe
+        :type superframe_id: int
+        :param time_slot: Time slot associated with the link to delete
+        :type time_slot: int
+        :param channel_offset: Channel offset associated with the link to delete
+        :type channel_offset: int
+        :return: instance of `DeleteLink`
+        """
+        if self.proto_version < 3:
+            logger.warning("[core::hub::dot15d4] TSCH mode not supported by this hardware !")
+
+
+        if neighbor < 0 or neighbor > 0xFFFF: 
+            logger.error("invalid neighbor address, must be between 0 & 0xFFFF (16-bit short format).")
+            raise ValueError()
+  
+        return Dot15d4Domain.bound('del_link', self.proto_version)(
+            superframe_id=superframe_id, 
+            offset=offset, 
+            neighbor=neighbor
+        )
+        
+
+    def create_update_superframe(self,superframe_id: int, number_of_slots: int, \
+                             flags: int, asn: int) -> HubMessage:
+        """Create an Update Superframe message.
+
+        :param superframe_id: Identifier of the associated superframe
+        :type superframe_id: int
+        :param number_of_slots: Number of slots available in the superframe
+        :type number_of_slots: int
+        :param flags: Flags associated with the superframe
+        :type flags: int        
+        :param asn: Absolute Slot Number starting the superframe update or addition
+        :type asn: int
+        :return: instance of `UpdateSuperframe`
+        """
+        if self.proto_version < 3:
+            logger.warning("[core::hub::dot15d4] TSCH mode not supported by this hardware !")
+            
+        return Dot15d4Domain.bound('update_superframe', self.proto_version)(
+            superframe_id=superframe_id, 
+            number_of_slots=number_of_slots, 
+            flags=flags, 
+            asn=asn
+        )
+
+
+    def create_delete_superframe(self,superframe_id: int) -> HubMessage:
+        """Create a Delete Superframe message.
+
+        :param superframe_id: Identifier of the superframe to delete
+        :type superframe_id: int
+        :return: instance of `DeleteSuperframe`
+        """
+        if self.proto_version < 3:
+            logger.warning("[core::hub::dot15d4] TSCH mode not supported by this hardware !")
+            
+        return Dot15d4Domain.bound('delete_superframe', self.proto_version)(
+            superframe_id=superframe_id
+        )
+
+    def create_set_channel_map(self,channel_map: int) -> HubMessage:
+        """Create a Set Channel Map message.
+
+        :param channel_map: Bitmap of enabled channels in TSCH mode
+        :type channel_map: int
+        :return: instance of `SetChannelMap`
+        """
+        if self.proto_version < 3:
+            logger.warning("[core::hub::dot15d4] TSCH mode not supported by this hardware !")
+            
+        return Dot15d4Domain.bound('set_chm', self.proto_version)(
+            channel_map=channel_map
+        )
+        
+@pb_bind(ProtocolHub, name="wihart", version=3)
 class WirelessHartDomain(Dot15d4Domain):
-    NAME = 'wirelesshart'
+    NAME = 'wihart'
     VERSIONS = {}
 
     def __init__(self, version: int):
         """Initializes a Wireless Hart domain instance
         """
         super().__init__(version)
-        conf.dot15d4_protocol = "wirelesshart"
+        conf.dot15d4_protocol = "wihart"
 
     
     def create_raw_pdu_received(self, channel: int, pdu: bytes, fcs: int, rssi: int = None, \
@@ -678,7 +866,10 @@ class ZigBeeDomain(Dot15d4Domain):
 from .address import SetNodeAddress
 from .mode import SniffMode, RouterMode, EndDeviceMode, CoordMode, EnergyDetectionMode, \
     JamMode, MitmMode, Start, Stop, Jammed, EnergyDetectionSample
-from .pdu import SendPdu, SendRawPdu, PduReceived, RawPduReceived
+from .tsch import ConfigureTSCH, AddLink, DeleteLink, UpdateSuperframe, DeleteSuperframe, \
+    SetChannelMap
+from .pdu import SendPdu, SendRawPdu, SendInSlotPdu, PduReceived, RawPduReceived,  \
+    DiscoveredCommunication, RawPduReceivedV3, PduReceivedV3
 
 __all__ = [
     'SetNodeAddress',
@@ -694,7 +885,15 @@ __all__ = [
     'SendPdu',
     'SendRawPdu',
     'PduReceived',
+    'DiscoveredCommunication',
     'RawPduReceived',
+    'SendInSlotPdu',
+    'ConfigureTSCH',
+    'AddLink',
+    'DeleteLink',
+    'UpdateSuperframe', 
+    'DeleteSuperframe', 
+    'SetChannelMap',
     'Jammed',
     'EnergyDetectionSample',
     'Dot15d4Domain',
@@ -702,5 +901,8 @@ __all__ = [
     'NodeAddressShort',
     'NodeAddressExt',
     'NodeAddressType',
+    'LinkType', 
+    'LinkOptions',
+
     'MitmRole'
 ]

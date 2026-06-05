@@ -14,7 +14,7 @@ from whad.dot15d4.sniffing import SnifferConfiguration
 from whad.exceptions import UnsupportedCapability, WhadDeviceDisconnected
 from whad.helpers import message_filter
 from whad.common.sniffing import EventsManager
-from whad.hub.dot15d4 import RawPduReceived, PduReceived
+from whad.hub.dot15d4 import RawPduReceived, PduReceived, RawPduReceivedV3, PduReceivedV3
 
 
 class Sniffer(Dot15d4, EventsManager):
@@ -86,15 +86,19 @@ class Sniffer(Dot15d4, EventsManager):
         try:
             while True:
                 if self.support_raw_pdu():
-                    message_type = RawPduReceived
+                    message_type = (RawPduReceived, RawPduReceivedV3)
                 else:
-                    message_type = PduReceived
+                    message_type = (PduReceived, PduReceivedV3)
 
+                
                 # Wait for a message to be received
                 for message in super().capture((message_type), timeout=1):
                     if message is not None:
                         packet = message.to_packet()
                         if packet is not None:
+                            if hasattr(packet.metadata, "asn") and self.network is not None:
+                                self.network.asn = packet.metadata.asn
+                                
                             self.monitor_packet_rx(packet)
                             yield packet
 

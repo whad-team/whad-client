@@ -97,6 +97,13 @@ DOT15D4_COMMANDS = {
     Dot15d4Commands.Start: "Start: can start depending on the current mode",
     Dot15d4Commands.Stop: "Stop: can stop depending on the current mode",
     Dot15d4Commands.ManInTheMiddle: "ManInTheMiddle: can perform a Man-in-the-Middle attack",
+    Dot15d4Commands.ConfigureTSCH: "ConfigureTSCH: can enable Time Slotted Channel Hopping (TSCH) mode",
+    Dot15d4Commands.AddLink: 'AddLink: can add a new link in TSCH mode', 
+    Dot15d4Commands.DeleteLink: 'DeleteLink: can delete an existing link in TSCH mode',  
+    Dot15d4Commands.UpdateSuperframe: 'UpdateSuperframe: can add or update a superframe in TSCH mode', 
+    Dot15d4Commands.DeleteSuperframe: 'DeleteSuperframe: can delete an existing superframe in TSCH mode',  
+    Dot15d4Commands.SetChannelMap: 'SetChannelMap: can configure the enabled channels in TSCH mode', 
+    Dot15d4Commands.SendInSlot: "SendInSlot: can transmit 802.15.4 packets on a time slot in TSCH mode",
 }
 
 ESB_COMMANDS = {

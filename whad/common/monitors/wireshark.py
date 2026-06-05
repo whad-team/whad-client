@@ -58,7 +58,9 @@ class WiresharkMonitor(PcapWriterMonitor):
         elif connector.domain in ("ant"):
             self._user_dlt = 150
             self.dissector = WiresharkMonitor.get_dissector("ant")
-
+        elif connector.domain in ("wihart"):
+            self._user_dlt = 151
+            self.dissector = WiresharkMonitor.get_dissector("wihart")
         return super().attach(connector)
 
     def setup(self):

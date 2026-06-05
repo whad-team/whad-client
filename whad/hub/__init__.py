@@ -39,6 +39,7 @@ class Domain(StrEnum):
     UNIFYING = 'unifying'
     ZIGBEE = 'zigbee'
     BTMESH = 'btmesh'
+    WIHART = 'wihart'
 
 class ProtocolHub(Registry):
     """WHAD Protocol Hub class
@@ -67,6 +68,8 @@ class ProtocolHub(Registry):
             conf.dot15d4_protocol = 'rf4ce'
         elif domain == Domain.ZIGBEE:
             conf.dot15d4_protocol = 'zigbee'
+        elif domain == Domain.WIHART:
+            conf.dot15d4_protocol = 'wirelesshart'
 
     def __init__(self, proto_version: int = LAST_VERSION):
         """Instantiate a WHAD protocol hub for a specific version.
@@ -110,6 +113,10 @@ class ProtocolHub(Registry):
     def unifying(self):
         return self.get('unifying')
 
+    @property
+    def wihart(self):
+        return self.get('wihart')
+
     def load(self, factory: str) -> Optional[Type[Registry]]:
         """Lazy loading of factory class (dedicated registry).
 
@@ -127,7 +134,7 @@ class ProtocolHub(Registry):
         elif factory in ('ble', 'btmesh'):
             from .ble import BleDomain
             return BleDomain
-        elif factory in ('dot15d4', 'rf4ce', 'zigbee'):
+        elif factory in ('dot15d4', 'rf4ce', 'zigbee', 'wihart'):
             from .dot15d4 import Dot15d4Domain
             return Dot15d4Domain
         elif factory == 'esb':
