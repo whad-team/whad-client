@@ -1,3 +1,6 @@
+'''
+This module contains various constants related to Channel management for ANTstick devices. 
+'''
 from whad.hub.ant import ChannelType as WhadChannelType
 from dataclasses import dataclass
 from enum import IntEnum
