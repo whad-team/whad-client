@@ -173,18 +173,6 @@ class PeriphMode(PbMessageWrapper):
                 return (inter_min, inter_max)
         return None
 
-@pb_bind(BleDomain, 'periph_mode', version=3)
-class PeriphModeV3(PeriphMode):
-    """BLE advertising mode message class, improved starting from version 3
-    """
-    adv_data = PbFieldBytes('ble.periph_mode.adv_data')
-    scanrsp_data = PbFieldBytes('ble.periph_mode.scanrsp_data')
-    adv_type = PbFieldInt('ble.periph_mode.adv_type')
-    channel_map = PbFieldBytes('ble.periph_mode.channel_map')
-    inter_min = PbFieldInt('ble.periph_mode.inter_min')
-    inter_max = PbFieldInt('ble.periph_mode.inter_max')
-
-
 @pb_bind(BleDomain, 'start', 1)
 class BleStart(PbMessageWrapper):
     """BLE start mode message class

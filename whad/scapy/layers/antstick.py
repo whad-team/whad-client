@@ -1,5 +1,5 @@
 from scapy.fields import ByteField, LenField, ByteEnumField, StrField, \
-    BitField, BitEnumField, LEIntField, LEX3BytesField, LEShortField, \
+    BitField, BitEnumField, LEIntField, XLE3BytesField, LEShortField, \
     StrFixedLenField, SignedByteField
 from scapy.packet import Packet, bind_layers
 
@@ -245,8 +245,8 @@ class ANTStick_Requested_Message_Advanced_Burst_Configuration(Packet):
     fields_desc = [
         ByteEnumField("enabled", None, {0:"disabled", 1:"enabled"}), 
         ByteEnumField("max_packet_length", None, {0x01 : "8 bytes", 0x02: "16 bytes", 0x03 : "24 bytes"}),
-        LEX3BytesField("required_features", None), 
-        LEX3BytesField("optional_features", None),         
+        XLE3BytesField("required_features", None), 
+        XLE3BytesField("optional_features", None),         
     ]
 
 class ANTStick_Requested_Message_Advanced_Burst_Configuration_Stall_Extension(Packet):

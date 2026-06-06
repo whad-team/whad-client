@@ -803,7 +803,7 @@ class PeripheralDevice(GenericProfile):
                 )
             return obj
 
-        if isinstance(obj, CharacteristicDescriptor):
+        if isinstance(obj, Descriptor):
             # wrap descriptor if required
             if not isinstance(obj, PeripheralCharacteristicDescriptor):
                 return PeripheralCharacteristicDescriptor(
@@ -923,7 +923,7 @@ class PeripheralDevice(GenericProfile):
                 return service
         return None
 
-    def service(self, uuid: Union[str, UUID]):
+    def get_service(self, uuid: Union[str, UUID]):
         """Retrieve a PeripheralService object given its UUID.
 
         :param  uuid:       Service UUID
