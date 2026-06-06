@@ -1,6 +1,6 @@
 from scapy.packet import Packet, bind_layers
 from scapy.fields import StrFixedLenField, ByteField, ByteEnumField, \
- 	BitField, BitEnumField,LEX3BytesField, LEShortField, LEIntField, SignedShortField, \
+ 	BitField, BitEnumField,XLE3BytesField, LEShortField, LEIntField, SignedShortField, \
 	SignedByteField, ShortField, LEShortEnumField, XLEShortField, ConditionalField
 from struct import pack
 from scapy.config import conf
@@ -422,13 +422,13 @@ class ANT_Plus_HR_Header_Hdr(Packet):
 class ANT_HR_Default_Data_Page(Packet):
 	name = "ANT Heart Rate Default Data Page"
 	fields_desc = [
-		LEX3BytesField("reserved",0xFFFFFF)
+		XLE3BytesField("reserved",0xFFFFFF)
 	]
 
 class ANT_HR_Cumulative_Operating_Time_Data_Page(Packet):
 	name = "ANT Heart Rate Cumulative Operating Time Data Page"
 	fields_desc = [
-		LEX3BytesField("cumulative_operating_time",None)
+		XLE3BytesField("cumulative_operating_time",None)
 	]
 
 class ANT_HR_Manufacturer_Information_Data_Page(Packet):
@@ -575,7 +575,7 @@ class ANT_Plus_Bicycle_Speed_Header_Hdr(Packet):
 class ANT_Bicycle_Speed_Default_Data_Page(Packet):
 	name = "ANT Bicycle Speed Default Data Page"
 	fields_desc = [
-		LEX3BytesField("reserved",0xFFFFFF),
+		XLE3BytesField("reserved",0xFFFFFF),
 		LEShortField("bike_speed_event_time", None),
 		LEShortField("cumulative_speed_revolution_count", None),
 	]
@@ -584,7 +584,7 @@ class ANT_Bicycle_Speed_Default_Data_Page(Packet):
 class ANT_Bicycle_Speed_Cumulative_Operating_Time_Data_Page(Packet):
 	name = "ANT Bicycle Speed Cumulative Operating Time Data Page"
 	fields_desc = [
-		LEX3BytesField("cumulative_operating_time",None),
+		XLE3BytesField("cumulative_operating_time",None),
 		LEShortField("bike_speed_event_time", None),
 		LEShortField("cumulative_speed_revolution_count", None),
 	]
@@ -875,7 +875,7 @@ class ANT_Plus_Bike_Power_Battery_Status_Data_Page(Packet):
 		ByteField("reserved",0xFF),
 		BitField("identifier",None, 4),
 		BitField("number_of_batteries",None, 4),
-		LEX3BytesField("cumulative_operating_time", None),
+		XLE3BytesField("cumulative_operating_time", None),
 		ByteField("fractional_battery_voltage", None),
 		ByteField("descriptive_bit_field", None),
 
@@ -900,7 +900,7 @@ class ANT_Plus_Bicycle_Cadence_Header_Hdr(Packet):
 class ANT_Bicycle_Cadence_Default_Data_Page(Packet):
 	name = "ANT Bicycle Cadence Default Data Page"
 	fields_desc = [
-		LEX3BytesField("reserved",0xFFFFFF),
+		XLE3BytesField("reserved",0xFFFFFF),
 		LEShortField("bike_cadence_event_time", None),
 		LEShortField("cumulative_cadence_revolution_count", None),
 
@@ -909,7 +909,7 @@ class ANT_Bicycle_Cadence_Default_Data_Page(Packet):
 class ANT_Bicycle_Cadence_Cumulative_Operating_Time_Data_Page(Packet):
 	name = "ANT Bicycle Cadence Cumulative Operating Time Data Page"
 	fields_desc = [
-		LEX3BytesField("cumulative_operating_time",None),
+		XLE3BytesField("cumulative_operating_time",None),
 		LEShortField("bike_cadence_event_time", None),
 		LEShortField("cumulative_cadence_revolution_count", None),
 	]
