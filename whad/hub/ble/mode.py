@@ -12,6 +12,9 @@ class ScanMode(PbMessageWrapper):
     """BLE scan mode message class
     """
     active = PbFieldBool('ble.scan_mode.active_scan')
+    # Introduced in v3, not available in versions 1 & 2.
+    interval = PbFieldInt('ble.scan_mode.interval', min_version=3, default=20)
+    use_ext_adv = PbFieldBool('ble.scan_mode.use_ext_adv', min_version=3, default=False)
 
     # Introduced in v3, not available in versions 1 & 2.
     use_ext_adv = PbFieldBool('ble.scan_mode.use_ext_adv', min_version=3, default=False)

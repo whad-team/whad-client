@@ -765,6 +765,13 @@ class WhadInstallApp(CommandLineApp):
             self.need_reload = True
         return True
 
+    def rules_antstick(self):
+        """Install udev rules for ANTStick & ANTStick 2
+        """
+        if self.install_udev_rule("antstick"):
+            self.need_reload = True
+        return True
+
     def rules_nucleowl55(self):
         """Install udev rules for ST Nucleo WL55 devboard
         """

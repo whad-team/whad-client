@@ -14,7 +14,6 @@ class SniffMode(PbMessageWrapper):
     device_number = PbFieldInt('ant.sniff.device_number', optional=True)
     device_type = PbFieldInt('ant.sniff.device_type', optional=True)
     transmission_type = PbFieldInt('ant.sniff.transmission_type', optional=True)
-    
 
 
 @pb_bind(AntDomain, 'jam', 3)
@@ -44,8 +43,8 @@ class Start(PbMessageWrapper):
     """ANT start mode message
     """
 
-    def __init__(self, message: Message = None):
-        super().__init__(message=message)
+    def __init__(self, version: int, message: Message = None):
+        super().__init__(version, message=message)
         self.message.ant.start.CopyFrom(StartCmd())
 
 
@@ -55,8 +54,8 @@ class Stop(PbMessageWrapper):
     """ANT stop mode message
     """
 
-    def __init__(self, message: Message = None):
-        super().__init__(message=message)
+    def __init__(self, version: int, message: Message = None):
+        super().__init__(version, message=message)
         self.message.ant.stop.CopyFrom(StopCmd())
 
 
@@ -73,7 +72,7 @@ class Jammed(PbMessageWrapper):
         return JammedEvt(
             timestamp=self.timestamp
         )
-    
+
     @staticmethod
     def from_event(event):
         """Convert an event into a message.

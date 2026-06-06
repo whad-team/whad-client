@@ -34,7 +34,8 @@ class SendPdu(PbMessageWrapper):
             return None
 
         msg = SendPdu(
-            channel_number=channel_number, 
+            version,
+            channel_number=channel_number,
             rf_channel=rf_channel,
             pdu=pdu
         )
@@ -65,7 +66,8 @@ class SendRawPdu(PbMessageWrapper):
             return None
 
         msg = SendRawPdu(
-            channel_number=channel_number, 
+            version,
+            channel_number=channel_number,
             rf_channel=rf_channel,
             pdu=pdu
         )
@@ -83,7 +85,7 @@ class PduReceived(PbMessageWrapper):
     rssi = PbFieldInt('ant.pdu.rssi', optional=True)
     timestamp = PbFieldInt('ant.pdu.timestamp', optional=True)
     crc_validity = PbFieldBool('ant.pdu.crc_validity', optional=True)
-    
+
     @dissect_failsafe
     def to_packet(self):
         """Convert message to its scapy packet representation
@@ -109,11 +111,12 @@ class PduReceived(PbMessageWrapper):
         return packet
 
     @staticmethod
-    def from_packet(packet):
+    def from_packet(packet, version: int = 3):
         """Convert scapy packet to a PduReceived message
         """
         # Create a PduReceived message
         msg = PduReceived(
+            version,
             channel_number=packet.metadata.channel_number,
             rf_channel=packet.metadata.rf_channel,
             pdu=bytes(packet.getlayer(ANT_Hdr)),
@@ -141,7 +144,7 @@ class RawPduReceived(PbMessageWrapper):
     rssi = PbFieldInt('ant.raw_pdu.rssi', optional=True)
     timestamp = PbFieldInt('ant.raw_pdu.timestamp', optional=True)
     crc_validity = PbFieldBool('ant.raw_pdu.crc_validity', optional=True)
-    
+
     @dissect_failsafe
     def to_packet(self):
         """Convert message to its scapy packet representation
@@ -166,11 +169,12 @@ class RawPduReceived(PbMessageWrapper):
         return packet
 
     @staticmethod
-    def from_packet(packet):
+    def from_packet(packet, version: int = 3):
         """Convert scapy packet to a PduReceived message
         """
         # Create a PduReceived message
         msg = RawPduReceived(
+            version,
             channel_number=packet.metadata.channel_number,
             rf_channel=packet.metadata.rf_channel,
             pdu=bytes(packet.getlayer(ANT_Hdr))[:-2],

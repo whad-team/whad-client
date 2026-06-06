@@ -633,7 +633,7 @@ class BLE(Connector):
         # Cannot set TX power level
         return False
 
-    def enable_scan_mode(self, active=False, interval: Optional[int] = None):
+    def enable_scan_mode(self, active=False, interval=20):
         """
         Enable Bluetooth Low Energy scanning mode.
         """

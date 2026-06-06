@@ -1,3 +1,9 @@
+'''
+This module defines ANT constants for ANTstick device:
+    - Antsticks Vendor ID & Product IDs
+    - ANT Message ID
+    - Ant Message code (for errors & events)
+'''
 class AntStickIds:
     ANTSTICK_ID_VENDOR      = 0x0FCF
     ANTSTICK_ID_PRODUCT     = 0x1008

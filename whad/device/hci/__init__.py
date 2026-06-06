@@ -1622,6 +1622,8 @@ class Hci(VirtualDevice):
     def _on_whad_ble_send_pdu(self, message):
         """Send a given PDU into the active connection
         """
+        # debug: 
+        #print("hci::send_pdu", message)        
         # Make sure we have an active connection
         if self.__conn_state == HCIConnectionState.ESTABLISHED:
             logger.debug("[%s] Received WHAD BLE send_pdu message", self.interface)
@@ -1743,6 +1745,7 @@ class Hci(VirtualDevice):
                     self._cached_adv_data = message.ext_pdus
                 if not self._advertising:
                     """
+                    TODO: handle extended advertising with HCI.
                     success = success and self._set_extended_advertising_parameters(message.inter_min, message.inter_max,
                                                                                     hci_ext_adv_type, pri_phy, sec_phy,
                                                                                     channel_map=chanmap, adv_sid)
@@ -1801,3 +1804,4 @@ class Hci(VirtualDevice):
             self._send_whad_command_result(CommandResult.SUCCESS)
         else:
             self._send_whad_command_result(CommandResult.WRONG_MODE)
+

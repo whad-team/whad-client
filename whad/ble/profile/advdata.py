@@ -18,10 +18,6 @@ class AdvDataError(Exception):
     """Advertisement Data error
     """
 
-    def __init__(self):
-        super().__init__()
-
-
 class AdvDataFieldListOverflow(Exception):
     """Advertisement data field list overflow
     """

@@ -205,47 +205,6 @@ class TestBleDomainFactory(object):
         with pytest.raises(ValueError):
             factory_v3.create_adv_mode(b"FOOBAR", channel_map=ChannelMap([1,2,3]))
 
-    def test_AdvMode_v3_bad_inter_min(self, factory_v3: BleDomain):
-        """Test creation of AdvMode message with bad interval minimal value"""
-        with pytest.raises(ValueError):
-            factory_v3.create_adv_mode(b"FOOBAR", inter_min=0, inter_max=0x4000)
-
-    def test_AdvMode_v3_bad_inter_max(self, factory_v3: BleDomain):
-        """Test creation of AdvMode message with bad interval minimal value"""
-        with pytest.raises(ValueError):
-            factory_v3.create_adv_mode(b"FOOBAR", inter_min=0x20, inter_max=0)
-
-    def test_AdvMode_v3_bad_interval_range(self, factory_v3: BleDomain):
-        """Test creation of AdvMode message with bad interval minimal value"""
-        with pytest.raises(ValueError):
-            factory_v3.create_adv_mode(b"FOOBAR", inter_min=0x1000, inter_max=0x20)
-
-    def test_AdvMode_v3_bad_channel_map(self, factory_v3: BleDomain):
-        """Test creation of AdvMode message with bad interval minimal value"""
-        with pytest.raises(ValueError):
-            factory_v3.create_adv_mode(b"FOOBAR", channel_map=ChannelMap([1,2,3]))
-
-
-    def test_AdvMode_v3_bad_inter_min(self, factory_v3: BleDomain):
-        """Test creation of AdvMode message with bad interval minimal value"""
-        with pytest.raises(ValueError):
-            factory_v3.create_adv_mode(b"FOOBAR", inter_min=0, inter_max=0x4000)
-
-    def test_AdvMode_v3_bad_inter_max(self, factory_v3: BleDomain):
-        """Test creation of AdvMode message with bad interval minimal value"""
-        with pytest.raises(ValueError):
-            factory_v3.create_adv_mode(b"FOOBAR", inter_min=0x20, inter_max=0)
-
-    def test_AdvMode_v3_bad_interval_range(self, factory_v3: BleDomain):
-        """Test creation of AdvMode message with bad interval minimal value"""
-        with pytest.raises(ValueError):
-            factory_v3.create_adv_mode(b"FOOBAR", inter_min=0x1000, inter_max=0x20)
-
-    def test_AdvMode_v3_bad_channel_map(self, factory_v3: BleDomain):
-        """Test creation of AdvMode message with bad interval minimal value"""
-        with pytest.raises(ValueError):
-            factory_v3.create_adv_mode(b"FOOBAR", channel_map=ChannelMap([1,2,3]))
-
     def test_AdvMode_extended(self, factory_v3: BleDomain):
         """Test creation of ExtAdvMode message for proto v3
         """

@@ -132,11 +132,11 @@ class AntDomain(Registry):
         """
         if isinstance(packet.metadata, ANTMetadata):
             if packet.metadata.raw:
-                return AntDomain.bound('send_raw', self.proto_version).from_packet(
+                return AntDomain.build('send_raw', self.proto_version).from_packet(
                     packet
                 )
             else:
-                return AntDomain.bound('send', self.proto_version).from_packet(
+                return AntDomain.build('send', self.proto_version).from_packet(
                     packet
                 )
         else:
@@ -163,7 +163,7 @@ class AntDomain(Registry):
         """Parses a WHAD ANT Domain message as seen by protobuf
         """
         message_type = message.ant.WhichOneof('msg')
-        message_clazz = AntDomain.bound(message_type, proto_version)
+        message_clazz = AntDomain.build(message_type, proto_version)
         return message_clazz.parse(proto_version, message)
 
 
@@ -177,7 +177,7 @@ class AntDomain(Registry):
         :type device_number: int
         :return: instance of `SetDeviceNumber`
         """
-        return AntDomain.bound('set_device_number', self.proto_version)(
+        return AntDomain.build('set_device_number', self.proto_version,
             channel_number=channel_number, 
             device_number=device_number
         )
@@ -193,7 +193,7 @@ class AntDomain(Registry):
         :type device_type: int
         :return: instance of `SetDeviceType`
         """
-        return AntDomain.bound('set_device_type', self.proto_version)(
+        return AntDomain.build('set_device_type', self.proto_version,
             channel_number=channel_number, 
             device_type=device_type
         )
@@ -209,7 +209,7 @@ class AntDomain(Registry):
         :type transmission_type: int
         :return: instance of `SetTransmissionType`
         """
-        return AntDomain.bound('set_transmission_type', self.proto_version)(
+        return AntDomain.build('set_transmission_type', self.proto_version,
             channel_number=channel_number, 
             transmission_type=transmission_type
         )
@@ -223,7 +223,7 @@ class AntDomain(Registry):
         :type channel_period: int
         :return: instance of `SetChannelPeriod`
         """
-        return AntDomain.bound('set_channel_period', self.proto_version)(
+        return AntDomain.build('set_channel_period', self.proto_version,
             channel_number=channel_number, 
             channel_period=channel_period
         )
@@ -238,7 +238,7 @@ class AntDomain(Registry):
         :type network_key: bytes
         :return: instance of `SetNetworkKey`
         """
-        return AntDomain.bound('set_network_key', self.proto_version)(
+        return AntDomain.build('set_network_key', self.proto_version,
             network_number=network_number, 
             network_key=network_key
         )
@@ -272,7 +272,7 @@ class AntDomain(Registry):
         :type asynchronous_transmission: bool
         :return: instance of `AssignChannel`
         """
-        return AntDomain.bound('assign_channel', self.proto_version)(
+        return AntDomain.build('assign_channel', self.proto_version,
             channel_number = channel_number, 
             network_number = network_number, 
             channel_type = channel_type, 
@@ -292,7 +292,7 @@ class AntDomain(Registry):
         :type channel_number: int
         :return: instance of `UnassignChannel`
         """
-        return AntDomain.bound('unassign_channel', self.proto_version)(
+        return AntDomain.build('unassign_channel', self.proto_version,
             channel_number = channel_number
         )
 
@@ -305,7 +305,7 @@ class AntDomain(Registry):
         :type channel_number: int
         :return: instance of `OpenChannel`
         """
-        return AntDomain.bound('open_channel', self.proto_version)(
+        return AntDomain.build('open_channel', self.proto_version,
             channel_number = channel_number
         )
 
@@ -318,7 +318,7 @@ class AntDomain(Registry):
         :type channel_number: int
         :return: instance of `CloseChannel`
         """
-        return AntDomain.bound('close_channel', self.proto_version)(
+        return AntDomain.build('close_channel', self.proto_version,
             channel_number = channel_number
         )
 
@@ -332,7 +332,7 @@ class AntDomain(Registry):
         :type rf_channel: int
         :return: instance of `SetRFChannel`
         """
-        return AntDomain.bound('set_rf_channel', self.proto_version)(
+        return AntDomain.build('set_rf_channel', self.proto_version,
             channel_number = channel_number, 
             rf_channel = rf_channel
         )
@@ -360,7 +360,7 @@ class AntDomain(Registry):
         :type transmission_type: int
         :return: instance of `Sniff`
         """
-        return AntDomain.bound('sniff', self.proto_version)(
+        return AntDomain.build('sniff', self.proto_version,
             rf_channel = rf_channel, 
             network_key = network_key, 
             device_number = device_number, 
@@ -379,7 +379,7 @@ class AntDomain(Registry):
         :type rf_channel: int
         :return: instance of `Jam`
         """
-        return AntDomain.bound('jam', self.proto_version)(
+        return AntDomain.build('jam', self.proto_version,
             rf_channel = rf_channel 
         )
         
@@ -400,7 +400,7 @@ class AntDomain(Registry):
         :type rf_channel: int
         :return: instance of `Send`
         """
-        return AntDomain.bound('send', self.proto_version)(
+        return AntDomain.build('send', self.proto_version,
             rf_channel = rf_channel, 
             channel_number = channel_number, 
             pdu = pdu
@@ -423,7 +423,7 @@ class AntDomain(Registry):
         :type rf_channel: int
         :return: instance of `SendRaw`
         """
-        return AntDomain.bound('send_raw', self.proto_version)(
+        return AntDomain.build('send_raw', self.proto_version,
             rf_channel = rf_channel, 
             channel_number = channel_number, 
             pdu = pdu
@@ -439,7 +439,7 @@ class AntDomain(Registry):
         :type channel_number: int
         :return: instance of `MasterMode`
         """
-        return AntDomain.bound('master_mode', self.proto_version)(
+        return AntDomain.build('master_mode', self.proto_version,
             channel_number = channel_number
         )
 
@@ -455,7 +455,7 @@ class AntDomain(Registry):
         :type channel_number: int
         :return: instance of `SlaveMode`
         """
-        return AntDomain.bound('slave_mode', self.proto_version)(
+        return AntDomain.build('slave_mode', self.proto_version,
             channel_number = channel_number
         )
 
@@ -466,7 +466,7 @@ class AntDomain(Registry):
         
         :return: instance of `Start`
         """
-        return AntDomain.bound('start', self.proto_version)()
+        return AntDomain.build('start', self.proto_version)
 
 
     def create_stop(self) -> HubMessage:
@@ -474,7 +474,7 @@ class AntDomain(Registry):
         
         :return: instance of `Stop`
         """
-        return AntDomain.bound('stop', self.proto_version)()
+        return AntDomain.build('stop', self.proto_version)
         
 
     def create_list_channels(self) -> HubMessage:
@@ -482,7 +482,7 @@ class AntDomain(Registry):
         
         :return: instance of `List Channels`
         """
-        return AntDomain.bound('list_channels', self.proto_version)()
+        return AntDomain.build('list_channels', self.proto_version)
 
 
     def create_list_networks(self) -> HubMessage:
@@ -490,7 +490,7 @@ class AntDomain(Registry):
         
         :return: instance of `ListNetworks`
         """
-        return AntDomain.bound('list_networks', self.proto_version)()
+        return AntDomain.build('list_networks', self.proto_version)
         
     def create_available_channels(self, number_of_channels : int) -> HubMessage:
         """Create an available channels notification
@@ -499,7 +499,7 @@ class AntDomain(Registry):
         :type number_of_channels: int
         :return: instance of `AvailableChannels`
         """
-        return AntDomain.bound('available_channels', self.proto_version)(
+        return AntDomain.build('available_channels', self.proto_version,
             number_of_channels = number_of_channels  
         )
 
@@ -511,7 +511,7 @@ class AntDomain(Registry):
         :type number_of_networks: int
         :return: instance of `AvailableChannels`
         """
-        return AntDomain.bound('available_networks', self.proto_version)(
+        return AntDomain.build('available_networks', self.proto_version,
             number_of_networks = number_of_networks  
         )
 
@@ -522,7 +522,7 @@ class AntDomain(Registry):
         :type timestamp: int
         :return: instance of `Jammed`
         """
-        return AntDomain.bound('jammed', self.proto_version)(
+        return AntDomain.build('jammed', self.proto_version,
             timestamp = timestamp
         )
 
@@ -535,7 +535,7 @@ class AntDomain(Registry):
         :type event: instance of `ChannelEventCode`
         :return: instance of `ChannelEvent`
         """
-        return AntDomain.bound('channel_event', self.proto_version)(
+        return AntDomain.build('channel_event', self.proto_version,
             channel_number = channel_number, 
             event = event
         )
@@ -565,7 +565,7 @@ class AntDomain(Registry):
         :type crc_validity:bool
         :return: instance of `PduReceived`
         """
-        return AntDomain.bound('pdu', self.proto_version)(
+        return AntDomain.build('pdu', self.proto_version,
             channel_number = channel_number,
             rf_channel = rf_channel,  
             pdu = pdu, 
@@ -602,7 +602,7 @@ class AntDomain(Registry):
         :type crc_validity:bool
         :return: instance of `RawPduReceived`
         """
-        return AntDomain.bound('raw_pdu', self.proto_version)(
+        return AntDomain.build('raw_pdu', self.proto_version,
             channel_number = channel_number, 
             rf_channel = rf_channel, 
             pdu = pdu, 

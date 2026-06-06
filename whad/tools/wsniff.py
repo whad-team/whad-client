@@ -59,6 +59,7 @@ class WhadSniffOutputPipe(Bridge):
         """
         if hasattr(message, "to_packet") and hasattr(self.input, "process_packet"):
             pkt = message.to_packet()
+
             if pkt is not None:
                 pkt = self.input.process_packet(pkt)
                 if pkt is not None:

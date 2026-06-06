@@ -146,7 +146,9 @@ class ProtocolHub(Registry):
         elif factory == 'unifying':
             from .unifying import UnifyingDomain
             return UnifyingDomain
-
+        elif factory == 'ant':
+            from .ant import AntDomain
+            return AntDomain
         # Not found
         logger.warning(
             "[protohub::load()] cannot dynamically load message definitions for domain %s !",

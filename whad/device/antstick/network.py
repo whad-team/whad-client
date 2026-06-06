@@ -1,3 +1,6 @@
+'''
+This module contains Network-related features for ANTstick device management.
+'''
 from dataclasses import dataclass
 from enum import IntEnum
 
