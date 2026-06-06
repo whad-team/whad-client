@@ -8,7 +8,7 @@ from packaging.version import Version
 from whad.scapy.layers.ant import ANT_Hdr
 
 # Main whad imports
-from whad.device import WhadDeviceConnector
+from whad.device import Device, WhadDeviceConnector
 from whad.helpers import message_filter, is_message_type
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 
@@ -25,20 +25,21 @@ from whad.ant.channel import ChannelDirection
 logger = logging.getLogger(__name__)
 
 class ANT(WhadDeviceConnector):
-    """
+    '''
     ANT protocol connector.
 
     This connector drives an ANT-capable device with ANT-specific WHAD messages.
     It is required by various role classes to interact with a real device and pre-process
     domain-specific messages.
-    """
+    '''
     domain = "ant"
 
-    def __init__(self, device=None, synchronous=False):
-        """
+    def __init__(self, device : Device = None, synchronous : bool =False):
+        '''
         Initialize the connector, open the device (if not already opened), discover
         the services (if not already discovered).
-        """
+        '''
+
         self.__ready = False
         super().__init__(device)
 
