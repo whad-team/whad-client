@@ -273,11 +273,11 @@ class Dot15d4Domain(Registry):
         """
         if isinstance(packet.metadata, Dot15d4Metadata):
             if packet.metadata.raw:
-                return Dot15d4Domain.bound('send_raw', self.proto_version).from_packet(
+                return Dot15d4Domain.build('send_raw', self.proto_version).from_packet(
                     packet, channel=packet.metadata.channel
                 )
             else:
-                return Dot15d4Domain.bound('send', self.proto_version).from_packet(
+                return Dot15d4Domain.build('send', self.proto_version).from_packet(
                     packet, channel=packet.metadata.channel
                 )
         else:
@@ -307,7 +307,7 @@ class Dot15d4Domain(Registry):
         """Parses a WHAD Dot15d4 Domain message as seen by protobuf
         """
         message_type = message.dot15d4.WhichOneof('msg')
-        message_clazz = Dot15d4Domain.bound(message_type, proto_version)
+        message_clazz = Dot15d4Domain.build(message_type, proto_version)
         return message_clazz.parse(proto_version, message)
 
     def create_set_node_address(self, address: NodeAddress) -> HubMessage:
@@ -454,7 +454,7 @@ class Dot15d4Domain(Registry):
         :type pdu: bytes
         :return: instance of `SendPdu`
         """
-        return Dot15d4Domain.bound('send_in_slot', self.proto_version)(
+        return Dot15d4Domain.build('send_in_slot', self.proto_version,
             slot=slot,
             wait_offset=wait_offset,
             pdu=pdu
@@ -575,7 +575,7 @@ class Dot15d4Domain(Registry):
         if self.proto_version < 3:
             logger.warning("[core::hub::dot15d4] TSCH mode not supported by this hardware !")
             
-        return Dot15d4Domain.bound('config_tsch', self.proto_version)(
+        return Dot15d4Domain.build('config_tsch', self.proto_version,
             enabled=enabled
         )
 
@@ -620,7 +620,7 @@ class Dot15d4Domain(Registry):
         if not isinstance(options,(LinkOptions,int)):
             logger.error("invalid Link Options provided")
 
-        return Dot15d4Domain.bound('add_link', self.proto_version)(
+        return Dot15d4Domain.build('add_link', self.proto_version,
             superframe_id=superframe_id, 
             src=source, 
             time_slot=time_slot, 
@@ -649,7 +649,7 @@ class Dot15d4Domain(Registry):
             logger.error("invalid neighbor address, must be between 0 & 0xFFFF (16-bit short format).")
             raise ValueError()
   
-        return Dot15d4Domain.bound('del_link', self.proto_version)(
+        return Dot15d4Domain.build('del_link', self.proto_version,
             superframe_id=superframe_id, 
             offset=offset, 
             neighbor=neighbor
@@ -673,7 +673,7 @@ class Dot15d4Domain(Registry):
         if self.proto_version < 3:
             logger.warning("[core::hub::dot15d4] TSCH mode not supported by this hardware !")
             
-        return Dot15d4Domain.bound('update_superframe', self.proto_version)(
+        return Dot15d4Domain.build('update_superframe', self.proto_version,
             superframe_id=superframe_id, 
             number_of_slots=number_of_slots, 
             flags=flags, 
@@ -691,7 +691,7 @@ class Dot15d4Domain(Registry):
         if self.proto_version < 3:
             logger.warning("[core::hub::dot15d4] TSCH mode not supported by this hardware !")
             
-        return Dot15d4Domain.bound('delete_superframe', self.proto_version)(
+        return Dot15d4Domain.build('delete_superframe', self.proto_version,
             superframe_id=superframe_id
         )
 
@@ -705,7 +705,7 @@ class Dot15d4Domain(Registry):
         if self.proto_version < 3:
             logger.warning("[core::hub::dot15d4] TSCH mode not supported by this hardware !")
             
-        return Dot15d4Domain.bound('set_chm', self.proto_version)(
+        return Dot15d4Domain.build('set_chm', self.proto_version,
             channel_map=channel_map
         )
         
@@ -757,7 +757,7 @@ class WirelessHartDomain(Dot15d4Domain):
         :return: instance of `RawPduReceived`
         """
         # Create our RawPduReceived message with mandatory fields
-        msg = Dot15d4Domain.bound('raw_pdu', self.proto_version)(
+        msg = Dot15d4Domain.build('raw_pdu', self.proto_version,
             channel=channel,
             pdu=pdu,
             fcs=fcs
@@ -809,7 +809,7 @@ class WirelessHartDomain(Dot15d4Domain):
         :return: instance of `RawPduReceived`
         """
         # Create our PduReceived message with mandatory fields
-        msg = Dot15d4Domain.bound('pdu', self.proto_version)(
+        msg = Dot15d4Domain.build('pdu', self.proto_version,
             channel=channel,
             pdu=pdu,
         )

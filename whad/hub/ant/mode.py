@@ -44,8 +44,8 @@ class Start(PbMessageWrapper):
     """ANT start mode message
     """
 
-    def __init__(self, message: Message = None):
-        super().__init__(message=message)
+    def __init__(self, version: int, message: Message = None):
+        super().__init__(version, message=message)
         self.message.ant.start.CopyFrom(StartCmd())
 
 
@@ -55,8 +55,8 @@ class Stop(PbMessageWrapper):
     """ANT stop mode message
     """
 
-    def __init__(self, message: Message = None):
-        super().__init__(message=message)
+    def __init__(self, version: int, message: Message = None):
+        super().__init__(version, message=message)
         self.message.ant.stop.CopyFrom(StopCmd())
 
 

@@ -37,7 +37,8 @@ class SendPdu(PbMessageWrapper):
         else:
             return None
 
-        msg = SendPdu.build(1,
+        msg = SendPdu.build(
+            version=1,
             channel=channel,
             pdu=pdu
         )
@@ -70,6 +71,7 @@ class SendInSlotPdu(PbMessageWrapper):
             return None
 
         msg = SendInSlotPdu(
+            version=1,
             slot=slot,
             wait_offset=wait_offset, 
             pdu=pdu
@@ -98,7 +100,8 @@ class SendRawPdu(PbMessageWrapper):
         if Dot15d4FCS in packet:
             pdu = bytes(packet[Dot15d4FCS])[:-2]
 
-            msg = SendRawPdu.build(1,
+            msg = SendRawPdu.build(
+                version=1,
                 channel=channel,
                 pdu=pdu,
                 fcs=packet.fcs
@@ -115,7 +118,8 @@ class SendRawPdu(PbMessageWrapper):
             else:
                 fcs = 0
 
-            msg = SendRawPdu.build(1,
+            msg = SendRawPdu.build(
+                version=1,
                 channel=channel,
                 pdu=pdu,
                 fcs=fcs
@@ -131,7 +135,8 @@ class SendRawPdu(PbMessageWrapper):
             else:
                 fcs = 0
 
-            msg = SendRawPdu.build(1,
+            msg = SendRawPdu.build(
+                version=1,
                 channel=channel,
                 pdu=pdu,
                 fcs=fcs
@@ -221,6 +226,7 @@ class PduReceivedV3(PbMessageWrapper):
         """
         # Create a PduReceived message
         msg = PduReceived(
+            version=1,
             channel=packet.metadata.channel,
             pdu=bytes(packet.getlayer(Dot15d4)),
         )
@@ -294,7 +300,8 @@ class PduReceived(PbMessageWrapper):
         """Convert scapy packet to a PduReceived message
         """
         # Create a PduReceived message
-        msg = PduReceived.build(1,
+        msg = PduReceived.build(
+            version=1,
             channel=packet.metadata.channel,
             pdu=bytes(packet.getlayer(Dot15d4)),
         )
@@ -413,6 +420,7 @@ class RawPduReceivedV3(PbMessageWrapper):
         """
         # Create a PduReceived message
         msg = RawPduReceived(
+            version=3,
             channel=packet.metadata.channel,
             pdu=bytes(packet.getlayer(Dot15d4FCS))[:-2],
             fcs=packet.fcs
@@ -511,7 +519,8 @@ class RawPduReceived(PbMessageWrapper):
         """Convert packet to a RawPduReceived message.
         """
         # Create a PduReceived message
-        msg = RawPduReceived.build(1,
+        msg = RawPduReceived.build(
+            version=1,
             channel=packet.metadata.channel,
             pdu=bytes(packet.getlayer(Dot15d4FCS))[:-2],
             fcs=packet.fcs
