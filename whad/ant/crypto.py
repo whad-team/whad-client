@@ -10,6 +10,10 @@ def is_valid_network_key(network_key : bytes) -> bool:
     :type network_key: bytes
     :returns: boolean indicating if the key is a valid key
     '''
+
+    if not isinstance(network_key, bytes) or len(network_key) != 8:
+        return False
+
     validate_xor_table = [0x20, 0x1a, 0x47, 0x11, 0x50, 0x93, 0x36, 0x8f]
     validate_and_table = [0xec, 0x3f, 0xd7, 0xdb, 0x79, 0xf7, 0xbe, 0xef]
 
@@ -36,7 +40,7 @@ def is_valid_network_key(network_key : bytes) -> bool:
         nb_xor += 1
     return k_deriv == 0
 
-def generate_sync_from_network_key(network_key) -> int:
+def generate_sync_from_network_key(network_key: bytes) -> int:
     '''
     Generates a synchronization word from a network key for raw sniffing.
 
@@ -44,6 +48,10 @@ def generate_sync_from_network_key(network_key) -> int:
     :type network_key: bytes
     :returns: synchronization word to use for raw sniffing
     '''
+
+    if not isinstance(network_key, bytes) or len(network_key) != 8:
+        return False
+
     sync_xor_key_table  = [0xfe, 0xff, 0x1c, 0x7c, 0xfc, 0x0c, 0x04, 0x3c]
     sync_and_table      = [0x41, 0x10, 0x28, 0x86, 0x08, 0xc0, 0x13, 0x24]
 

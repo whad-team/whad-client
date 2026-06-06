@@ -98,8 +98,8 @@ class ListChannels(PbMessageWrapper):
     """ANT list channels message
     """
 
-    def __init__(self, message: Message = None):
-        super().__init__(message=message)
+    def __init__(self, version:int, message: Message = None):
+        super().__init__(version, message=message)
         self.message.ant.list_channels.CopyFrom(ListChannelsCmd())
 
 
