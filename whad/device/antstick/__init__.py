@@ -82,7 +82,7 @@ class ANTStick(VirtualDevice):
     INTERFACE_NAME = "antstick"
 
     @classmethod
-    def list(cls) -> List[Antstick]:
+    def list(cls) -> List['ANTStick']:
         '''
         Returns a list of available ANTStick devices.
         '''
