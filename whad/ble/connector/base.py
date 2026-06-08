@@ -27,7 +27,7 @@ from whad.hub.generic.cmdresult import Success, CommandResult
 from whad.hub.ble.bdaddr import BDAddress
 from whad.hub.ble.chanmap import ChannelMap
 from whad.hub.ble import Commands, AdvType, Direction, BLEMetadata, ExtAdvPdu, BlePhy, AuxPtr
-from whad.hub.events import ConnectionEvt, DisconnectionEvt, SyncEvt, DesyncEvt, \
+from whad.hub.events import ConnectionEvt, DisconnectionEvt, PhyUpdatedEvt, SyncEvt, DesyncEvt, \
     TriggeredEvt, WhadEvent
 
 # Bluetooth Low Energy dependencies
@@ -943,6 +943,9 @@ class BLE(Connector):
         elif isinstance(event, TriggeredEvt):
             logger.debug("[ble connector] on_event() called: triggered event")
             self.on_triggered(event.id)
+        elif isinstance(event, PhyUpdatedEvt):
+            logger.debug("[ble connector] on_event() called: PHY update event")
+            self.on_phy_updated(event.tx_phy, event.rx_phy, event.timestamp)
         else:
             logger.error("[ble connector] on_event() called: unknown event !")
 
@@ -990,6 +993,11 @@ class BLE(Connector):
         for trigger in self.__triggers:
             if trigger.identifier == identifier:
                 trigger.triggered = True
+
+    def on_phy_updated(self, tx: int, rx: int, timestamp: int):
+        """PHY update event callback.
+        """
+        logger.info("PHY updated (tx:%d, rx:%d, timestamp:%d)", tx, rx, timestamp)
 
     def on_disconnected(self, disconnection_data: dict):
         """Disconnection event handler.
