@@ -6,6 +6,7 @@ from whad.protocol.whad_pb2 import Message
 from whad.protocol.ble.ble_pb2 import CentralModeCmd, StartCmd as BleStartCmd, StopCmd as BleStopCmd
 from whad.hub.message import pb_bind, PbFieldBytes, PbMessageWrapper, PbFieldBool, PbFieldInt, PbFieldArray
 from whad.hub.ble import BleDomain, BleAdvType, ChannelMap, BleCsa, AuxPtr, ExtAdvPdu
+from whad.hub.events import PhyUpdatedEvt
 
 @pb_bind(BleDomain, 'scan_mode', 1)
 class ScanMode(PbMessageWrapper):
@@ -230,3 +231,29 @@ class SetSupportedPhys(PbMessageWrapper):
 class SetTxPowerLevel(PbMessageWrapper):
     """Set BLE TX power."""
     level = PbFieldInt('ble.set_tx_pwr.level')
+
+@pb_bind(BleDomain, 'phy_updated', 3)
+class PhyUpdated(PbMessageWrapper):
+    """PHY has been updated."""
+    tx_phy = PbFieldInt('ble.phy_updated.tx_phy')
+    rx_phy = PbFieldInt('ble.phy_updated.rx_phy')
+    timestamp = PbFieldInt('ble.phy_updated.timestamp', optional=True)
+
+    def to_event(self):
+        """Convert this message to an event.
+        """
+        return PhyUpdatedEvt(
+            tx_phy=self.tx_phy,
+            rx_phy=self.rx_phy,
+            timestamp=self.timestamp
+        )
+
+    @staticmethod
+    def from_event(event):
+        return PhyUpdated(
+            version=3,
+            tx_phy=event.tx_phy,
+            rx_phy=event.rx_phy,
+            timestamp=event.timestamp
+        )
+

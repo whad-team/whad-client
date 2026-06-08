@@ -113,6 +113,7 @@ class AddressType:
     RPA = BleAddrType.RPA
 
 class BlePhy:
+    UNDEFINED = BlePhy.UNDEFINED
     LE_1M = BlePhy.LE_1M
     LE_1M_CODED = BlePhy.LE_1M_CODED
     LE_2M = BlePhy.LE_2M
@@ -408,6 +409,21 @@ class BleDomain(Registry):
             msg.add_tx_phy(tx)
         for rx in rx_phys:
             msg.add_rx_phy(rx)
+        return msg
+
+    def create_phy_updated(self, tx_phy: int, rx_phy: int, timestamp: Optional[int] = None) -> HubMessage:
+        """Create a PhyUpdated message.
+
+        :param tx_phy: Updated TX PHY
+        :type  tx_phy: int
+        :param rx_phy: Updated RX PHY
+        :type  rx_phy: int
+        :return: PhyUpdated message
+        :rtype: HubMessage
+        """
+        msg = BleDomain.build('phy_updated', self.proto_version, tx_phy=tx_phy, rx_phy=rx_phy)
+        if timestamp is not None:
+            msg.timestamp = timestamp
         return msg
 
     def create_set_tx_power_level(self, level: int) -> HubMessage:
@@ -1456,7 +1472,7 @@ from .sniffing import SniffAdv, SniffConnReq, SniffAccessAddress, SniffActiveCon
 from .jamming import JamAdv, JamAdvChan, JamConn, ReactiveJam
 from .mode import (
     ScanMode, AdvMode, CentralMode, PeriphMode, BleStart, BleStop,
-    SetEncryption, SetPhy, SetTxPowerLevel, SetSupportedPhys
+    SetEncryption, SetPhy, SetTxPowerLevel, SetSupportedPhys, PhyUpdated
 )
 from .pdu import SetAdvData, SendBleRawPdu, SendBlePdu, BleAdvPduReceived, BlePduReceived, \
     BleRawPduReceived, Injected, SetExtAdvPdus
@@ -1518,4 +1534,5 @@ __all__ = [
     "SetTxPowerLevel",
     "SetExtAdvPdus",
     "SetSupportedPhys",
+    "PhyUpdated"
 ]

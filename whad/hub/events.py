@@ -25,7 +25,7 @@ class WhadEvent(object):
             return self.__parameters[name]
         else:
             raise AttributeError
-        
+
 class ConnectionEvt(WhadEvent):
     """Connection Event.
 
@@ -87,3 +87,13 @@ class DesyncEvt(WhadEvent):
     """
     def __init__(self, **parameters):
         super().__init__(**parameters)
+
+class PhyUpdatedEvt(WhadEvent):
+    """PHY update event.
+
+    This event is sent to notify that the current PHY (RX/TX) has been updated
+    following a PHY update procedure initiated by the host or the remote device.
+    """
+    def __init__(self, **parameters):
+        super().__init__(**parameters)
+
