@@ -189,6 +189,19 @@ class ExtAdvPdu:
     def auxptr(self, value: AuxPtr):
         self.__aux_ptr = value
 
+def phy_to_btle_rf(phy: int) -> int:
+    """Convert BlePhy constant into BTLE_RF PHY value."""
+    if 0 < phy < 4:
+        return [0, 2, 1].index(phy)
+    else:
+        return 0
+
+def btle_rf_to_phy(phy: int) -> int:
+    """Convert BTLE_RF PHY value to BlePhy."""
+    if phy >= 0 and phy <= 3:
+        return [BlePhy.LE_1M, BlePhy.LE_2M, BlePhy.LE_1M_CODED, BlePhy.UNDEFINED].index(phy)
+    return 0
+
 @dataclass(repr=False)
 class BLEMetadata(Metadata):
     direction : BleDirection = None
@@ -218,7 +231,8 @@ class BLEMetadata(Metadata):
             is_crc_valid = is_crc_valid,
             rssi = rssi,
             channel = channel,
-            timestamp = int(100000 * pkt.time)
+            timestamp = int(100000 * pkt.time),
+            phy=btle_rf_to_phy(header.phy)
         )
 
     def convert_to_header(self):
@@ -253,7 +267,8 @@ class BLEMetadata(Metadata):
             crc_checked = crc_checked,
             crc_valid = crc_valid,
             sig_power_valid = sig_power_valid,
-            dewhitened = dewhitened
+            dewhitened = dewhitened,
+            phy=phy_to_btle_rf(self.phy)
         )
         return header, timestamp
 
