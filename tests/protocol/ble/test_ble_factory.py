@@ -12,7 +12,7 @@ from whad.hub.ble import BleDomain, SetBdAddress, SniffAdv, SniffConnReq, \
     BleStart, BleStop, HijackMaster, HijackSlave, HijackBoth, Hijacked, ReactiveJam, \
     Synchronized, Desynchronized, PrepareSequenceManual, PrepareSequenceConnEvt, \
     PrepareSequencePattern, Injected, Direction, AdvType, Triggered, Trigger, DeleteSequence, \
-    SetEncryption, SetPhy, SetTxPowerLevel, SetExtAdvPdus, SetSupportedPhys
+    SetEncryption, SetPhy, SetTxPowerLevel, SetExtAdvPdus, SetSupportedPhys, PhyUpdated
 
 from whad.hub.ble import BleCsa, BlePhy, ExtAdvPdu, AuxPtr
 from whad.hub.ble.bdaddr import BDAddress
@@ -570,3 +570,18 @@ class TestBleDomainFactory(object):
         assert obj.key == b"KEY"
         assert obj.rand == b"RAND"
         assert obj.ediv == b"EDIV"
+
+    def test_PhyUpdated_no_ts(self, factory_v3: BleDomain):
+        """Test creation of PhyUpdated message with no timestamp."""
+        obj = factory_v3.create_phy_updated(BlePhy.LE_1M, BlePhy.LE_2M)
+        assert obj.tx_phy == BlePhy.LE_1M
+        assert obj.rx_phy == BlePhy.LE_2M
+        assert obj.timestamp is None
+
+    def test_PhyUpdated_with_ts(self, factory_v3: BleDomain):
+        """Test creation of PhyUpdated message with no timestamp."""
+        obj = factory_v3.create_phy_updated(BlePhy.LE_1M, BlePhy.LE_2M, 1234567)
+        assert obj.tx_phy == BlePhy.LE_1M
+        assert obj.rx_phy == BlePhy.LE_2M
+        assert obj.timestamp == 1234567
+
