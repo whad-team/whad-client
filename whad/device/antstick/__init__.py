@@ -200,7 +200,8 @@ class ANTStick(VirtualDevice):
         self._configure_endpoints()
 
         self.__antstick.reset()
-            
+        self._antstick_reset()
+        sleep(0.1)
         # Get all relevant informations about the dongle: serial number, manufacturer, firmware version ...
         logger.debug("Recovering serial number, manufacturer, firmware version...")
         serial_number = self._get_serial_number()

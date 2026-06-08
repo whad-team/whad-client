@@ -25,13 +25,7 @@ if __name__ == '__main__':
             sniffer = ANT(dev)
             print("Available channels: ", sniffer.list_channels())
             print("Available networks: ", sniffer.list_networks())
-            '''
-            print(sniffer.sniff_ant(
-                device_type = 0, 
-                device_number = 0,
-                transmission_type = 0
-            ))
-            '''
+            
             sniffer.set_network_key(0, ANT_PLUS_NETWORK_KEY)
             sniffer.set_device_number(0,7912)
             sniffer.set_device_type(0,120)
@@ -48,7 +42,7 @@ if __name__ == '__main__':
             p = ANT_Hdr(bytes.fromhex("a6c5e81e78010aFFFF")+ b"MASTER")
             p.broadcast = 0
             print(sniffer.send(p))
-            #sniffer.send(pkt)
+
             while True:
                 input()
                 p = ANT_Hdr(bytes.fromhex("a6c5e81e78010aFFFF")+ b"ABCDEF")#b"SLAAVE")

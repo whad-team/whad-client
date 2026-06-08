@@ -24,20 +24,14 @@ if __name__ == '__main__':
             profile = HeartRateDisplay()
 
             slave = Slave(dev, profile=profile)
-            channel = slave.search_channel()#0, 120, 1, channel_period=8070)
-            #channel.app.set_profile(profile)
+            channel = slave.search_channel()
             print("Chan:", channel)
 
-            profile.on_heart_rate_received = lambda u : print(u)
-            while True:
-                sleep(1)
-            '''
-            base_heart_rate = None
-            while True:
-                if base_heart_rate != profile.computed_heart_rate:
-                    base_heart_rate = profile.computed_heart_rate
-                    print(profile.computed_heart_rate, profile.heart_beat_count)
-            '''
+            profile.start()
+
+            for heart_rate in profile.heart_rates():
+                print(heart_rate)
+
         except (KeyboardInterrupt, SystemExit):
             dev.close()
 

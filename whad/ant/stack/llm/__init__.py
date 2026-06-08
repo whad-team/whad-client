@@ -66,6 +66,13 @@ class ANTChannel:
         """
         self.__opened = True
 
+
+    def mark_as_closed(self):
+        """Mark the channel as closed.
+        """
+        self.__opened = False
+
+
     def is_opened(self):
         """Indicates if the channel is open or not.
         """
@@ -80,6 +87,14 @@ class ANTChannel:
         """Return the next pending transfer channel event.
         """
         return self.__transfer_events.get()
+
+    def close(self):
+        """Close this channel.
+
+        This method closes the channel and frees the associated
+        resources through the link layer.
+        """
+        self.__app.get_layer('ll').close_channel(self.__channel_number)
 
     @property
     def app(self) -> AppLayer:
@@ -313,7 +328,6 @@ class LinkLayer(Layer):
         # Instantiate a Applicative layer (contextual) to handle the channel
         app_instance = self.instantiate(AppLayer)
         app_instance.set_channel_number(channel_number)
-        print(app_instance)
 
         channel = self.state.register_channel(
             app_instance,
@@ -387,6 +401,26 @@ class LinkLayer(Layer):
         )
         channel.mark_as_opened()
         return channel
+
+    def close_channel(self, channel):
+        if isinstance(channel, ANTChannel):
+            channel_number = channel.channel_number
+        elif isinstance(channel, int):
+            channel_number = channel
+
+        if channel_number not in self.state.channels:
+            raise InvalidChannel()
+
+        self.state.channels[channel_number].mark_as_closed()
+
+        self.get_layer('phy').close_channel(channel_number)
+
+        self.get_layer('phy').unassign_channel(channel_number)
+
+        self.state.unregister_channel(channel_number)
+
+        print("destroyed")
+        return True
 
     @instance('app', tag='broadcast')
     def _send_broadcast(self, app_inst: Layer, channel_number:int, payload : bytes):

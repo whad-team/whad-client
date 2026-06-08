@@ -20,12 +20,10 @@ if __name__ == '__main__':
             # Create the WHAD Device
             dev = WhadDevice.create(interface)
 
-            # Create the  ANT master
-            
-            # Create the slave ANT connector
+            # Create the ANT master connector, associated with the HeartRateMonitor profile
             profile = HeartRateMonitor()
 
-            master = Master(dev)#, profile=hrmprofile)
+            master = Master(dev)
             channel = master.create_channel(1234, 120, 1, channel_period=8070)
             channel.app.set_profile(profile)
 
