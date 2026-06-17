@@ -174,7 +174,7 @@ class TcpSocket(Device):
         :param bytes payload: Data to write
         :returns: number of bytes written to the device
         """
-        logger.debug("sending data to TCP socket: %s", data.hex())
+        logger.debug("sending data to TCP socket: %s", payload.hex())
         if not self.__opened:
             raise WhadDeviceNotReady()
 
