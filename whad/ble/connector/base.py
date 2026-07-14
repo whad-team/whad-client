@@ -5,7 +5,7 @@ basic BLE-related methods for the attached interface.
 """
 import struct
 import logging
-from typing import Optional
+from typing import Optional, Union, List
 
 # Scapy
 from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_DATA, BTLE_ADV_IND, \
@@ -15,6 +15,8 @@ from scapy.packet import Packet
 
 # Device interface
 from whad.device import Connector
+from whad.hub.ble.mode import SetTxPowerLevel
+from whad.hub.ble.pdu import SetAdvData, SetExtAdvPdus
 from whad.hub.discovery import Domain, Capability
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 
@@ -23,7 +25,7 @@ from whad.helpers import message_filter
 from whad.hub.generic.cmdresult import Success, CommandResult
 from whad.hub.ble.bdaddr import BDAddress
 from whad.hub.ble.chanmap import ChannelMap
-from whad.hub.ble import Commands, AdvType, Direction, BLEMetadata
+from whad.hub.ble import Commands, AdvType, Direction, BLEMetadata, ExtAdvPdu, BlePhy
 from whad.hub.events import ConnectionEvt, DisconnectionEvt, SyncEvt, DesyncEvt, \
     TriggeredEvt, WhadEvent
 
@@ -164,6 +166,16 @@ class BLE(Connector):
         # Retrieve supported commands
         commands = self.device.get_domain_commands(Domain.BtLE)
         return (commands & (1 << Commands.JamAdvOnChannel))>0
+
+    def can_be_advertiser(self) -> bool:
+        """
+        Determine if the device implements an advertiser mode.
+        """
+        commands = self.device.get_domain_commands(Domain.BtLE)
+        return (
+            (commands & (1 << Commands.AdvMode))>0 and
+            (commands & (1 << Commands.SetAdvData))>0
+        )
 
     def can_be_central(self):
         """
@@ -527,6 +539,77 @@ class BLE(Connector):
         # Cannot set BD address
         return False
 
+    def set_phy(self, tx: int, rx: int) -> bool:
+        """Force hardware adapter to use the specified PHYs.
+
+        :param tx: TX PHY to use
+        :type  tx: int
+        :param rx: RX PHY to use
+        :type  rx: int
+        :return: `True` if hardware accepted the specified PHYs, `False` otherwise.
+        :rtype: bool
+        """
+        # Check PHY values
+        if tx not in (BlePhy.LE_1M, BlePhy.LE_2M, BlePhy.LE_1M_CODED):
+            raise ValueError()
+
+        # Ensure command is supported.
+        commands = self.device.get_domain_commands(Domain.BtLE)
+        if (commands & (1 << Commands.SetPhy))>0:
+            # Create a SetPhy message
+            msg = self.hub.ble.create_set_phy(tx, rx)
+            resp = self.send_command(msg, message_filter(CommandResult))
+            return isinstance(resp, Success)
+
+        # Cannot set PHY
+        return False
+
+    def set_supported_phys(self, tx: List[int], rx: List[int]) -> bool:
+        """Set hardware supported PHYs.
+
+        :param tx: List of supported PHYs for TX
+        :type  tx: list
+        :param rx: List of supported PHYs for RX
+        :type  rx: list
+        :return: `True` on success, `False` otherwise.
+        :rtype: bool
+        """
+        # Check PHY values
+        for txphy in tx:
+            if txphy not in (BlePhy.LE_1M, BlePhy.LE_2M, BlePhy.LE_1M_CODED):
+                raise ValueError()
+        for rxphy in rx:
+            if rxphy not in (BlePhy.LE_1M, BlePhy.LE_2M, BlePhy.LE_1M_CODED):
+                raise ValueError()
+
+        # Ensure command is supported.
+        commands = self.device.get_domain_commands(Domain.BtLE)
+        if (commands & (1 << Commands.SetSupportedPhys))>0:
+            # Create a SetSupportedPhys message
+            msg = self.hub.ble.create_set_supported_phys(tx, rx)
+            resp = self.send_command(msg, message_filter(CommandResult))
+            return isinstance(resp, Success)
+
+        # Cannot set supported PHYs.
+        return False
+
+    def set_tx_power(self, level: int) -> bool:
+        """Set TX power level.
+
+        :param level: TX power level in dBm
+        :type  level: int
+        """
+        # Ensure command is supported
+        commands = self.device.get_domain_commands(Domain.BtLE)
+        if (commands & (1 << Commands.SetTxPowerLevel))>0:
+            # Create a SetTxPowerLevel message
+            msg = self.hub.ble.create_set_tx_power_level(level)
+            resp = self.send_command(msg, message_filter(CommandResult))
+            return isinstance(resp, Success)
+
+        # Cannot set TX power level
+        return False
+
     def enable_scan_mode(self, active=False):
         """
         Enable Bluetooth Low Energy scanning mode.
@@ -547,22 +630,90 @@ class BLE(Connector):
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
-    def enable_adv_mode(self, adv_data=None, scan_data=None):
+    def enable_adv_mode(self, adv_data=None, scan_data=None, adv_type: AdvType = AdvType.ADV_IND,
+                        channel_map: ChannelMap = None, inter_min: int = 0x20, inter_max: int = 0x4000,
+                        ext_pdus: Optional[List[ExtAdvPdu]] = None):
         """
         Enable BLE advertising mode (acts as a broadcaster)
         """
+        logger.debug("Enable advertising mode")
+        # Build advertising data if required
+        if isinstance(adv_data, AdvDataFieldList):
+            adv_data = adv_data.to_bytes()
+        if isinstance(scan_data, AdvDataFieldList):
+            scan_data = scan_data.to_bytes()
+
         # Create a AdvMode message
         msg = self.hub.ble.create_adv_mode(
             adv_data,
-            scan_rsp=scan_data
+            scanrsp_data=scan_data,
+            adv_type=adv_type,
+            channel_map=channel_map,
+            inter_min=inter_min,
+            inter_max=inter_max,
+            ext_pdus=ext_pdus
         )
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
-    def enable_peripheral_mode(self, adv_data: bytes = None, scan_data: bytes = None):
+    def set_adv_data(self, adv_data: Union[AdvDataFieldList, bytes], scan_data: Optional[Union[AdvDataFieldList, bytes]] = None):
+        """Update advertising data, even if the device is already advertising.
+
+        :param adv_data:  Advertising data
+        :type  adv_data:  AdvDataFieldList, bytes
+        :param scan_data: Scan response data
+        :type  scan_data: AdvDataFieldList, bytes, optional
+        """
+
+        # Convert advertising data and scan response data to bytes
+        adv_data = adv_data if isinstance(adv_data, bytes) else adv_data.to_bytes()
+        if isinstance(scan_data, AdvDataFieldList):
+            scan_data = scan_data.to_bytes()
+        else:
+            scan_data = None
+        msg = self.hub.ble.create_set_adv_data(adv_data, scan_data)
+        resp = self.send_command(msg, message_filter(CommandResult))
+        return isinstance(resp, Success)
+
+    def set_ext_adv_pdus(self, pdus: List[ExtAdvPdu]) -> bool:
+        """Set extended advertising PDUs, even if the device is already advertising.
+
+        :param pdus: List of extended advertising PDUs
+        :type  pdus: list
+        """
+        commands = self.get_domain_commands(Domain.BtLE)
+        if (commands & (1 << Commands.SetExtAdvPdus))>0:
+            # Create a SetExtAdvPdus message
+            msg = self.hub.create_set_ext_adv_pdus(pdus)
+            resp = self.send_command(msg, message_filter(CommandResult))
+            return isinstance(resp, Success)
+
+        # Not supported
+        return False
+
+    def enable_peripheral_mode(self, adv_data: Union[AdvDataFieldList, bytes],
+                               scan_data: Optional[Union[AdvDataFieldList, bytes]] = None,
+                               adv_type: AdvType = AdvType.ADV_IND, channel_map: Optional[ChannelMap] = None,
+                               inter_min: int = 0x20, inter_max: int = 0x4000,
+                               ext_pdus: Optional[List[ExtAdvPdu]] = None):
         """
         Enable Bluetooth Low Energy peripheral mode (acts as slave).
+
+        :param adv_data: Advertising data
+        :type  adv_data: AdvDataFieldList, bytes
+        :param scan_data: Scan response data
+        :type  scan_data: AdvDataFieldList, bytes, optional
+        :param adv_type: Advertisement type
+        :type  adv_type: AdvType
+        :param channel_map: Advertising channel map
+        :type  channel_map: ChannelMap, optional
+        :param inter_min: Minimum advertising interval
+        :type  inter_min: int
+        :param inter_max: Maximum advertising interval
+        :type  inter_max: int
+        :param pdus: Extended Advertising PDUs
+        :type  pdus: list
         """
         # Build advertising data if required
         if isinstance(adv_data, AdvDataFieldList):
@@ -573,17 +724,37 @@ class BLE(Connector):
         # Create a PeriphMode message
         msg = self.hub.ble.create_periph_mode(
             adv_data=adv_data,
-            scan_rsp=scan_data
+            scan_rsp=scan_data,
+            adv_type=adv_type,
+            channel_map=channel_map,
+            inter_min=inter_min,
+            inter_max=inter_max,
+            ext_pdus=ext_pdus
         )
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
-    def connect_to(self, bd_addr: BDAddress, random: Optional[bool] = False, access_address: Optional[int] = None,
+    def connect_to(self, bd_addr: BDAddress, random: bool = False, access_address: Optional[int] = None,
                    channel_map: Optional[ChannelMap] = None, crc_init: Optional[int] = None, hop_interval: Optional[int] = None,
                    hop_increment: Optional[int] = None):
         """
         Initiate a Bluetooth Low Energy connection.
+
+        :param bd_addr: Target BD address
+        :type  bd_addr: whad.ble.address.BDaddress
+        :param random: Set to `True` if target BD address is random
+        :type  random: bool, optional
+        :param access_address: BLE connection access address to use
+        :type  access_address: int, optional
+        :param channel_map: Channel map to use for this connection
+        :type  channel_map: ChannelMap, optional
+        :param crc_init: CRC Init value (seed) to use
+        :type  crc_init: int
+        :param hop_interval: Hop interval value
+        :type  hop_interval: int, optional
+        :param hop_increment: Hop increment value
+        :type  hop_increment: int, optional
         """
         # Create a ConnectTo message
         msg = self.hub.ble.create_connect_to(
@@ -616,10 +787,7 @@ class BLE(Connector):
                 logger.info('an error occurred while starting !')
                 self.__started = False
 
-            return self.__started
-        else:
-            logger.debug("starting current BLE mode, ignoring (already started)")
-            return True
+        return self.__started
 
     def disconnect(self, conn_handle):
         """Terminate a specific connection.

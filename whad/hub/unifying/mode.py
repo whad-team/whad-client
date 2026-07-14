@@ -33,8 +33,8 @@ class UnifyingStart(PbMessageWrapper):
     """Logitech Unifying UnifyingStart message
     """
 
-    def __init__(self, message: Message = None):
-        super().__init__(message=message)
+    def __init__(self, version: int, message: Message = None):
+        super().__init__(version, message=message)
         self.message.unifying.start.CopyFrom(StartCmd())
 
 @pb_bind(UnifyingDomain, 'stop', 1)
@@ -42,8 +42,8 @@ class UnifyingStop(PbMessageWrapper):
     """Logitech Unifying UnifyingStop message
     """
 
-    def __init__(self, message: Message = None):
-        super().__init__(message=message)
+    def __init__(self, version: int, message: Message = None):
+        super().__init__(version, message=message)
         self.message.unifying.stop.CopyFrom(StopCmd())
 
 @pb_bind(UnifyingDomain, 'dongle', 1)
@@ -72,6 +72,6 @@ class SniffPairing(PbMessageWrapper):
     """Logitech Unifying SniffPairing message
     """
 
-    def __init__(self, message: Message = None):
-        super().__init__(message=message)
+    def __init__(self, version: int, message: Message = None):
+        super().__init__(version, message=message)
         self.message.unifying.sniff_pairing.CopyFrom(SniffPairingCmd())

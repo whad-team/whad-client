@@ -188,7 +188,7 @@ class CentralMock(MockDevice):
 
         # Device found ? "Connect" to this device and send a notification.
         if target is not None:
-            connection_evt = Connected(
+            connection_evt = Connected.build(ProtocolHub.LAST_VERSION,
                 access_address=0,
                 initiator=self.__address.value,
                 advertiser=target.address.value,
@@ -237,7 +237,7 @@ class CentralMock(MockDevice):
                 # Convert response PDUs into BlePduReceived messages and add them
                 # to the messages sent back to the connector
                 for answer in answers:
-                    result.append(BlePduReceived(
+                    result.append(BlePduReceived.build(ProtocolHub.LAST_VERSION,
                         conn_handle=send_pdu.conn_handle,
                         direction=Direction.SLAVE_TO_MASTER,
                         pdu=bytes(answer),

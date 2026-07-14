@@ -3,7 +3,7 @@
 import struct
 import logging
 
-from typing import Any, Callable, Type
+from typing import Any, Callable, Type, Optional
 from abc import abstractmethod
 
 from scapy.packet import Packet
@@ -69,14 +69,16 @@ class PbField(object):
     """Protocol Buffers field model
     """
 
-    def __init__(self, path: str, field_type, optional=False):
+    def __init__(self, path: str, field_type, optional: bool = False, min_version: int = 0, default = None):
         self.__path = path
         self.__type = field_type
         self.__optional = optional
+        self.__min_version = min_version
+        self.__default_value = default
 
     def __repr__(self):
         """String representation."""
-        return f"PbField(path='{self.__path}', type='{self.__type.__name__}')"
+        return f"PbField(path='{self.__path}', type='{self.__type.__name__}', optional='{self.__optional}', min_version='{self.__min_version}')"
 
     @property
     def path(self):
@@ -91,6 +93,16 @@ class PbField(object):
         """
         return self.__optional
 
+    @property
+    def min_version(self) -> int:
+        """Return the minimal version number for which this field is defined."""
+        return self.__min_version
+
+    @property
+    def default_value(self) -> Any:
+        """Return default value for this field (only used when min_version > protocol version)"""
+        return self.__default_value
+
     def update(self, message: Message):
         """Update field in protobuf message
         """
@@ -100,53 +112,54 @@ class PbFieldInt(PbField):
     """Protocol buffers integer field model
     """
 
-    def __init__(self, path: str, optional: bool = False):
+    def __init__(self, path: str, optional: bool = False, min_version: int = 0, default: int = 0):
         """Create a PB field model for integer.
         """
-        super().__init__(path, int, optional=optional)
+        super().__init__(path, int, optional=optional, min_version=min_version, default=default)
 
 class PbFieldBytes(PbField):
     """Protocol buffers bytes field model
     """
 
-    def __init__(self, path:  str, optional: bool = False):
+    def __init__(self, path:  str, optional: bool = False, min_version: int = 0, default: bytes = b''):
         """Create a PB field model for bytes
         """
-        super().__init__(path, bytes, optional=optional)
+        super().__init__(path, bytes, optional=optional, min_version=min_version, default=default)
 
 class PbFieldArray(PbField):
     """Protocol buffers array field model
     """
 
-    def __init__(self, path: str, optional: bool = False):
+    def __init__(self, path: str, optional: bool = False, min_version: int = 0, default: list = []):
         """Create a PB field model for arrays.
         """
-        super().__init__(path, list, optional=optional)
+        super().__init__(path, list, optional=optional, min_version=min_version, default=default)
 
 class PbFieldBool(PbField):
     """Protocol buffers bool field model
     """
 
-    def __init__(self, path: str, optional: bool = False):
+    def __init__(self, path: str, optional: bool = False, min_version: int = 0, default: bool = False):
         """Create a PB field model for bools.
         """
-        super().__init__(path, bool, optional=optional)
+        super().__init__(path, bool, optional=optional, min_version=min_version, default=default)
 
 class PbFieldMsg(PbField):
     """Protocol buffers message field model
     """
 
-    def __init__(self, path: str, wrap_class, optional: bool = False):
+    def __init__(self, path: str, wrap_class, optional: bool = False, min_version: int = 0, default: Optional[Message] = None):
         """Create a PB field model for messages.
         """
-        super().__init__(path, wrap_class, optional=optional)
+        super().__init__(path, wrap_class, optional=optional, min_version=min_version, default=default)
 
 
 class HubMessage(object):
     """Main class from which any ProtocolHub message derives from.
     """
 
-    def __init__(self,  message: Message = None):
+    def __init__(self,  version: int, message: Message = None):
+        self.__version = version
         # Allocate a new Protobuf message structure if required
         if message is None:
             self.__msg = Message()
@@ -206,7 +219,9 @@ class HubMessage(object):
             if isinstance(value, list):
                 getattr(root_node, path_nodes[-1]).extend(value)
             else:
-                setattr(root_node, path_nodes[-1], value)
+                # Update field if declared for the protocol version in use
+                if field.min_version <= self.__version:
+                    setattr(root_node, path_nodes[-1], value)
         else:
             raise IndexError()
 
@@ -225,11 +240,18 @@ class HubMessage(object):
 
         # Return the final field
         if hasattr(root_node, path_nodes[-1]):
+            # Process nested protobuf messages
             if isinstance(field, PbFieldMsg):
                 return field.type(getattr(root_node, path_nodes[-1]))
             else:
+                # If field is optional but not present, return None
                 if field.is_optional() and not root_node.HasField(path_nodes[-1]):
                     return None
+
+                # If field has been introduced in a more recent version,
+                # return the default value associated with previous versions.
+                elif field.min_version > self.__version:
+                    return field.default_value
                 else:
                     return getattr(root_node, path_nodes[-1])
         else:
@@ -271,7 +293,7 @@ class PbMessageWrapper(HubMessage):
     transparently access and updates these fields through simple parameters.
     """
 
-    def __init__(self, message: Message = None, **kwargs):
+    def __init__(self, version: int, message: Message = None, **kwargs):
         """Initialize a `PbMessageWrapper` object.
 
         This code goes through all the declared properties and finds out the
@@ -281,7 +303,7 @@ class PbMessageWrapper(HubMessage):
         self.__pb_fields = {}
 
         # Create our HubMessage
-        super().__init__(message=message)
+        super().__init__(version, message=message)
 
         # Browse our properties and list PB fields
         for prop in dir(self):
@@ -298,7 +320,10 @@ class PbMessageWrapper(HubMessage):
         # Override message values with keyword arguments
         for message_field in kwargs:
             if message_field in self.__pb_fields:
-                self.set_field_value(self.__pb_fields[message_field], kwargs[message_field])
+                if self.__pb_fields[message_field].min_version <= version:
+                    self.set_field_value(self.__pb_fields[message_field], kwargs[message_field])
+                else:
+                    self.set_field_value(self.__pb_fields[message_field], self.__pb_fields[message_field].default_value)
 
     def __getattribute__(self, name):
         """Override the class __getattribute__ function to allow transparent
@@ -334,7 +359,12 @@ class PbMessageWrapper(HubMessage):
         ) + ">"
 
     @classmethod
-    def parse(parent_class, version: int, message: Message):
+    def parse(cls, version: int, message: Message):
         """Parse a generic protobuf message message.
         """
-        return parent_class(message=message)
+        return cls(version, message=message)
+
+    @classmethod
+    def build(cls, version: int, **kwargs):
+        """Build an instance of this message for the given protocol version."""
+        return cls(version, **kwargs)

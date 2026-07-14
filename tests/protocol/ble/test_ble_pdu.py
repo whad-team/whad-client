@@ -2,17 +2,19 @@
 """
 import pytest
 
+from whad.hub.ble.pdu import SetExtAdvPdus
 from whad.protocol.whad_pb2 import Message
 from whad.hub.message import AbstractPacket
 from whad.hub.ble import SendBleRawPdu, Direction, SendBlePdu, BleAdvPduReceived, \
-    AdvType, AddressType, BlePduReceived, BleRawPduReceived, SetAdvData
+    AdvType, AddressType, BlePduReceived, BleRawPduReceived, SetAdvData, \
+    BlePhy, ExtAdvPdu
 
 BD_ADDRESS_DEFAULT = bytes([0x11, 0x22, 0x33, 0x44, 0x55, 0x66])
 
 @pytest.fixture
 def set_adv_data():
     msg = Message()
-    msg.ble.set_adv_data.scan_data = b'TEST'
+    msg.ble.set_adv_data.adv_data = b'TEST'
     msg.ble.set_adv_data.scanrsp_data = b'RESPONSE'
     return msg
 
@@ -25,18 +27,59 @@ class TestSetAdvData(object):
         """
         parsed_obj = SetAdvData.parse(1, set_adv_data)
         assert isinstance(parsed_obj, SetAdvData)
-        assert parsed_obj.scan_data == b'TEST'
+        assert parsed_obj.adv_data == b'TEST'
         assert parsed_obj.scanrsp_data == b'RESPONSE'
 
     def test_crafting(self):
         """Check SetAdvData crafting
         """
-        msg = SetAdvData(
-            scan_data=b'HELLOWORLD',
+        msg = SetAdvData.build(1,
+            adv_data=b'HELLOWORLD',
             scanrsp_data=b'FOOBAR'
         )
-        assert msg.scan_data == b'HELLOWORLD'
+        assert msg.adv_data == b'HELLOWORLD'
         assert msg.scanrsp_data == b'FOOBAR'
+
+@pytest.fixture
+def set_ext_adv_pdus():
+    msg = Message()
+    pdu = msg.ble.set_ext_adv_pdus.pdus.add()
+    pdu.adv_data = b'ADVDATA'
+    pdu.aux_ptr.channel = 10
+    pdu.aux_ptr.ca = 1
+    pdu.aux_ptr.offset_units = 0
+    pdu.aux_ptr.offset = 42
+    pdu.aux_ptr.phy = BlePhy.LE_2M
+    return msg
+
+class TestSetExtAdvPdus(object):
+    """Test SetExtAdvPdus message parsing/crafting
+    """
+
+    def test_parsing(self, set_ext_adv_pdus):
+        """Check SetExtAdvPdus parsing
+        """
+        parsed_obj = SetExtAdvPdus.parse(3, set_ext_adv_pdus)
+        assert isinstance(parsed_obj, SetExtAdvPdus)
+        assert len(list(parsed_obj.pdus())) == 1
+        pdu = list(parsed_obj.pdus())[0]
+        assert pdu.adv_data == b'ADVDATA'
+        assert pdu.auxptr is not None
+        assert pdu.auxptr.channel == 10
+        assert pdu.auxptr.ca == 1
+        assert pdu.auxptr.units == 0
+        assert pdu.auxptr.offset == 42
+        assert pdu.auxptr.phy == BlePhy.LE_2M
+
+    def test_crafting(self):
+        """Check SetExtAdvPdus crafting
+        """
+        msg = SetExtAdvPdus.build(3)
+        msg.add_pdu(ExtAdvPdu(b'FOOBAR'))
+        assert len(msg.ext_pdus) == 1
+        pdu = msg.ext_pdus[0]
+        assert not pdu.HasField('aux_ptr')
+        assert pdu.adv_data == b'FOOBAR'
 
 @pytest.fixture
 def send_ble_raw_pdu():
@@ -66,11 +109,12 @@ class TestSendRawPdu(object):
         assert parsed_obj.pdu == b"HELLOWORLD"
         assert parsed_obj.crc == 0x112233
         assert parsed_obj.encrypt == False
+        assert parsed_obj.phy == BlePhy.LE_1M
 
     def test_crafting(self):
         """Check SendRawPdu crafting
         """
-        msg = SendBleRawPdu(
+        msg = SendBleRawPdu.build(1,
             direction=Direction.SLAVE_TO_MASTER,
             conn_handle=2,
             access_address=0x99887766,
@@ -84,7 +128,58 @@ class TestSendRawPdu(object):
         assert msg.pdu == b"FOOBAR"
         assert msg.crc == 0xAABBCC
         assert msg.encrypt == True
+        assert msg.phy == BlePhy.LE_1M
 
+@pytest.fixture
+def send_ble_raw_pdu_v3():
+    """Create a send_ble_raw_pdu protocol buffer message.
+    """
+    msg = Message()
+    msg.ble.send_raw_pdu.direction = Direction.MASTER_TO_SLAVE
+    msg.ble.send_raw_pdu.conn_handle = 1
+    msg.ble.send_raw_pdu.access_address = 0x11223344
+    msg.ble.send_raw_pdu.pdu = b"HELLOWORLD"
+    msg.ble.send_raw_pdu.crc = 0x112233
+    msg.ble.send_raw_pdu.encrypt = False
+    msg.ble.send_raw_pdu.phy = BlePhy.LE_2M
+    return msg
+
+class TestSendRawPduV3(object):
+    """Test SendBleRawPduV3 message parsing/crafting
+    """
+
+    def test_parsing(self, send_ble_raw_pdu_v3):
+        """Check SendBleRawPdu parsing
+        """
+        parsed_obj = SendBleRawPdu.parse(3, send_ble_raw_pdu_v3)
+        assert isinstance(parsed_obj, SendBleRawPdu)
+        assert parsed_obj.direction == Direction.MASTER_TO_SLAVE
+        assert parsed_obj.conn_handle == 1
+        assert parsed_obj.access_address == 0x11223344
+        assert parsed_obj.pdu == b"HELLOWORLD"
+        assert parsed_obj.crc == 0x112233
+        assert parsed_obj.encrypt == False
+        assert parsed_obj.phy == BlePhy.LE_2M
+
+    def test_crafting(self):
+        """Check SendRawPdu crafting
+        """
+        msg = SendBleRawPdu.build(3,
+            direction=Direction.SLAVE_TO_MASTER,
+            conn_handle=2,
+            access_address=0x99887766,
+            pdu=b"FOOBAR",
+            crc=0xAABBCC,
+            encrypt=True,
+            phy=BlePhy.LE_1M_CODED
+        )
+        assert msg.direction == Direction.SLAVE_TO_MASTER
+        assert msg.conn_handle == 2
+        assert msg.access_address == 0x99887766
+        assert msg.pdu == b"FOOBAR"
+        assert msg.crc == 0xAABBCC
+        assert msg.encrypt == True
+        assert msg.phy == BlePhy.LE_1M_CODED
 
 @pytest.fixture
 def send_ble_pdu():
@@ -114,7 +209,7 @@ class TestSendPdu(object):
     def test_crafting(self):
         """Check SendPdu crafting
         """
-        msg = SendBlePdu(
+        msg = SendBlePdu.build(1,
             direction=Direction.SLAVE_TO_MASTER,
             conn_handle=2,
             pdu=b"FOOBAR",
@@ -124,6 +219,49 @@ class TestSendPdu(object):
         assert msg.conn_handle == 2
         assert msg.pdu == b"FOOBAR"
         assert msg.encrypt == True
+
+@pytest.fixture
+def send_ble_pdu_v3():
+    """Create a send_ble_pdu protocol buffer message.
+    """
+    msg = Message()
+    msg.ble.send_pdu.direction = Direction.MASTER_TO_SLAVE
+    msg.ble.send_pdu.conn_handle = 1
+    msg.ble.send_pdu.pdu = b"HELLOWORLD"
+    msg.ble.send_pdu.encrypt = False
+    msg.ble.send_pdu.phy = BlePhy.LE_2M
+    return msg
+
+class TestSendPduV3(object):
+    """Test SendPdu v3 message parsing/crafting
+    """
+
+    def test_parsing(self, send_ble_pdu_v3):
+        """Check SendBlePdu parsing
+        """
+        parsed_obj = SendBlePdu.parse(3, send_ble_pdu_v3)
+        assert isinstance(parsed_obj, SendBlePdu)
+        assert parsed_obj.direction == Direction.MASTER_TO_SLAVE
+        assert parsed_obj.conn_handle == 1
+        assert parsed_obj.pdu == b"HELLOWORLD"
+        assert parsed_obj.encrypt == False
+        assert parsed_obj.phy == BlePhy.LE_2M
+
+    def test_crafting(self):
+        """Check SendPdu crafting
+        """
+        msg = SendBlePdu.build(3,
+            direction=Direction.SLAVE_TO_MASTER,
+            conn_handle=2,
+            pdu=b"FOOBAR",
+            encrypt=True,
+            phy=BlePhy.LE_1M_CODED
+        )
+        assert msg.direction == Direction.SLAVE_TO_MASTER
+        assert msg.conn_handle == 2
+        assert msg.pdu == b"FOOBAR"
+        assert msg.encrypt == True
+        assert msg.phy == BlePhy.LE_1M_CODED
 
 
 @pytest.fixture
@@ -187,7 +325,7 @@ class TestAdvPduReceived(object):
     def test_crafting(self):
         """Check AdvPduReceived crafting
         """
-        msg = BleAdvPduReceived(
+        msg = BleAdvPduReceived.build(1,
             adv_type=AdvType.ADV_NONCONN_IND,
             rssi=30,
             bd_address=BD_ADDRESS_DEFAULT,
@@ -250,7 +388,7 @@ class TestPduReceived(object):
     def test_crafting(self):
         """Check PduReceived crafting
         """
-        msg = BlePduReceived(
+        msg = BlePduReceived.build(1,
             direction=Direction.SLAVE_TO_MASTER,
             conn_handle=3,
             pdu=b"FOOBAR",
@@ -307,7 +445,7 @@ class TestRawPduReceived(object):
     def test_crafting(self):
         """Check BleRawPduReceived crafting
         """
-        msg = BleRawPduReceived(
+        msg = BleRawPduReceived.build(1,
             direction=Direction.SLAVE_TO_MASTER,
             channel=22,
             rssi=-10,
@@ -333,3 +471,79 @@ class TestRawPduReceived(object):
         assert msg.conn_handle == 8
         assert msg.processed == True
         assert msg.decrypted == False
+
+@pytest.fixture
+def raw_pdu_v3():
+    """Create a raw_pdu protocol v3 buffer message
+    """
+    msg = Message()
+    msg.ble.raw_pdu.direction = Direction.MASTER_TO_SLAVE
+    msg.ble.raw_pdu.channel = 10
+    msg.ble.raw_pdu.rssi = -60
+    msg.ble.raw_pdu.timestamp = 1234
+    msg.ble.raw_pdu.relative_timestamp = 10
+    msg.ble.raw_pdu.crc_validity = True
+    msg.ble.raw_pdu.access_address = 0x11223344
+    msg.ble.raw_pdu.pdu = b"HELLOWORLD"
+    msg.ble.raw_pdu.crc = 0xAABBCC
+    msg.ble.raw_pdu.conn_handle = 42
+    msg.ble.raw_pdu.processed = False
+    msg.ble.raw_pdu.decrypted = False
+    msg.ble.raw_pdu.phy = BlePhy.LE_2M
+    return msg
+
+class TestRawPduReceivedV3(object):
+    """Test RawPduReceivedV3 message parsing/crafting
+    """
+
+    def test_parsing(self, raw_pdu_v3):
+        """Check BleRawPduReceivedV3 parsing
+        """
+        parsed_obj = BleRawPduReceived.parse(3, raw_pdu_v3)
+        assert isinstance(parsed_obj, BleRawPduReceived)
+        assert parsed_obj.direction == Direction.MASTER_TO_SLAVE
+        assert parsed_obj.channel == 10
+        assert parsed_obj.rssi == -60
+        assert parsed_obj.timestamp == 1234
+        assert parsed_obj.relative_timestamp == 10
+        assert parsed_obj.crc_validity == True
+        assert parsed_obj.access_address == 0x11223344
+        assert parsed_obj.pdu == b"HELLOWORLD"
+        assert parsed_obj.crc == 0xAABBCC
+        assert parsed_obj.conn_handle == 42
+        assert parsed_obj.processed == False
+        assert parsed_obj.decrypted == False
+        assert parsed_obj.phy == BlePhy.LE_2M
+
+    def test_crafting(self):
+        """Check BleRawPduReceivedV3 crafting
+        """
+        msg = BleRawPduReceived.build(3,
+            direction=Direction.SLAVE_TO_MASTER,
+            channel=22,
+            rssi=-10,
+            timestamp=5555,
+            relative_timestamp=12,
+            crc_validity=False,
+            access_address=0x99887766,
+            pdu=b"FOOBAR",
+            crc=0x112233,
+            conn_handle=8,
+            processed=True,
+            decrypted=False,
+            phy=BlePhy.LE_1M_CODED
+        )
+        assert msg.direction == Direction.SLAVE_TO_MASTER
+        assert msg.channel == 22
+        assert msg.rssi == -10
+        assert msg.timestamp == 5555
+        assert msg.relative_timestamp == 12
+        assert msg.crc_validity == False
+        assert msg.access_address == 0x99887766
+        assert msg.pdu == b"FOOBAR"
+        assert msg.crc == 0x112233
+        assert msg.conn_handle == 8
+        assert msg.processed == True
+        assert msg.decrypted == False
+        assert msg.phy == BlePhy.LE_1M_CODED
+

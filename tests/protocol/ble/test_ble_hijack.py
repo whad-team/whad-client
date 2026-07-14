@@ -27,7 +27,7 @@ class TestHijackMaster(object):
     def test_crafting(self):
         """Check HijackMaster crafting
         """
-        msg = HijackMaster(access_address=0x99887766)
+        msg = HijackMaster.build(1, access_address=0x99887766)
         assert msg.access_address == 0x99887766
 
 @pytest.fixture
@@ -52,7 +52,7 @@ class TestHijackSlave(object):
     def test_crafting(self):
         """Check HijackSlave crafting
         """
-        msg = HijackSlave(access_address=0x99887766)
+        msg = HijackSlave.build(1, access_address=0x99887766)
         assert msg.access_address == 0x99887766
 
 @pytest.fixture
@@ -77,7 +77,7 @@ class TestHijackBoth(object):
     def test_crafting(self):
         """Check HijackBoth crafting
         """
-        msg = HijackBoth(access_address=0x99887766)
+        msg = HijackBoth.build(1, access_address=0x99887766)
         assert msg.access_address == 0x99887766
 
 @pytest.fixture
@@ -104,6 +104,6 @@ class TestHijacked(object):
     def test_crafting(self):
         """Check Hijacked crafting
         """
-        msg = Hijacked(success=False, access_address=0x99887766)
+        msg = Hijacked.build(1, success=False, access_address=0x99887766)
         assert msg.access_address == 0x99887766
         assert msg.success == False

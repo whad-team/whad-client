@@ -10,20 +10,20 @@ from whad.hub.discovery import Discovery
 class ResetQuery(PbMessageWrapper):
     """Device reset message class
     """
-    
-    def __init__(self, message: Message = None):
+
+    def __init__(self, version, message: Message = None):
         """Define an empty message deriving from DeviceResetQuery.
         """
-        super().__init__(message=message)
+        super().__init__(version, message=message)
         self.message.discovery.reset_query.CopyFrom(DeviceResetQuery())
 
 @pb_bind(Discovery, 'ready_resp', 1)
 class DeviceReady(PbMessageWrapper):
     """Device ready message class
     """
-    
-    def __init__(self, message: Message = None):
+
+    def __init__(self, version, message: Message = None):
         """Define an empty message deriving from DeviceReadyResp.
         """
-        super().__init__(message=message)
+        super().__init__(version, message=message)
         self.message.discovery.ready_resp.CopyFrom(DeviceReadyResp())

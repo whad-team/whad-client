@@ -37,7 +37,7 @@ class TestPrepareSequenceManualTrigger(object):
     def test_crafting(self):
         """Check PrepareSequenceManual crafting
         """
-        msg = PrepareSequenceManual(
+        msg = PrepareSequenceManual.build(1,
             sequence_id=42,
             direction=Direction.SLAVE_TO_MASTER
         )
@@ -81,7 +81,7 @@ class TestPrepareSequenceConnEventTrigger(object):
     def test_crafting(self):
         """Check PrepareSequenceConnEvt crafting
         """
-        msg = PrepareSequenceConnEvt(
+        msg = PrepareSequenceConnEvt.build(1,
             connection_event=66,
             sequence_id=42,
             direction=Direction.SLAVE_TO_MASTER
@@ -131,7 +131,7 @@ class TestPrepareSequenceReceptionTrigger(object):
     def test_crafting(self):
         """Check PrepareSequenceConnEvt crafting
         """
-        msg = PrepareSequencePattern(
+        msg = PrepareSequencePattern.build(1,
             pattern=b"FOOBAR",
             mask=b"\xFF\x00\xFF\x00",
             offset=2,
@@ -170,7 +170,7 @@ class TestTriggerSequence(object):
     def test_crafting(self):
         """Check Trigger crafting
         """
-        msg = Trigger(sequence_id=12)
+        msg = Trigger.build(1, sequence_id=12)
         assert msg.sequence_id == 12
 
 @pytest.fixture
@@ -193,7 +193,7 @@ class TestDeleteSequence(object):
     def test_crafting(self):
         """Check DeleteSequence crafting
         """
-        msg = DeleteSequence(sequence_id=12)
+        msg = DeleteSequence.build(1, sequence_id=12)
         assert msg.sequence_id == 12
 
 @pytest.fixture
@@ -216,5 +216,5 @@ class TestTriggered(object):
     def test_crafting(self):
         """Check Trigger crafting
         """
-        msg = Triggered(sequence_id=12)
+        msg = Triggered.build(1, sequence_id=12)
         assert msg.sequence_id == 12
