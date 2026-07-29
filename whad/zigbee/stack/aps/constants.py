@@ -46,3 +46,22 @@ class APSSecurityStatus(IntEnum):
     UNSECURED = 0
     SECURED_NWK_KEY = 1
     SECURED_LINK_KEY = 2
+
+class APSFragmentationBlockType(IntEnum):
+    """
+    Enum storing the different possible values for the APS extended header
+    fragmentation field.
+    """
+    NONE = 0
+    FIRST_BLOCK = 1
+    MIDDLE_BLOCK = 2
+
+# Conservative default max size (in bytes) of an ASDU chunk carried per
+# fragment, keeping on-air frames within the 802.15.4 127-byte PHY budget
+# even with NWK security overhead.
+APS_MAX_FRAME_SIZE = 80
+
+# Zigbee spec's apscMaxFrameRetries constant (section 2.2.4.3): number of
+# times an APSDE-DATA request with acknowledged_transmission=True is
+# resent after not receiving a matching APS ack within apsAckWaitDuration.
+APS_MAX_FRAME_RETRIES = 3
