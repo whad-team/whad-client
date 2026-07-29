@@ -24,3 +24,6 @@ class APSIB(Dot15d4Database):
         self.apsNonmemberRadius = 7
         self.apsCounter = 0
         self.apsUseChannel = None
+
+        self.apsAckWaitDuration = 1.0
+        self.apsFragmentationBuffers = {}

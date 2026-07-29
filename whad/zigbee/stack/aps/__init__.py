@@ -8,7 +8,8 @@ from whad.zigbee.stack.aps.database import APSIB
 from whad.zigbee.stack.aps.security import APSApplicationLinkKeyData, \
     APSNetworkKeyData, APSTrustCenterLinkKeyData
 from whad.zigbee.stack.aps.constants import APSSecurityStatus, \
-    APSSourceAddressMode, APSDestinationAddressMode, APSKeyType
+    APSSourceAddressMode, APSDestinationAddressMode, APSKeyType, \
+    APSFragmentationBlockType, APS_MAX_FRAME_SIZE, APS_MAX_FRAME_RETRIES
 from whad.zigbee.stack.nwk.constants import NWKAddressMode
 from whad.zigbee.crypto import ApplicationSubLayerCryptoManager
 
@@ -148,11 +149,7 @@ class APSDataService(APSService):
         if alias_address is not None and acknowledged_transmission:
             return False
 
-        if acknowledged_transmission:
-            apdu.frame_control.ack_req = True
-            raise RequiredImplementation("APSAckImplementation")
-        else:
-            apdu.frame_control.ack_req = False
+        apdu.frame_control.ack_req = acknowledged_transmission
 
         if security_enabled_transmission:
             apdu.frame_control.security = True
@@ -160,9 +157,53 @@ class APSDataService(APSService):
             apdu.frame_control.security = False
 
         counter = self.manager.database.get("apsCounter")
-        self.manager.database.set("apsCounter", counter+1)
-        return self.manager.get_layer('nwk').get_service("data").data(
-            apdu,
+        self.manager.database.set("apsCounter", (counter+1) % 256)
+
+        asdu_bytes = bytes(asdu)
+        if fragmentation_permitted and len(asdu_bytes) > APS_MAX_FRAME_SIZE:
+            if acknowledged_transmission:
+                raise RequiredImplementation("APSFragmentedAckImplementation")
+
+            header = apdu.copy()
+            header.remove_payload()
+            header.frame_control.extended_hdr = True
+
+            fragments = [
+                asdu_bytes[offset:offset + APS_MAX_FRAME_SIZE]
+                for offset in range(0, len(asdu_bytes), APS_MAX_FRAME_SIZE)
+            ]
+
+            result = True
+            for block_number, fragment in enumerate(fragments):
+                fragment_header = header.copy()
+                fragment_header.fragmentation = (
+                    APSFragmentationBlockType.FIRST_BLOCK if block_number == 0
+                    else APSFragmentationBlockType.MIDDLE_BLOCK
+                )
+                # Per the APS extended header spec, the first block's
+                # block_number carries the *total* number of blocks in the
+                # transfer, not its own (zero) position; subsequent blocks
+                # carry their actual position instead.
+                fragment_header.block_number = (
+                    len(fragments) if block_number == 0 else block_number
+                )
+                fragment_apdu = fragment_header / fragment
+
+                result = self.manager.get_layer('nwk').get_service("data").data(
+                    fragment_apdu,
+                    nsdu_handle=0,
+                    alias_address=alias_address,
+                    alias_sequence_number=alias_sequence_number,
+                    destination_address_mode=NWKAddressMode.MULTICAST if multicast else NWKAddressMode.UNICAST,
+                    destination_address=destination_address,
+                    radius=radius,
+                    non_member_radius=self.database.get("apsNonmemberRadius"),
+                    discover_route=False,
+                    security_enable=use_network_key
+                ) and result
+            return result
+
+        nwk_kwargs = dict(
             nsdu_handle=0,
             alias_address=alias_address,
             alias_sequence_number=alias_sequence_number,
@@ -173,6 +214,35 @@ class APSDataService(APSService):
             discover_route=False,
             security_enable=use_network_key
         )
+        if acknowledged_transmission:
+            return self._send_acknowledged(apdu, nwk_kwargs)
+
+        return self.manager.get_layer('nwk').get_service("data").data(apdu, **nwk_kwargs)
+
+    def _send_acknowledged(self, apdu, nwk_kwargs):
+        """
+        Transmits an ASDU requiring an APS-level ack (ack_req), retrying the
+        whole APSDE-DATA request (same apdu/counter) up to
+        apscMaxFrameRetries times if the nwk...data() call fails or no
+        matching APS ack is received within apsAckWaitDuration seconds.
+        """
+        counter = apdu.counter
+        for _ in range(APS_MAX_FRAME_RETRIES):
+            if not self.manager.get_layer('nwk').get_service("data").data(apdu, **nwk_kwargs):
+                continue
+            try:
+                self.wait_for_packet(
+                    lambda pkt: (
+                        ZigbeeAppDataPayload in pkt and
+                        pkt.aps_frametype == 2 and
+                        pkt.counter == counter
+                    ),
+                    timeout=self.database.get("apsAckWaitDuration")
+                )
+                return True
+            except APSTimeoutException:
+                continue
+        return False
 
     @Dot15d4Service.indication("APSDE-DATA")
     def indicate_data(
@@ -193,9 +263,6 @@ class APSDataService(APSService):
             asdu = ZigbeeAppDataPayload(apdu.data)
         else:
             asdu = apdu
-
-        if 'extended_hdr' in asdu.frame_control and asdu.aps_frametype in (0, 2):
-            raise RequiredImplementation("Fragmentation")
 
         if hasattr(asdu, "dst_endpoint"):
             dst_endpoint = asdu.dst_endpoint
@@ -294,6 +361,39 @@ class APSDataService(APSService):
                     }
         )
 
+    def _reassemble_fragment(self, asdu, source_address):
+        """
+        Buffers an incoming APS fragment.
+
+        Returns the fully reassembled ASDU once complete, or None while the
+        transfer is still in progress.
+        """
+        buffers = self.database.get("apsFragmentationBuffers")
+        key = (source_address, asdu.counter)
+        entry = buffers.setdefault(key, {"blocks": {}, "total": None})
+        blocks = entry["blocks"]
+
+        if asdu.fragmentation == APSFragmentationBlockType.FIRST_BLOCK:
+            entry["total"] = asdu.block_number
+            blocks[0] = bytes(asdu.payload)
+        else:
+            blocks[asdu.block_number] = bytes(asdu.payload)
+
+        total = entry["total"]
+        if total is None or sorted(blocks) != list(range(total)):
+            return None
+
+        del buffers[key]
+        reassembled_payload = b"".join(blocks[index] for index in range(total))
+
+        header = asdu.copy()
+        header.remove_payload()
+        header.frame_control.extended_hdr = False
+        header.fragmentation = APSFragmentationBlockType.NONE
+        header.block_number = 0
+
+        return ZigbeeAppDataPayload(bytes(header) + reassembled_payload)
+
     def on_data_apdu(
                         self,
                         apdu,
@@ -306,6 +406,18 @@ class APSDataService(APSService):
         """
         Callback processing APDU data forwarded by the APS Manager.
         """
+        if ZigbeeSecurityHeader in apdu:
+            asdu = ZigbeeAppDataPayload(apdu.data)
+        else:
+            asdu = apdu
+
+        if 'extended_hdr' in asdu.frame_control and asdu.aps_frametype in (0, 2):
+            reassembled = self._reassemble_fragment(asdu, source_address)
+            if reassembled is None:
+                # More fragments expected, nothing to deliver upstream yet.
+                return
+            apdu = reassembled
+
         self.indicate_data(
                             apdu,
                             destination_address_mode,
@@ -314,6 +426,14 @@ class APSDataService(APSService):
                             security_status,
                             link_quality
         )
+
+    def on_ack_apdu(self, nsdu):
+        """
+        Callback processing an incoming APS-level ack (aps_frametype==2),
+        forwarded by the APS Manager. Delivers it to any pending
+        APSDE-DATA(acknowledged_transmission=True) request waiting on it.
+        """
+        self.add_packet_to_queue(nsdu)
 
 class APSManagementService(APSService):
     """
@@ -744,7 +864,7 @@ class APSManager(Dot15d4Manager):
                     link_quality
                 )
             elif nsdu.aps_frametype == 2: # ack
-                pass
+                self.get_service("data").on_ack_apdu(nsdu)
 
     @source('nwk', 'NLME-JOIN')
     def on_join(
