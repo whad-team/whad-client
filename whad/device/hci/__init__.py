@@ -440,8 +440,10 @@ class Hci(VirtualDevice):
 
 
         except (BrokenPipeError, OSError) as err:
-            print(err)
-            logger.error("Error, waiting...")
+            # Prevent possible close() mid-read
+            if not self.__opened or self.__socket is None:
+                raise WhadDeviceDisconnected()
+            logger.error("[hci] read error: %s", err)
             sleep(1)
 
     def _wait_response(self, timeout=None):
