@@ -10,7 +10,7 @@ for a given connected device:
 """
 import logging
 from struct import unpack
-from time import sleep
+import time
 from typing import Iterator, Optional, Union, Type, TypeVar, List
 
 from whad.ble.profile import PrimaryService
@@ -599,16 +599,24 @@ class PeripheralDevice(GenericProfile):
                 crypto_material.ltk.ediv
             )
 
-    def pairing(self, pairing=None):
+    def pairing(self, pairing=None, timeout: float = 30.0):
         """Trigger a pairing according to provided parameters.
         Default parameters will be used if pairing parameter is None.
+
+        :param pairing: Pairing parameters.
+        :param timeout: Maximum time in seconds to wait for pairing to complete.
+
         """
         if not self.__smp.initiate_pairing(parameters=pairing):
             return False
 
+        start = time.time()
         while not self.__smp.is_pairing_done():
-            sleep(0.1)
+            time.sleep(0.1)
             if self.__smp.is_pairing_failed():
+                return False
+            if (time.time() - start) > timeout:
+                logger.warning("pairing timed out after %.1fs", timeout)
                 return False
 
         self.__smp.reset_state()

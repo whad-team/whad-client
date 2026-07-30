@@ -43,7 +43,7 @@ from whad.scapy.layers.hci import HCI_VERSIONS, BT_MANUFACTURERS, \
 
 # Whad
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
-    WhadDeviceUnsupportedOperation, WhadDeviceError
+    WhadDeviceUnsupportedOperation, WhadDeviceError, WhadDeviceDisconnected
 
 # Whad hub
 from whad.hub.discovery import Domain
@@ -374,14 +374,21 @@ class Hci(VirtualDevice):
         """
         if not self.__opened:
             raise WhadDeviceNotReady()
+
+        # Avoid None.recv() (ran into multiples times)
+        sock = self.__socket
+        if sock is None:
+            raise WhadDeviceDisconnected()
         try:
             # We assume here that we can determine if there is something to read
             # by calling readable without locking our socket
-            if self.__socket is not None and self.__socket.readable(0.1):
+            if sock.readable(0.1):
                 # Lock our socket to catch the awaiting event
                 self.__lock.acquire()
-                event = self.__socket.recv()
-                self.__lock.release()
+                try:
+                    event = sock.recv()
+                finally:
+                    self.__lock.release()
                 if event.type == 0x4 and event.code in (0xe, 0xf, 0x13):
                     self.__hci_responses.put(event)
                 else:
@@ -433,8 +440,10 @@ class Hci(VirtualDevice):
 
 
         except (BrokenPipeError, OSError) as err:
-            print(err)
-            logger.error("Error, waiting...")
+            # Prevent possible close() mid-read
+            if not self.__opened or self.__socket is None:
+                raise WhadDeviceDisconnected()
+            logger.error("[hci] read error: %s", err)
             sleep(1)
 
     def _wait_response(self, timeout=None):
