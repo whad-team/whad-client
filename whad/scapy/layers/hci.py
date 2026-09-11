@@ -145,6 +145,41 @@ class HCI_Cmd_ST_Write_BD_Address(Packet):
     ]
 
 
+class HCI_Cmd_Realtek_Read_ROM_Version(Packet):
+    """Realtek vendor command 0xfc6d."""
+
+    name = "Realtek Read ROM Version"
+    fields_desc = []
+
+
+class HCI_Cmd_Complete_Realtek_Read_ROM_Version(Packet):
+    """Return parameters for Realtek vendor command 0xfc6d."""
+
+    name = "Realtek Read ROM Version Complete"
+    fields_desc = [ByteField("version", 0)]
+
+
+class HCI_Cmd_Realtek_Download(Packet):
+    """Download one Realtek firmware fragment with vendor command 0xfc20."""
+
+    name = "Realtek Download Firmware Fragment"
+    fields_desc = [ByteField("index", 0), StrField("data", b"")]
+
+
+class HCI_Cmd_Complete_Realtek_Download(Packet):
+    """Return parameters for Realtek vendor command 0xfc20."""
+
+    name = "Realtek Download Firmware Fragment Complete"
+    fields_desc = [ByteField("index", 0)]
+
+
+class HCI_Cmd_Realtek_Drop_Firmware(Packet):
+    """Drop the active Realtek patch with vendor command 0xfc66."""
+
+    name = "Realtek Drop Firmware"
+    fields_desc = []
+
+
 class HCI_Cmd_LE_Set_Host_Channel_Classification(Packet):
 	name = "HCI Command LE Set Host Channel Classification"
 	fields_desc = [
@@ -170,3 +205,8 @@ bind_layers(HCI_Command_Hdr, HCI_Cmd_Ericsson_Write_BD_Address,                 
 bind_layers(HCI_Command_Hdr, HCI_Cmd_BCM_Write_BD_Address,                                  opcode=0xfc01)
 bind_layers(HCI_Command_Hdr, HCI_Cmd_CSR_Write_BD_Address,                                  opcode=0xfc00)
 bind_layers(HCI_Command_Hdr, HCI_Cmd_CSR_Reset,                                             opcode=0xfc00)
+bind_layers(HCI_Command_Hdr, HCI_Cmd_Realtek_Read_ROM_Version,                              ogf=0x3f, ocf=0x006d)
+bind_layers(HCI_Event_Command_Complete, HCI_Cmd_Complete_Realtek_Read_ROM_Version,           opcode=0xfc6d)
+bind_layers(HCI_Command_Hdr, HCI_Cmd_Realtek_Download,                                      ogf=0x3f, ocf=0x0020)
+bind_layers(HCI_Event_Command_Complete, HCI_Cmd_Complete_Realtek_Download,                   opcode=0xfc20)
+bind_layers(HCI_Command_Hdr, HCI_Cmd_Realtek_Drop_Firmware,                                 ogf=0x3f, ocf=0x0066)
