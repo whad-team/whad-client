@@ -339,6 +339,8 @@ class  ANT_Plus_Header_Hdr(Packet):
 
 class ANT_Plus_Weight_Scale_Header_Hdr(Packet):
 	name = "ANT Plus Weight Scale Header"
+	profile_name = "ANT+ Weight Scale"
+	
 	fields_desc = [
 		ByteField("data_page_number", None),
 	]
@@ -388,6 +390,37 @@ class ANT_Plus_Weight_Scale_Body_Composition_Mass_Data_Page(Packet):
 		ByteField("bone_mass", None)
 	]
 
+class ANT_Weight_Scale_Manufacturer_Information_Data_Page(Packet):
+	name = "ANT Weight Scale Manufacturer Information Data Page"
+	fields_desc = [
+		ByteEnumField("manufacturer_id", None, ANT_MANUFACTURERS_ID),
+		LEShortField("serial_number", None),
+		ShortField("reserved", None),
+		LEShortField("reserved_2", None),
+	]
+
+class ANT_Weight_Scale_Product_Information_Data_Page(Packet):
+	name = "ANT Weight Scale Product Information Data Page"
+	fields_desc = [
+		ByteField("hardware_version", None),
+		ByteField("software_version", None),
+		ByteField("model_number", None),
+		ShortField("reserved", None),
+		LEShortField("reserved_2", None),
+	]
+
+class ANT_Weight_Scale_Battery_Status_Data_Page(Packet):
+	name = "ANT Weight Scale Battery Status Data Page"
+	fields_desc = [
+		ByteField("reserved", 0xFF),
+		ByteField("fractional_battery_voltage", None),
+		BitField("reserved_2", None, 1),
+		BitEnumField("battery_status", None, 3,  {0x00 : "reserved", 0x01 : "new", 0x02: "good", 0x03 : "ok", 0x04: "low", 0x05 : "critical", 0x06 : "reserved", 0x07: "invalid"}),
+		BitField("coarse_battery_voltage", None, 4),
+		ShortField("reserved_3", None),
+		ShortField("reserved_4", None),
+	]
+
 class ANT_Plus_User_Profile_Data_Page(Packet):
 	name = "User Profile Data Page"
 	fields_desc = [
@@ -413,6 +446,8 @@ class ANT_Plus_User_Profile_Data_Page(Packet):
 
 class ANT_Plus_HR_Header_Hdr(Packet):
 	name = "ANT Heart Rate Header"
+	profile_name = "ANT+ Heart Rate Monitoring"
+
 	fields_desc = [
 		BitField("toggle_bit", None, 1),
 		BitField("data_page_number", None, 7),
@@ -521,6 +556,8 @@ class ANT_HR_Common_Payload(Packet):
 
 class ANT_Plus_Ranging_Header_Hdr(Packet):
 	name = "ANT Ranging Header"
+	profile_name = "ANT+ Ranging"
+
 	fields_desc = [
 		ByteField("data_page_number", None)
 	]
@@ -557,6 +594,8 @@ class ANT_Ranging_Trigger_Distance_Measurement(Packet):
 
 class ANT_Plus_Bicycle_Speed_And_Cadence(Packet):
 	name = "ANT Bicycle Speed and Cadence"
+	profile_name = "ANT+ Bicycle Speed & Cadence"
+
 	fields_desc = [
 		LEShortField("bike_cadence_event_time", None),
 		LEShortField("cumulative_cadence_revolution_count", None),
@@ -566,6 +605,8 @@ class ANT_Plus_Bicycle_Speed_And_Cadence(Packet):
 
 class ANT_Plus_Bicycle_Speed_Header_Hdr(Packet):
 	name = "ANT Bicycle Speed Header"
+	profile_name = "ANT+ Bicycle Speed"
+
 	fields_desc = [
 	BitField("toggle_bit", None, 1),
 	BitField("data_page_number", None, 7),
@@ -690,6 +731,8 @@ class ANT_Plus_Speed_Distance_Calories_Page(Packet):
 
 class ANT_Plus_Bike_Power_Header_Hdr(Packet):
 	name = "ANT Bike Power Header"
+	profile_name = "ANT+ Bike Power"
+
 	fields_desc = [
 		ByteField("data_page_number", None)
 	]
@@ -697,6 +740,7 @@ class ANT_Plus_Bike_Power_Header_Hdr(Packet):
 
 class ANT_Plus_Bike_Power_Standard_Power_Only_Main_Data_Page(Packet):
 	name = "ANT Bike Power Standard Power-Only Main Data Page"
+
 	fields_desc = [
 		ByteField("update_event_count", None), 
 		BitEnumField("pedal_differentiation", None, 1, { 0 : "right_pedal", 1: "unknown_pedal"}), 
@@ -892,6 +936,8 @@ bind_layers(ANT_Plus_Bike_Power_Header_Hdr, ANT_Plus_Bike_Power_Battery_Status_D
 
 class ANT_Plus_Bicycle_Cadence_Header_Hdr(Packet):
 	name = "ANT Bicycle Cadence Header"
+	profile_name = "ANT+ Bicycle Cadence"
+
 	fields_desc = [
 	BitField("toggle_bit", None, 1),
 	BitField("data_page_number", None, 7),
@@ -1228,6 +1274,10 @@ bind_layers(ANT_Plus_Weight_Scale_Header_Hdr, ANT_Plus_Weight_Scale_Body_Composi
 bind_layers(ANT_Plus_Weight_Scale_Header_Hdr, ANT_Plus_Weight_Scale_Body_Metabolic_Information_Data_Page, data_page_number = 3)
 bind_layers(ANT_Plus_Weight_Scale_Header_Hdr, ANT_Plus_Weight_Scale_Body_Composition_Mass_Data_Page, data_page_number = 4)
 bind_layers(ANT_Plus_Weight_Scale_Header_Hdr, ANT_Plus_User_Profile_Data_Page, data_page_number = 0x3A)
+bind_layers(ANT_Plus_Weight_Scale_Header_Hdr, ANT_Weight_Scale_Manufacturer_Information_Data_Page, data_page_number = 0x50)
+bind_layers(ANT_Plus_Weight_Scale_Header_Hdr, ANT_Weight_Scale_Product_Information_Data_Page, data_page_number = 0x51)
+bind_layers(ANT_Plus_Weight_Scale_Header_Hdr, ANT_Weight_Scale_Battery_Status_Data_Page, data_page_number = 0x52)
+bind_layers(ANT_Plus_Weight_Scale_Header_Hdr, ANT_Request_Data_Page, data_page_number = 0x46)
 
 
 bind_layers(ANT_Plus_Ranging_Header_Hdr,ANT_Ranging_Measurement_Data_Page, data_page_number=0x10)

@@ -1,6 +1,7 @@
 from scapy.fields import ByteField, LenField, ByteEnumField, StrField, \
     BitField, BitEnumField, LEIntField, XLE3BytesField, LEShortField, \
-    StrFixedLenField, SignedByteField
+    StrFixedLenField, SignedByteField, LESignedShortField, LEShortField, \
+    ShortField, ConditionalField, PacketField, PacketLenField, SignedShortField
 from scapy.packet import Packet, bind_layers
 
 antstick_message_ids = {
@@ -345,16 +346,6 @@ class ANTStick_Command_Close_Channel(Packet):
         ByteField("channel_number", None),
     ]
 
-class ANTStick_Data_Extension(Packet):
-    name = "ANTStick Data Extension"
-    fields_desc = [
-        ByteField("flag", 0x80), 
-        LEShortField("device_number" , None), 
-        ByteField("device_type", None), 
-        ByteField("transmission_type", None), 
-        #ByteField("checksum", None)
-    ]
-
 
 class ANTStick_Command_Reset(Packet):
     name = "ANTStick Reset command"
@@ -433,25 +424,51 @@ class ANTStick_Command_Lib_Config(Packet):
         BitField("reserved1", 0,5)
     ]
 
+
+
 class ANTStick_RSSI_Data_Extension(Packet):
     name = "ANTStick RSSI Data Extension"
     fields_desc = [
         ByteEnumField("type", None, {0x20 : "dBm"}),
-        SignedByteField("rssi", None), 
-        SignedByteField("threshold", None)
+        SignedShortField("rssi", None), 
+        SignedShortField("threshold", None),
     ]
-
+    def extract_padding(self, s):
+        return "", s
 
 class ANTStick_Timestamp_Data_Extension(Packet):
     name = "ANTStick Timestamp Data Extension"
     fields_desc = [
         LEIntField("timestamp", None)
     ]
-    
+    def extract_padding(self, s):
+        return "", s
+
+class ANTStick_Channel_Id_Extension(Packet):
+    name = "ANTStick Channel ID Extension"
+    fields_desc = [
+        LEShortField("device_number", None), 
+        SignedByteField("device_type", None), 
+        SignedByteField("transmission_type", None)
+    ]
+    def extract_padding(self, s):
+        return "", s
+
+class ANTStick_Data_Extension(Packet):
+    name = "ANTStick Data Extension"
+    fields_desc = [
+        ByteField("flag", 0x80), 
+        ConditionalField(PacketLenField("channel_id_extension_field", None, ANTStick_Channel_Id_Extension, length_from=lambda _: 4), lambda p : (p.flag & 0x80) != 0),
+        ConditionalField(PacketLenField("rssi_extension_field", None, ANTStick_RSSI_Data_Extension, length_from=lambda _: 5), lambda p : (p.flag & 0x40) != 0),
+        #ConditionalField(PacketLenField("timestamp_extension_field", None, ANTStick_Timestamp_Data_Extension, length_from=lambda _: 4), lambda p : (p.flag & 0x20) != 0),
+
+        #ByteField("checksum", None)
+    ]
+
 bind_layers(ANTStick_Message, ANTStick_Data_Broadcast_Data, id=0x4E)
 bind_layers(ANTStick_Data_Broadcast_Data, ANTStick_Data_Extension)
-bind_layers(ANTStick_Data_Extension, ANTStick_RSSI_Data_Extension)
-bind_layers(ANTStick_RSSI_Data_Extension, ANTStick_Timestamp_Data_Extension)
+#bind_layers(ANTStick_Data_Extension, ANTStick_RSSI_Data_Extension)
+#bind_layers(ANTStick_RSSI_Data_Extension, ANTStick_Timestamp_Data_Extension)
 
 
 bind_layers(ANTStick_Message, ANTStick_Data_Acknowledged_Data, id=0x4F)
