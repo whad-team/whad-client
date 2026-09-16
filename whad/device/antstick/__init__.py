@@ -148,6 +148,7 @@ class ANTStick(VirtualDevice):
         self.__number_of_networks = 0
         self.__channels = {}
         self.__networks = {}
+        self.__sniff_mode = False
         self.__reload_channel = None
         # Call VirtualDevice init
         super().__init__()
@@ -239,7 +240,7 @@ class ANTStick(VirtualDevice):
 
         # Close underlying device.
         self.__opened = False
-        
+
     def _initialize_channels(self):
         '''Initialize the internal structure linked to channels
         '''
@@ -331,7 +332,6 @@ class ANTStick(VirtualDevice):
                 # Process events
                 while not self.__event_queue.empty():
                     event = ANTStick_Message(self.__event_queue.get())
-                    logger.debug("Processing event : " + repr(event))
 
                     if event.message_code in (
                         AntMessageCode.EVENT_RX_FAIL,
@@ -377,19 +377,19 @@ class ANTStick(VirtualDevice):
 
                         # Recover the device number from the ANTStick Message PDU
                         device_number = (
-                            data.device_number if ANTStick_Data_Extension in data 
+                            data.channel_id_extension_field.device_number if ANTStick_Data_Extension in data 
                             else self.__channels[channel_number].device_number
                         )
                         
                         # Recover the device type from the ANTStick Message PDU
                         device_type = (
-                            data.device_type if ANTStick_Data_Extension in data 
+                            data.channel_id_extension_field.device_type if ANTStick_Data_Extension in data 
                             else self.__channels[channel_number].device_type
                         )
 
                         # Recover the transmission type from the ANTStick Message PDU
                         transmission_type = (
-                            data.transmission_type if ANTStick_Data_Extension in data 
+                            data.channel_id_extension_field.transmission_type if ANTStick_Data_Extension in data 
                             else self.__channels[channel_number].transmission_type
                         )
 
@@ -416,14 +416,16 @@ class ANTStick(VirtualDevice):
                         # Extract RSSI and timestamp if available
                         rssi = None
                         if ANTStick_RSSI_Data_Extension in data:
-                            rssi = data.rssi
+                            rssi = data.rssi_extension_field.rssi
+                        
+                        '''
                         if ANTStick_Timestamp_Data_Extension in data:
-                            timestamp = data.timestamp
+                            timestamp = data.timestamp_extension_field.timestamp
                         else:
                             # If timestamp is not available, build it according to Host clock
-                            now = time() * 1000
-                            timestamp = now - self.__last_timestamp
-
+                        '''
+                        now = time() * 1000
+                        timestamp = now - self.__last_timestamp
                         # Transmit the PDU as WHAD ANT Message
                         self._send_whad_ant_pdu(
                             pdu=bytes(pkt), 
@@ -1064,7 +1066,6 @@ class ANTStick(VirtualDevice):
         :rtype: ANTStick_Message
         '''
         data = bytes(ANTStick_Message() / command)
-        logger.debug("Transmitting ANTStick command: " +  repr(ANTStick_Message(data)))
         
 
         while True:
@@ -1096,6 +1097,7 @@ class ANTStick(VirtualDevice):
 
         if ANTStick_Channel_Response_Or_Event in response and response.message_code == 40: # invalid message 
             return None
+
 
         return response
 
@@ -1177,9 +1179,10 @@ class ANTStick(VirtualDevice):
                 ANTStick_Message(msg).message_code >= 1 and ANTStick_Message(msg).message_code <= 17 # event range
             ):
                 self.__event_queue.put(msg)
+                
             else:
                 self.__response_queue.put(msg)
-    
+                
 
 
     # WHAD command handlers
@@ -1196,6 +1199,7 @@ class ANTStick(VirtualDevice):
         :param message: WHAD ANT-domain SniffMode message
         :type message: SniffMode
         """
+        self.__sniff_mode = True
         self._set_network_key(network_number = 0, network_key = message.network_key)
         self._assign_channel(
             channel_number = 0, 
@@ -1241,6 +1245,9 @@ class ANTStick(VirtualDevice):
         :param message: WHAD ANT-domain Stop message
         :type message: Stop
         """
+        if self.__sniff_mode:
+            self._close_channel(0)
+
         self.__opened_stream = False
         self._send_whad_command_result(CommandResult.SUCCESS)
 
