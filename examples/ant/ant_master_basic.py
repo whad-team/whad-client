@@ -1,16 +1,36 @@
-from whad.ant import ANT
+from whad.ant import Master
 from whad.scapy.layers.ant import ANT_Hdr
-from whad.ant.channel import ChannelDirection
+from whad.ant.stack.app.profiles import AntProfile
 from whad.ant.crypto import ANT_PLUS_NETWORK_KEY
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
 import sys
 
-import logging
-logging.getLogger("whad.device.antstick").setLevel(logging.DEBUG)
-#logging.basicConfig(level=logging.DEBUG)
-
 from time import sleep
+
+
+class MyProfile(AntProfile):
+
+
+    DEVICE_NUMBER = 0xABCD
+    DEVICE_TYPE = 1
+    TRANSMISSION_TYPE = 1
+    CHANNEL_PERIOD = 8070
+    SEARCH_TIMEOUT = 0
+    DEFAULT_RF_CHANNEL = 50
+    NETWORK_KEY = ANT_PLUS_NETWORK_KEY    
+
+
+    def on_broadcast(self, broadcast):
+        print("Received broadcast: ")
+        print(repr(broadcast))
+
+    def on_ack_burst(self, ack_burst):
+        print("Received ack / burst: ")
+        print(repr(ack_burst))
+        
+def rx(pkt):
+    pkt.show()
 
 if __name__ == '__main__':
     if len(sys.argv) >= 2:
@@ -21,55 +41,29 @@ if __name__ == '__main__':
             # Create the WHAD Device
             dev = WhadDevice.create(interface)
 
-            # Create the sniffer ANT connector
-            sniffer = ANT(dev)
-            print("Available channels: ", sniffer.list_channels())
-            print("Available networks: ", sniffer.list_networks())
-            
-            sniffer.set_network_key(0, ANT_PLUS_NETWORK_KEY)
-            sniffer.set_device_number(0,7912)
-            sniffer.set_device_type(0,120)
-            sniffer.set_transmission_type(0,1)
-            
-            sniffer.assign_channel(0, 0, shared=False, direction=ChannelDirection.TX, unidirectional=False)
-            sniffer.set_rf_channel(0,57)
-            sniffer.set_channel_period(0,32768//4)
-            sniffer.open_channel(0)
+            profile = MyProfile()
+            profile.start()
 
+            # Create the master ANT connector
+            master = Master(dev, profile=mini_app)
+            #master.attach_callback(rx)
 
-            # Start the sniffer and iterate over packets
-            sniffer.start()
-            p = ANT_Hdr(bytes.fromhex("a6c5e81e78010aFFFF")+ b"MASTER")
-            p.broadcast = 0
-            print(sniffer.send(p))
+            print("Available channels: ", master.list_channels())
+            print("Available networks: ", master.list_networks())
+            channel = master.create_channel()
+            print(channel)
 
-            while True:
-                input()
-                p = ANT_Hdr(bytes.fromhex("a6c5e81e78010aFFFF")+ b"ABCDEF")#b"SLAAVE")
-                p.broadcast = 1
-                p.count = 0
-                p.end = 0
-                print(sniffer.send(p))
-
-                p = ANT_Hdr(bytes.fromhex("a6c5e81e78010aFFFF")+ b"GHIJKL")#b"SLAAVE")
-                p.broadcast = 1
-                p.count = 1
-                p.slot = 0
-                p.end = 0
-                print(sniffer.send(p))
-
-                p = ANT_Hdr(bytes.fromhex("a6c5e81e78010aFFFF")+ b"MNOPQR")#b"SLAAVE")
-                p.broadcast = 1
-                p.count = 0
-                p.slot = 0
-                p.end = 1
-                print(sniffer.send(p))
-                input()
-                p = ANT_Hdr(bytes.fromhex("a6c5e81e78010aFFFF")+ b"MASTER")#b"SLAAVE")
-                p.broadcast = 1
-                p.end = 1
-                print(sniffer.send(p))
-
+            # Start the master and iterate over packets
+            if channel is not None:
+                while channel.is_opened():
+                    # Send a broadcast packet 
+                    profile.broadcast("Hello")
+                    input()
+                    # Send an acked packet 
+                    acked = profile.ack("World")
+                    input()
+                    # Send a burst packet
+                    profile.burst(b"A" * 30)
 
 
             

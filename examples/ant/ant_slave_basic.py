@@ -1,4 +1,5 @@
-from whad.ant import ANT
+from whad.ant import Slave
+from whad.ant.stack.app.profiles import AntProfile
 from whad.scapy.layers.ant import ANT_Hdr
 from whad.ant.channel import ChannelDirection
 from whad.ant.crypto import ANT_PLUS_NETWORK_KEY
@@ -6,68 +7,53 @@ from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
 import sys
 
-import logging
-logger = logging.getLogger('whad.device.antstick')
-#logging.basicConfig(level=logging.DEBUG)
-
 from time import sleep
 
+class MyProfile(AntProfile):
+
+
+    DEVICE_NUMBER = 1234
+    DEVICE_TYPE = 1
+    TRANSMISSION_TYPE = 1
+    CHANNEL_PERIOD = 8070
+    SEARCH_TIMEOUT = 0
+    DEFAULT_RF_CHANNEL = 50
+    NETWORK_KEY = ANT_PLUS_NETWORK_KEY    
+
+    def on_broadcast(self, broadcast):
+        print("Received broadcast: ")
+        print(repr(broadcast))
+
+    def on_ack_burst(self, ack_burst):
+        print("Received ack / burst: ")
+        print(repr(ack_burst))
+        
 if __name__ == '__main__':
     if len(sys.argv) >= 2:
         # Retrieve target interface
         interface = sys.argv[1]
 
         try:
+            profile = MyProfile()
             # Create the WHAD Device
             dev = WhadDevice.create(interface)
 
-            # Create the sniffer ANT connector
-            sniffer = ANT(dev)
-            print("Available channels: ", sniffer.list_channels())
-            print("Available networks: ", sniffer.list_networks())
-            '''
-            print(sniffer.sniff_ant(
-                device_type = 0, 
-                device_number = 0,
-                transmission_type = 0
-            ))
-            '''
-            sniffer.set_network_key(0, ANT_PLUS_NETWORK_KEY)
-            sniffer.set_device_number(0,7912)
-            sniffer.set_device_type(0,120)
-            sniffer.set_transmission_type(0,1)
-            sniffer.set_channel_period(0,32768)
-            sniffer.assign_channel(0, 0, shared=False, direction=ChannelDirection.RX, unidirectional=False)
-            sniffer.set_rf_channel(0,57)
-            sniffer.open_channel(0)
-
-            sniffer.start()
-
-            # Start the sniffer and iterate over packets
-
-            while True:
-                input()
-                p = ANT_Hdr(bytes.fromhex("a6c5e81e78010aFFFF")+ b"ABCDEF")#b"SLAAVE")
-                p.broadcast = 1
-                p.count = 0
-                p.slot = 0
-                p.end = 0
-                print(sniffer.send(p))
-
-                p = ANT_Hdr(bytes.fromhex("a6c5e81e78010aFFFF")+ b"GHIJKL")#b"SLAAVE")
-                p.broadcast = 1
-                p.count = 1
-                p.slot = 0
-                p.end = 1
-                print(sniffer.send(p))
+            # Create the slave ANT connector
+            slave = Slave(dev, profile=profile)
+            profile.start()
+            
+            channel = slave.search_channel()
+            
+            print("Available channels: ", slave.list_channels())
+            print("Available networks: ", slave.list_networks())
+            
+            while channel.is_opened():
+                # Transmit burst packet
+                profile.burst("B" * 20)
                 input()
 
-                p = ANT_Hdr(bytes.fromhex("a6c5e81e78010aFFFF")+ b"SLAAVE")#b"SLAAVE")
-                p.broadcast = 1
-                p.slot = 0
-                p.end = 1
-                print(sniffer.send(p))
 
+            
         except (KeyboardInterrupt, SystemExit):
             dev.close()
 
