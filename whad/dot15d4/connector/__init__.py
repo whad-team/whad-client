@@ -697,7 +697,6 @@ class Dot15d4(Connector):
         """
         Normal PDU processing (Dot15d4).
         """
-        # Enqueue PDU if in synchronous mode
         if self.is_synchronous():
             self.add_pending_packet(packet)
         else:

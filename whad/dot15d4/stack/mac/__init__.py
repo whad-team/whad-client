@@ -260,8 +260,8 @@ class MACManagementService(MACService):
                     channel_page=0,
                     channel=11,
                     start_time=0,
-                    beacon_order=15,
-                    superframe_order=15,
+                    beacon_order=15,#3
+                    superframe_order=15,#1
                     pan_coordinator=True,
                     battery_life_extension=False,
                     coord_realignement=False,
@@ -284,8 +284,8 @@ class MACManagementService(MACService):
         if coord_realignement:
             raise RequiredImplementation("CoordinatorRealignment")
         else:
-            self.database.set("macBeaconOrder", 3)
-            self.database.set("macSuperframeOrder", 1)
+            self.database.set("macBeaconOrder", beacon_order)
+            self.database.set("macSuperframeOrder", superframe_order)
             self.database.set("macPanId", pan_id)
             self.manager.get_layer('phy').set_channel_page(channel_page)
             self.manager.get_layer('phy').set_channel(channel)
@@ -296,9 +296,11 @@ class MACManagementService(MACService):
 
             sf_beaconorder = self.database.get("macBeaconOrder")
             sf_assocpermit = self.database.get("macAssociationPermit")
+            
             is_coordinator = (
                 self.database.get("macCoordShortAddress") == self.database.get("macShortAddress")
             )
+
             sf_battlifeextend = self.database.get("macBattLifeExt")
             beacon_payload = self.database.get("macBeaconPayload")
 
@@ -313,6 +315,7 @@ class MACManagementService(MACService):
             ) / beacon_payload
 
             self.database.set("macLastBeacon", Dot15d4() / beacon)
+
 
             # if beaconOrder < 15, we start a beacon-enabled network
             if beacon_order < 15:
@@ -774,7 +777,7 @@ class MACManagementService(MACService):
         pending = self.manager.get_pending_transaction(pdu.src_addr)
         if pending is not None:
             packet, source_address_mode, destination_address_mode = pending
-
+            print(packet, source_address_mode, destination_address_mode)
             self.manager.send_data(
                 packet,
                 source_address_mode=source_address_mode,
