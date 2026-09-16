@@ -133,7 +133,9 @@ class AntDomain(Registry):
         if isinstance(packet.metadata, ANTMetadata):
             if packet.metadata.raw:
                 return AntDomain.build('send_raw', self.proto_version).from_packet(
-                    packet
+                    packet, 
+                    packet.metadata.channel_number,
+                    packet.metadata.rf_channel
                 )
             else:
                 return AntDomain.build('send', self.proto_version).from_packet(

@@ -32,13 +32,19 @@ class SendPdu(PbMessageWrapper):
             pdu = bytes(packet[ANT_Hdr])
         else:
             return None
-
-        msg = SendPdu(
-            version,
-            channel_number=channel_number,
-            rf_channel=rf_channel,
-            pdu=pdu
-        )
+        if rf_channel is not None:
+            msg = SendPdu(
+                version,
+                channel_number=channel_number,
+                rf_channel=rf_channel,
+                pdu=pdu
+            )
+        else:
+            msg = SendPdu(
+                version,
+                channel_number=channel_number,
+                pdu=pdu
+            )
         return msg
 
 
@@ -64,13 +70,21 @@ class SendRawPdu(PbMessageWrapper):
             pdu = bytes(packet[ANT_Hdr])
         else:
             return None
+        if rf_channel is not None:
 
-        msg = SendRawPdu(
-            version,
-            channel_number=channel_number,
-            rf_channel=rf_channel,
-            pdu=pdu
-        )
+            msg = SendRawPdu(
+                version,
+                channel_number=channel_number,
+                rf_channel=rf_channel,
+                pdu=pdu
+            )
+        else:
+
+            msg = SendRawPdu(
+                version,
+                channel_number=channel_number,
+                pdu=pdu
+            )
         return msg
 
 
