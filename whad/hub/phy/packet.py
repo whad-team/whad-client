@@ -64,7 +64,8 @@ class SendPacket(PbMessageWrapper):
         """Convert packet to message
         """
         return SendPacket(
-            packet=bytes(packet)
+            packet=bytes(packet), 
+            version=1
         )
 
 @pb_bind(PhyDomain, 'send_raw', 1)
