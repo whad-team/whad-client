@@ -1,15 +1,9 @@
 from whad.ant import ANT, Sniffer
-from whad.ant.channel import ChannelDirection
 from whad.ant.crypto import ANT_PLUS_NETWORK_KEY
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
 import sys
 from time import sleep
-
-
-def receive_callback(pkt):
-    print(repr(pkt))
-    print("\t", bytes(pkt).hex())
 
 if __name__ == '__main__':
     if len(sys.argv) >= 2:
@@ -22,6 +16,8 @@ if __name__ == '__main__':
 
             # Create the sniffer ANT connector
             sniffer = Sniffer(dev)
+
+            # Configure the sniffer
             sniffer.network_key =  ANT_PLUS_NETWORK_KEY
             sniffer.channel = 57
             sniffer.device_number = 8130
@@ -29,7 +25,8 @@ if __name__ == '__main__':
             sniffer.transmission_type = 0
 
             sniffer.start()
-            
+
+            # Iterate over received packets            
             for i in sniffer.sniff():
                 print(repr(i))
 
