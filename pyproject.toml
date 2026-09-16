@@ -75,6 +75,8 @@ wuni-mouse = "whad.unifying.cli.wuni_mouse:wuni_mouse_main"
 wuni-keyboard = "whad.unifying.cli.wuni_keyboard:wuni_kb_main"
 wbtmesh-provisionee = "whad.btmesh.cli.provisionee:btmesh_provisionee_main"
 wbtmesh-provisioner = "whad.btmesh.cli.provisioner:btmesh_provisioner_main"
+wantplus-display = "whad.ant.cli.display:antplus_display_main"
+wantplus-sensor = "whad.ant.cli.sensor:antplus_sensor_main"
 
 # setuptools specific
 [tool.setuptools]
