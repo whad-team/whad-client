@@ -11,7 +11,7 @@ from time import sleep, time
 from typing import Optional, Generator
 
 from scapy.packet import Packet
-from whad.ant.crypto import ANT_PLUS_NETWORK_KEY, ANT_FS_NETWORK_KEY
+from whad.ant.crypto import ANT_PLUS_NETWORK_KEY, ANT_FS_NETWORK_KEY, generate_sync_from_network_key
 from whad.scapy.layers.ant import ANT_Hdr
 from whad.ant.channel import ChannelDirection
 from whad.hub.ant import ChannelEventCode
@@ -151,6 +151,25 @@ class ANTChannel:
         """Assigned channel period
         """
         return self.__channel_period
+
+
+    @device_type.setter
+    def device_type(self, new_value:int):
+        """Assign new device type
+        """
+        self.__device_type = new_value
+
+    @transmission_type.setter
+    def transmission_type(self, new_value:int):
+        """Assign new transmission type
+        """
+        self.__transmission_type = new_value
+
+    @device_number.setter
+    def device_number(self, new_value:int):
+        """Assigned device number
+        """
+        self.__device_number = new_value
 
 
     @property
@@ -369,7 +388,8 @@ class LinkLayer(Layer):
         self.get_layer('phy').set_device_number(channel_number, device_number)
         self.get_layer('phy').set_device_type(channel_number, device_type)
         self.get_layer('phy').set_transmission_type(channel_number, transmission_type)
-        
+        self.get_layer('phy').set_rf_channel(channel_number, rf_channel)
+
         self.get_layer('phy').assign_channel(
             channel_number,
             network_number,
@@ -377,7 +397,6 @@ class LinkLayer(Layer):
             direction=ChannelDirection.TX,
             unidirectional=unidirectional)
         
-        self.get_layer('phy').set_rf_channel(channel_number, rf_channel)
         self.get_layer('phy').set_channel_period(channel_number, channel_period)
         self.get_layer('phy').open_channel(channel_number)
     
@@ -419,7 +438,6 @@ class LinkLayer(Layer):
 
         self.state.unregister_channel(channel_number)
 
-        print("destroyed")
         return True
 
     @instance('app', tag='broadcast')
@@ -438,8 +456,11 @@ class LinkLayer(Layer):
         elif len(payload) > 8:
             payload = payload[:8]
         
+        preamble = generate_sync_from_network_key(channel.network_key)
+
         packet = (
             ANT_Hdr(
+                preamble = preamble,
                 device_number = channel.device_number, 
                 device_type = channel.device_type, 
                 transmission_type = channel.transmission_type, 
@@ -447,7 +468,7 @@ class LinkLayer(Layer):
                 ack = 0, 
                 end = 0,
                 count = 0, 
-                slot = True, 
+                slot = 1 if ChannelDirection.TX else 0, 
                 unknown = 2
 
             ) / payload
@@ -475,9 +496,11 @@ class LinkLayer(Layer):
             payload = payload[:8]
 
         channel = self.state.channels[channel_number]
+        preamble = generate_sync_from_network_key(channel.network_key)
 
         packet = (
             ANT_Hdr(
+                preamble = preamble,
                 device_number = channel.device_number, 
                 device_type = channel.device_type, 
                 transmission_type = channel.transmission_type, 
@@ -485,12 +508,15 @@ class LinkLayer(Layer):
                 ack = 0, 
                 end = 1,
                 count = 0, 
-                slot = 1,
+                slot = 0 if ChannelDirection.RX else 1,
                 unknown = 2
 
             ) / payload
         )
-        
+
+
+
+        #packet.show()
         success = self.send('phy',
             packet, 
             channel_number = channel_number
@@ -517,11 +543,14 @@ class LinkLayer(Layer):
         for payload in payloads:
             burst_payload += bytes(payload)
         
+        preamble = generate_sync_from_network_key(channel.network_key)
+
         packets = []
         count = 0
         for i in range(0, len(burst_payload), 8):
             packets.append(
                 ANT_Hdr(
+                    preamble = preamble,
                     device_number = channel.device_number, 
                     device_type = channel.device_type, 
                     transmission_type = channel.transmission_type, 
@@ -588,6 +617,16 @@ class LinkLayer(Layer):
                 self.state.channels[channel_number].mark_as_opened()
 
             app_instance = self.state.channels[channel_number].app
+
+            if (
+                self.state.channels[channel_number].device_type == 0 or
+                self.state.channels[channel_number].device_number == 0 or
+                self.state.channels[channel_number].transmission_type == 0
+            ):
+                self.state.channels[channel_number].device_type = pdu.device_type
+                self.state.channels[channel_number].transmission_type = pdu.transmission_type
+                self.state.channels[channel_number].device_number = pdu.device_number
+            
             self.send(app_instance.name, pdu)
 
 
