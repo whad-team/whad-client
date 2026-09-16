@@ -42,6 +42,9 @@ class Sniffer(ANT, EventsManager):
             rf_channel = self.__configuration.channel
         )
 
+    def stop(self):
+        super().stop()
+        
     @property
     def network_key(self):
         return self.__configuration.network_key
@@ -88,7 +91,6 @@ class Sniffer(ANT, EventsManager):
 
     @channel.setter
     def channel(self, channel=57):
-        #self.stop()
         self.__configuration.channel = channel
         self._enable_sniffing()
 
@@ -107,7 +109,7 @@ class Sniffer(ANT, EventsManager):
 
         if ANT_FS_Link_Command_Packet in packet:
             self.channel = packet.frequency
-            print("[i] Hopping to channel "+str(packet.frequency))
+            # print("[i] Hopping to channel "+str(packet.frequency))
             
         return packet
 
@@ -126,7 +128,7 @@ class Sniffer(ANT, EventsManager):
                     message_type = PduReceived
 
                 for message in super().capture(messages=(message_type), timeout=timeout):
-                    if message is not None and issubclass(message, AbstractPacket):
+                    if message is not None:
                         packet = message.to_packet()
                         if packet is not None:
                             packet = self.process_packet(packet)

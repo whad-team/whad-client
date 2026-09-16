@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from whad.ant.crypto import ANT_PLUS_NETWORK_KEY
+from whad.ant.crypto import ANT_PLUS_NETWORK_KEY,ANT_FS_NETWORK_KEY
 
 @dataclass
 class SnifferConfiguration:

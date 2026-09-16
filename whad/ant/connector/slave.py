@@ -6,6 +6,7 @@ from scapy.packet import Packet
 
 from whad.ant.connector import ANT
 from whad.ant.stack import ANTStack
+from whad.ant.stack.app.profiles.antplus import find_slave_profile
 from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter, is_message_type
 from whad.hub.ant import RawPduReceived, PduReceived
@@ -49,8 +50,13 @@ class Slave(ANT):
     def stack(self):
         return self.__stack
 
+    @property
+    def profile(self):
+        return self.__profile
+
+
     def _enable_role(self):
-        """Enable Master role.
+        """Enable Slave role.
         """
         if self.__started:
             super().start()
@@ -119,17 +125,25 @@ class Slave(ANT):
 
             if self.__profile is not None:
                 channel.app.set_profile(self.__profile)
+            else:
+                candidate_profile = find_slave_profile(channel.device_type)
+                if candidate_profile is not None:
+                    self.__profile = candidate_profile()
+                    channel.app.set_profile(self.__profile)
+                    
         return channel 
                
 
     def start(self):
-        """Start Slave  mode.
+        """Start Slave mode.
         """
+        super().start()
         self.__started = True
 
     def stop(self):
         """Stop Slave mode.
         """
+        super().stop()
         self.__started = False
 
     def on_pdu(self, pdu):

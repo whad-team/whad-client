@@ -42,13 +42,13 @@ class ANT(WhadDeviceConnector):
 
         self.__ready = False
         super().__init__(device)
-
         # Capability cache
         self.__can_send = None
         self.__can_send_raw = None
 
         # Open device and make sure it is compatible
-        self.device.open()
+        if not self.device.is_open():
+            self.device.open()
         self.device.discover()
 
         # Check if device supports ANT
@@ -227,7 +227,7 @@ class ANT(WhadDeviceConnector):
         if not self.can_manage_channels():
             raise UnsupportedCapability("ChannelManagement")
 
-        # Create a SniffMode message
+        # Create a OpenChannel message
         msg = self.hub.ant.create_open_channel(
             channel_number = channel_number 
         )
@@ -525,11 +525,7 @@ class ANT(WhadDeviceConnector):
         """
         Normal PDU processing.
         """
-        # Enqueue PDU if in synchronous mode
-        if self.is_synchronous():
-            self.add_pending_packet(packet)
-        else:
-            pass
+        pass
 
     def on_event(self, event):
         """ANT event dispatch.
@@ -539,5 +535,6 @@ class ANT(WhadDeviceConnector):
 
 
 from whad.ant.connector.sniffer import Sniffer
+from whad.ant.connector.scanner import Scanner
 from whad.ant.connector.master import Master
 from whad.ant.connector.slave import Slave
