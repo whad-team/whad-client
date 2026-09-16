@@ -52,17 +52,24 @@ if __name__ == '__main__':
             )
             # Instantiate a coordinator with our application object
             coordinator = Coordinator(dev, applications=[basic_app])
-
+            
             # Attach & start the wireshark monitor
             monitor.attach(coordinator)
             monitor.start()
 
             # Start the coordinator
             coordinator.start()
+            coordinator.stack.get_layer('apl').get_application_by_name('zdo').network_manager.configure_extended_address(0x7cc6b6fffe8313a1)
+            #coordinator.stack.get_layer('apl').get_application_by_name('zdo').network_manager.configure_extended_pan_id(0xc9e56dc281664499)
+            
+            coordinator.stack.get_layer('aps').database.set("apsDesignatedCoordinator", True)
+            coordinator.stack.get_layer('aps').database.set("apsTrustCenterAddress", 0x7cc6b6fffe8313a1)
+            coordinator.stack.get_layer('nwk').database.set("nwkBatteryLifeExtension", False)
+            coordinator.stack.get_layer('mac').database.set("macBattLifeExt", 0)
 
             # Start a network formation
             print("[i] Network formation !")
-            network = coordinator.start_network()
+            network = coordinator.start_network(ext_pan_id=0xc9e56dc281664499, network_key=bytes.fromhex("e7aabb325ed9b265046160aa4dccdd55"))
             while True:
                 # When there is an user input, discover the network
                 input()

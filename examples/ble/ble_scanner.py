@@ -14,9 +14,10 @@ if __name__ == '__main__':
             dev = Device.create(interface)
 
             # Attach a scanner role and scan devices
-            with Scanner(dev) as scanner:
-                for remote_dev in scanner.discover_devices():
-                    print(remote_dev)
+            scanner = Scanner(dev)
+            scanner.start()
+            for remote_dev in scanner.discover_devices():
+                print(remote_dev)
 
         # Handle interruptions (user or system)
         except (KeyboardInterrupt, SystemExit):
