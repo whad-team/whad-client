@@ -1,19 +1,15 @@
 """ANT+ Display tool interactive shell.
 """
-import html
 import string
 import inspect
 from time import sleep
-from typing import List
+from typing import Union, Optional
 
 from prompt_toolkit import print_formatted_text, HTML
 
-from whad.device import WhadDevice, WhadDeviceConnector
-from whad.ant import ANT, Slave, Scanner
-from whad.ant.stack.app.profiles.antplus.hrm import HeartRateDisplay
-from whad.ant.stack.app.profiles.antplus.bsc import CombinedSpeedAndCadenceDisplay
+from whad.device import Device
+from whad.ant import Slave, Scanner
 from whad.ant.stack.app.profiles.antplus import find_slave_profile
-from whad.scapy.layers.ant import ANT_PLUS_PROFILES
 
 from whad.common.monitors import WiresharkMonitor
 from whad.exceptions import ExternalToolNotFound
@@ -29,7 +25,7 @@ class AntPlusDisplayShell(InteractiveShell):
     """ANT+ Display interactive shell
     """
 
-    def __init__(self, interface: WhadDevice = None, connector=None):
+    def __init__(self, interface: Device = None, connector=None):
         super().__init__(HTML("<b>wantplus-display></b> "))
 
         # If interface is None, pick the first matching our needs
@@ -43,7 +39,7 @@ class AntPlusDisplayShell(InteractiveShell):
         # If connector is not provided
         if connector is None:
             # Reset target info and connector.
-            self.__connector: (Slave | Scanner | None) = None
+            self.__connector: Optional[Union[Slave, Scanner]] = None
             self.__device_type = None
         else:
             # If connector provided, consider the device already connected
