@@ -102,7 +102,7 @@ class WhadDumpApp(CommandLineApp):
 
                     connector = UnixConnector(interface)
                     connector.domain = self.args.domain
-                    hub = ProtocolHub(2)
+                    hub = ProtocolHub(3)
                     connector.format = hub.get(self.args.domain).format
 
                     self.connector = connector

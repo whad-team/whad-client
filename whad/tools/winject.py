@@ -30,6 +30,7 @@ from whad.scapy.layers.rf4ce import *       # pylint: disable=wildcard-import,un
 from whad.scapy.layers.phy import *         # pylint: disable=wildcard-import,unused-wildcard-import
 from whad.scapy.layers.esb import *         # pylint: disable=wildcard-import,unused-wildcard-import
 from whad.scapy.layers.unifying import *    # pylint: disable=wildcard-import,unused-wildcard-import
+from whad.scapy.layers.ant import *    # pylint: disable=wildcard-import,unused-wildcard-import
 from whad.device.unix import UnixConnector
 from whad.tools.utils import list_implemented_injectors, get_injector_parameters, \
     gen_option_name, build_configuration_from_args
@@ -341,7 +342,7 @@ class WhadInjectApp(CommandLineApp):
                         connector = UnixConnector(self.input_interface)
 
                         connector.domain = self.args.domain
-                        hub = ProtocolHub(2)
+                        hub = ProtocolHub(3)
                         connector.format = hub.get(self.args.domain).format
                         connector.on_packet = self.on_incoming_packet
                         connector.unlock()

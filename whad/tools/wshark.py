@@ -63,7 +63,7 @@ class WhadWiresharkApp(CommandLineApp):
                 # a dummy connector.
                 connector = UnixConnector(interface)
                 connector.domain = self.args.domain
-                hub = ProtocolHub(2)
+                hub = ProtocolHub()
                 connector.format = hub.get(self.args.domain).format
 
                 # Attack a wireshark monitor
