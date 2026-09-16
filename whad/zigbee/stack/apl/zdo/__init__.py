@@ -113,6 +113,7 @@ class ZigbeeDeviceObjects(ApplicationObject):
         self.security_manager.send_transport_key(
             network_address
         )
+        
 
     def on_transport_key(
                             self,

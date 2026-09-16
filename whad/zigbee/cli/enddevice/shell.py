@@ -305,44 +305,65 @@ class ZigbeeEndDeviceShell(InteractiveShell):
                 nodes = self.__target_network['info'].discover()
                 self.__target_network['discovered'] = True
                 for node in nodes:
+                    print(node.address, node.extended_address)
+                
+                    try:
+                        short_address = str(Dot15d4Address(node.address))
+                    except InvalidDot15d4AddressException:
+                        short_address = "unknown"
+                    try:
+                        extended_address = str(Dot15d4Address(node.extended_address))
+                    except InvalidDot15d4AddressException:
+                        extended_address = "unknown"
+
                     if isinstance(node, CoordinatorNode):
                         print("New Coordinator discovered (addr. = %s, ext. addr. = %s)" % (
-                                str(Dot15d4Address(node.address)),
-                                str(Dot15d4Address(node.extended_address))
+                                short_address,
+                                extended_address
                             )
                         )
                     elif isinstance(node, RouterNode):
                         print("New Router discovered (addr. = %s, ext. addr. = %s)" % (
-                                str(Dot15d4Address(node.address)),
-                                str(Dot15d4Address(node.extended_address))
+                                short_address,
+                                extended_address
                             )
                         )
                     else:
                         print("New End Device discovered (addr. = %s, ext. addr. = %s)" % (
-                                str(Dot15d4Address(node.address)),
-                                str(Dot15d4Address(node.extended_address))
+                                short_address,
+                                extended_address
                             )
                         )
 
             print_formatted_text(HTML('<ansigreen>Addr.     Ext. addr.                  Type</ansigreen>'))
 
             for node in self.__target_network['info'].nodes:
+
+                try:
+                    short_address = str(Dot15d4Address(node.address))
+                except InvalidDot15d4AddressException:
+                    short_address = "unknown"
+                try:
+                    extended_address = str(Dot15d4Address(node.extended_address))
+                except InvalidDot15d4AddressException:
+                    extended_address = "unknown"
+
                 if isinstance(node, CoordinatorNode):
                     print("%s    %s     coordinator" % (
-                            str(Dot15d4Address(node.address)),
-                            str(Dot15d4Address(node.extended_address))
+                            short_address,
+                            extended_address
                         )
                     )
                 elif isinstance(node, RouterNode):
                     print("%s    %s     router" % (
-                            str(Dot15d4Address(node.address)),
-                            str(Dot15d4Address(node.extended_address))
+                            short_address,
+                            extended_address
                         )
                     )
                 else:
                     print("%s    %s     end device" % (
-                            str(Dot15d4Address(node.address)),
-                            str(Dot15d4Address(node.extended_address))
+                            short_address,
+                            extended_address
                         )
                     )
         else:
@@ -358,7 +379,8 @@ class ZigbeeEndDeviceShell(InteractiveShell):
         nodes = []
         if self.__target_network['discovered']:
             nodes = ["0x{:04x}".format(node.address) for node in self.__target_network['info'].nodes]
-            nodes.extend(['%s' % str(Dot15d4Address(node.extended_address)) for node in self.__target_network['info'].nodes])
+            nodes.extend(['%s' % str(Dot15d4Address(node.extended_address)) for node in self.__target_network['info'].nodes if node.extended_address is not None])
+            
         return nodes
 
     def complete_endpoints(self):
@@ -460,7 +482,7 @@ class ZigbeeEndDeviceShell(InteractiveShell):
     def get_cache_endpoints(self, address):
         input_clusters = {}
         for node in self.__target_network['info'].nodes:
-            if address == "0x{:04x}".format(node.address) or address == str(Dot15d4Address(node.extended_address)).lower():
+            if address == "0x{:04x}".format(node.address) or (node.extended_address is not None and address == str(Dot15d4Address(node.extended_address)).lower()):
                 endpoints = {}
                 try:
                     for endpoint in node.endpoints:

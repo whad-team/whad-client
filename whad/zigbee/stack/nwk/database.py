@@ -11,6 +11,7 @@ class NWKIB(Dot15d4Database):
         Reset the NWKIB database to its default value.
         """
         self.nwkSequenceNumber = 0
+        self.nwkBatteryLifeExtension = 0
         #self.nwkPassiveAckTimeout = None
         self.nwkMaxBroadcastRetries = 3
         self.nwkMaxChildren = 4

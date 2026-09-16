@@ -692,7 +692,7 @@ class NWKManagementService(NWKService):
             pan_coordinator=True,
             beacon_order=beacon_order,
             superframe_order=superframe_order,
-            battery_life_extension=battery_life_extension,
+            battery_life_extension=self.database.get("nwkBatteryLifeExtension"),
             coord_realignement=False # for now, should be different if we update an existing PAN
         )
 
@@ -840,10 +840,10 @@ class NWKManagementService(NWKService):
                 discover_route=0,
                 seqnum=sequence_number,
                 radius=radius,
-                flags=["extended_src"], #, "extended_dst"],
+                flags=["extended_src",'extended_dst'],
                 destination=network_address,
                 source=self.database.get("nwkNetworkAddress"),
-                #ext_dst=selected_parent.extended_address, # ?
+                ext_dst=extended_source_address,#selected_parent.extended_address, # ?
                 ext_src=self.database.get("nwkIeeeAddress")
             )
             nsdu = ZigbeeNWKCommandPayload(
@@ -877,9 +877,10 @@ class NWKManagementService(NWKService):
                 crypto_manager = NetworkLayerCryptoManager(selected_key_material.key)
                 msdu = crypto_manager.encrypt(msdu)
                 selected_key_material.outgoing_frame_counter += 1
+                msdu.nwk_seclevel = 0
             else:
                 msdu = npdu / nsdu
-
+                
             self.manager.get_layer('mac').get_service("data").data(
                 msdu,
                 destination_address_mode=MACAddressMode.SHORT,
@@ -1239,7 +1240,7 @@ class NWKManager(Dot15d4Manager):
                 )
                 if success:
                     self.__pending_join_indication = (
-                        new_address,
+                        node.address,
                         source_address,
                         capability_information,
                         False,
@@ -1332,11 +1333,15 @@ class NWKManager(Dot15d4Manager):
             cm = self.database.get("nwkMaxChildren")
             lm = self.database.get("nwkMaxDepth")
             rm = self.database.get("nwkMaxRouters")
-            cskip = (
-                (1 + cm * (lm - depth - 1))
-                if rm == 1 else
-                (1 + cm - rm  - cm * (rm ** (lm - depth - 1)))
-            )
+
+            if depth >= lm:
+                return None
+            if rm == 1:
+                cskip = 1 + cm * (lm - depth - 1)
+            else:
+                cskip = (
+                    1 + cm - rm - cm * (rm ** (lm - depth - 1))
+                ) // (1 - rm)
 
             if cskip == 0:
                 return None

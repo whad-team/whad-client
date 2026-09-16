@@ -221,6 +221,8 @@ class ZDONetworkManager(ZDOObject):
 
         apsUseInsecureJoin = aps_management.get("apsUseInsecureJoin")
         apsChannelMask = aps_management.get("apsChannelMask")
+
+
         if nwkExtendedPANID != 0:
             # we are already connected :) don't do anything
             return True
