@@ -1,10 +1,3 @@
-#!/usr/bin/env python3
-"""ANT+ Combined Bike Speed & Cadence Sensor Example.
-
-Usage:
-    python3 examples/ant/antplus_combined_speed_cadence_sensor.py <device>
-"""
-
 from whad.ant import Master
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound

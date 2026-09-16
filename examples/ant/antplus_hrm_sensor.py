@@ -9,7 +9,7 @@ from whad.ant import Master
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
 from whad.ant.stack.app.profiles.antplus.hrm import HeartRateMonitor
-import sys,time
+import sys,time,random
 
 if __name__ == '__main__':
     if len(sys.argv) >= 2:
@@ -20,17 +20,14 @@ if __name__ == '__main__':
             dev = WhadDevice.create(interface)
             profile = HeartRateMonitor()
 
-            master = Master(dev)
-            channel = master.create_channel(
-                1234, 120, 1, channel_period=8070
-            )
-            channel.app.set_profile(profile)
+            master = Master(dev, profile=profile)
             profile.start()
-
-            print("Heart Rate Monitor Sensor started. Press Ctrl+C to stop.")
-            while True:
-                profile.computed_heart_rate = profile.computed_heart_rate + 1
-                time.sleep(1)
+            channel = master.create_channel()
+            if channel is not None:
+                print("Heart Rate Monitor Sensor started. Press Ctrl+C to stop.")
+                while channel.is_opened():
+                    profile.computed_heart_rate = random.randint(60,80)
+                    time.sleep(1)
 
         except (KeyboardInterrupt, SystemExit):
             if channel is not None:
