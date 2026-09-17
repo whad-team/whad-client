@@ -1077,7 +1077,7 @@ class Hci(VirtualDevice):
             self._download_realtek_firmware(
                 firmware, custom_config, expected_address=bd_address
             )
-        except Exception:
+        except RealtekFirmwareError:
             logger.exception(
                 "[%s] Failed to configure Realtek public Bluetooth address",
                 self.interface
@@ -1089,7 +1089,7 @@ class Hci(VirtualDevice):
                     )
                     self._bd_address_type = AddressType.PUBLIC
                     self._dev_id = self._generate_dev_id()
-                except Exception:
+                except RealtekFirmwareError:
                     logger.exception(
                         "[%s] Failed to restore the stock Realtek configuration",
                         self.interface

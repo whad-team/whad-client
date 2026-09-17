@@ -21,6 +21,12 @@ RTK_ROM_LMP_8761A = 0x8761
 RTK_FIRMWARE_DIR_ENV = "WHAD_RTK_FIRMWARE_DIR"
 RTK_FIRMWARE_NAME_8761BU = "rtl8761bu_fw.bin"
 RTK_CONFIG_NAME_8761BU = "rtl8761bu_config.bin"
+RTK_FIRMWARE_CLASS_PATH = Path("/sys/module/firmware_class/parameters/path")
+RTK_FIRMWARE_SEARCH_DIRS = (
+    Path("/lib/firmware/rtl_bt"),
+    Path("/usr/lib/firmware/rtl_bt"),
+    Path("/run/current-system/firmware/rtl_bt"),
+)
 
 
 class RealtekFirmwareError(ValueError):
@@ -197,20 +203,40 @@ def iter_download_fragments(payload):
         yield index, fragment
 
 
+def _system_firmware_search_dirs():
+    """Return configured and distribution-specific Linux firmware paths."""
+
+    search_dirs = []
+    try:
+        configured_root = RTK_FIRMWARE_CLASS_PATH.read_text(
+            encoding="utf-8"
+        ).strip()
+    except OSError:
+        configured_root = ""
+
+    if configured_root:
+        search_dirs.append(Path(configured_root) / "rtl_bt")
+    search_dirs.extend(RTK_FIRMWARE_SEARCH_DIRS)
+
+    # The configured root can repeat a static fallback. Preserve search order
+    # while avoiding an identical path twice.
+    return tuple(dict.fromkeys(search_dirs))
+
+
 def load_rtl8761bu_images():
     """Load the RTL8761BU epatch and optional base configuration.
 
-    ``WHAD_RTK_FIRMWARE_DIR`` takes precedence.  Uncompressed Linux firmware
-    files are used as a fallback.  Compressed distro firmware is intentionally
-    not decompressed in-process; callers can point the environment variable at
-    an uncompressed copy.
+    ``WHAD_RTK_FIRMWARE_DIR`` overrides system discovery. Otherwise, the
+    kernel-configured firmware root and common distribution paths are searched.
+    Compressed distro firmware is intentionally not decompressed in-process;
+    callers can point the environment variable at an uncompressed copy.
     """
 
     search_dirs = []
     if RTK_FIRMWARE_DIR_ENV in os.environ:
         search_dirs.append(Path(os.environ[RTK_FIRMWARE_DIR_ENV]))
     else:
-        search_dirs.append(Path("/lib/firmware/rtl_bt"))
+        search_dirs.extend(_system_firmware_search_dirs())
 
     firmware_path = None
     for directory in search_dirs:
@@ -226,5 +252,12 @@ def load_rtl8761bu_images():
         )
 
     config_path = firmware_path.with_name(RTK_CONFIG_NAME_8761BU)
-    config_data = config_path.read_bytes() if config_path.is_file() else None
-    return RealtekFirmware(firmware_path.read_bytes()), RealtekConfig.parse(config_data)
+    try:
+        firmware_data = firmware_path.read_bytes()
+        config_data = config_path.read_bytes() if config_path.is_file() else None
+    except OSError as error:
+        raise RealtekFirmwareError(
+            "RTL8761BU firmware files could not be read"
+        ) from error
+
+    return RealtekFirmware(firmware_data), RealtekConfig.parse(config_data)
