@@ -98,8 +98,12 @@ class AntPlusSensorShell(InteractiveShell):
 
     @category("Monitoring")
     def do_wireshark(self, args):
-        """
-        Launch Wireshark to monitor packets.
+        """launch wireshark to monitor packets
+
+        <ansicyan><b>wireshark</b> <i>["on" | "off"]</i></ansicyan>
+
+        This command launches a wireshark that will display all the packets sent
+        and received in the active connection.
         """
 
         if len(args) < 1:
@@ -153,8 +157,11 @@ class AntPlusSensorShell(InteractiveShell):
 
     @category("Device interaction")
     def do_start(self, args):
-        """
-        Start the ANT+ sensor.
+        """Start the ANT+ sensor.
+
+        <ansicyan><b>start</b></ansicyan>
+        
+        Start the ANT+ sensor. 
         """
 
         if self.__interface is None:
@@ -210,8 +217,11 @@ class AntPlusSensorShell(InteractiveShell):
  
     @category("Device interaction")
     def do_stop(self, args):
-        """
-        Stop the ANT+ sensor.
+        """Stop the ANT+ sensor.
+
+        <ansicyan><b>stop</b></ansicyan>
+        
+        Stop the ANT+ sensor. 
         """
 
         if self.__connector is None:
@@ -299,7 +309,10 @@ class AntPlusSensorShell(InteractiveShell):
 
     @category("Device interaction")
     def do_profile(self, args):
-        """
+        """Show profile attributes and data pages.
+
+        <ansicyan><b>profile</b></ansicyan>
+        
         Show profile attributes and data pages.
         """
 
@@ -307,7 +320,7 @@ class AntPlusSensorShell(InteractiveShell):
             self.error("No profile selected.")
             return
 
-        attributes, interactions = self.get_profile_content()
+        attributes, _ = self.get_profile_content()
 
         print_formatted_text(
             HTML("<green><b>Attributes</b></green>")
@@ -373,8 +386,11 @@ class AntPlusSensorShell(InteractiveShell):
 
     @category("Device interaction")
     def do_get(self, args):
-        """
-        Get an attribute value.
+        """Get local attribute value from profile if the channel is started.
+
+        <ansicyan><b>get</b> <i>attribute_name</i></ansicyan>
+
+        Get attribute value from profile if the channel is started.
         """
 
         if self.__profile is None:
@@ -417,11 +433,11 @@ class AntPlusSensorShell(InteractiveShell):
 
     @category("Device interaction")
     def do_set(self, args):
-        """
-        Set the value of a profile attribute.
+        """Set the value of a profile attribute.
 
-        Usage:
-            set <attribute> <value>
+        <ansicyan><b>set</b> <i>attribute_name</i></ansicyan>
+
+        Set the value of a profile attribute if the channel is started.
         """
 
         if self.__profile is None:
@@ -498,10 +514,13 @@ class AntPlusSensorShell(InteractiveShell):
 
     @category("Device interaction")
     def do_monitor(self, args):
-        """
-        Monitor an attribute.
-        """
+        """Monitor the local attribute value from profile if a channel is started.
 
+        <ansicyan><b>monitor</b> <i>attribute_name</i></ansicyan>
+
+        Monitor the local attribute value from profile if a channel is started.
+        Note this command only monitors **local** changes potentially performed by the selected profile.
+        """
         if self.__profile is None:
             self.error("No profile selected.")
             return
@@ -541,8 +560,11 @@ class AntPlusSensorShell(InteractiveShell):
 
     @category("Device interaction")
     def do_reset(self, args):
-        """
-        Reset profile values.
+        """Reset the profile.
+        <ansicyan><b>reset</b></ansicyan>
+
+        Reset the profile. 
+        This command will reset the profile attributes to their default values. 
         """
 
         if self.__profile is None:
@@ -579,8 +601,11 @@ class AntPlusSensorShell(InteractiveShell):
 
     @category("Device interaction")
     def do_send(self, args):
-        """
-        Send a specific data page.
+        """Manually send a specific data page.
+        <ansicyan><b>send</b> <i>page</i></ansicyan>
+
+        Manually send a specific data page, according to its page number or name.
+        It will force the transmission of a specific data page by the sensor.
         """
 
         if self.__profile is None:
@@ -639,3 +664,28 @@ class AntPlusSensorShell(InteractiveShell):
 
     def get_device_type(self):
         return self.__device_type
+
+
+
+    def do_quit(self, args):
+        """Exit <b>wantplus-sensor</b> CLI tool.
+        
+        <ansicyan><b>exit</b></ansicyan>
+        
+        Exit <b>wantplus-sensor</b> CLI tool.
+        """
+        if self.__connector is not None:
+            self.__connector.stop()
+        if self.__interface is not None:
+            self.__interface.close()
+        self.stop()
+
+    def do_exit(self, arg):
+        """Exit <b>wantplus-sensor</b> CLI tool (alias for quit).
+        
+        <ansicyan><b>quit</b></ansicyan>
+        
+        Exit <b>wantplus-sensor</b> CLI tool.
+        """
+        return self.do_quit(arg)
+
