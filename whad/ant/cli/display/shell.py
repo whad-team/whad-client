@@ -488,11 +488,11 @@ class AntPlusDisplayShell(InteractiveShell):
         self.stop()
 
     def do_exit(self, arg):
-        """Exit <b>wantplus_display</b> CLI tool (alias for quit).
+        """Exit <b>wantplus-display</b> CLI tool (alias for quit).
         
         <ansicyan><b>quit</b></ansicyan>
         
-        Exit <b>wantplus_display</b> CLI tool.
+        Exit <b>wantplus-display</b> CLI tool.
         """
         return self.do_quit(arg)
 
