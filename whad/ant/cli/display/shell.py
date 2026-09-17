@@ -111,15 +111,18 @@ class AntPlusDisplayShell(InteractiveShell):
         <ansicyan><b>scan</b></ansicyan>
 
         Scan surrounding ANT+ devices and display discovered device types.
+        
+        <i>
         Currently supported device types:
-         - 119: Weight Scale
-         - 120: Heart Rate Monitor
-         - 121: Combined Speed and Cadence
-         - 122: Bike Cadence Sensor
-         - 123: Bike Speed Sensor
-         - 124: Speed & Distance
-
-        You can stop a scan by hitting <b>CTL-c</b> at any time.
+            - <b>119:</b> Weight Scale
+            - <b>120:</b> Heart Rate Monitor
+            - <b>121:</b> Combined Speed and Cadence
+            - <b>122:</b> Bike Cadence Sensor
+            - <b>123:</b> Bike Speed Sensor
+            - <b>124:</b> Speed and Distance
+        </i>
+         
+        Scan can be stopped by hitting [CTRL + C]. 
         """
         if self.__wireshark is not None:
             self.__wireshark.stop()
@@ -133,7 +136,16 @@ class AntPlusDisplayShell(InteractiveShell):
         try:
             print_formatted_text(HTML('<ansigreen>RSSI Lvl   Dev. Num.     Dev. Type    Trans. Type      Profile</ansigreen>'))
             for device in self.__connector.discover_devices():
-                print("[ "+str(device.rssi)+" dBm] " + str(device.device_number) + "          " + str(device.device_type)+"          " + str(device.transmission_type) + "                " + device.profile)
+                print(
+                    "[ "+str(device.rssi)+" dBm] " + 
+                    str(device.device_number) + 
+                    "          " + 
+                    str(device.device_type)+
+                    "          " + 
+                    str(device.transmission_type) + 
+                    "                " + 
+                    device.profile
+                )
                 self.__detected_devices_cache.append(device)
                 self.__detected_devices_cache = list(set(self.__detected_devices_cache))
         except KeyboardInterrupt:
@@ -286,10 +298,11 @@ class AntPlusDisplayShell(InteractiveShell):
 
     @category("Device interaction")
     def do_profile(self, args):
-        """Show profile attributes and available interactions.
+        """Show profile attributes and available data pages.
 
         <ansicyan><b>profile</b></ansicyan>
 
+        Show all profile attributes.
         """
         if (
             self.__connector is not None and
@@ -331,6 +344,8 @@ class AntPlusDisplayShell(InteractiveShell):
 
         <ansicyan><b>get</b> <i>attribute_name</i></ansicyan>
 
+        Get attribute value from profile if a device is connected.
+
         """
         if (
             self.__connector is not None and
@@ -363,8 +378,9 @@ class AntPlusDisplayShell(InteractiveShell):
     def do_monitor(self, args):
         """Monitor attribute value from profile if a device is connected.
 
-        <ansicyan><b>get</b> <i>attribute_name</i></ansicyan>
+        <ansicyan><b>monitor</b> <i>attribute_name</i></ansicyan>
 
+        Monitor attribute value from profile if a device is connected.
         """
         # Check that we have at least one parameter set.
         if len(args) == 0:
@@ -410,10 +426,11 @@ class AntPlusDisplayShell(InteractiveShell):
 
     @category("Device interaction")
     def do_request(self, args):
-        """Request a generic information if device is connected.
+        """Request a specific data-page information if the device is connected and update the associated attributes.
 
         <ansicyan><b>request</b> <i>attribute_name</i></ansicyan>
-
+        
+        Request a specific data-page information if the device is connected and update the associated attributes.
         """
         # If no parameters provided, display an error and do not process.
         if len(args) == 0:
@@ -458,7 +475,11 @@ class AntPlusDisplayShell(InteractiveShell):
         return self.__profile
 
     def do_quit(self, args):
-        """close wble-central
+        """Exit <b>wantplus_display</b> CLI tool.
+        
+        <ansicyan><b>exit</b></ansicyan>
+        
+        Exit <b>wantplus_display</b> CLI tool.
         """
         if self.__connector is not None:
             self.__connector.stop()
@@ -467,7 +488,11 @@ class AntPlusDisplayShell(InteractiveShell):
         self.stop()
 
     def do_exit(self, arg):
-        """alias for <ansicyan>quit</ansicyan>
+        """Exit <b>wantplus_display</b> CLI tool (alias for quit).
+        
+        <ansicyan><b>quit</b></ansicyan>
+        
+        Exit <b>wantplus_display</b> CLI tool.
         """
         return self.do_quit(arg)
 
