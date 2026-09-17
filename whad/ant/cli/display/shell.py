@@ -1,19 +1,15 @@
 """ANT+ Display tool interactive shell.
 """
-import html
 import string
 import inspect
 from time import sleep
-from typing import List
+from typing import Union, Optional
 
 from prompt_toolkit import print_formatted_text, HTML
 
-from whad.device import WhadDevice, WhadDeviceConnector
-from whad.ant import ANT, Slave, Scanner
-from whad.ant.stack.app.profiles.antplus.hrm import HeartRateDisplay
-from whad.ant.stack.app.profiles.antplus.bsc import CombinedSpeedAndCadenceDisplay
+from whad.device import Device
+from whad.ant import Slave, Scanner
 from whad.ant.stack.app.profiles.antplus import find_slave_profile
-from whad.scapy.layers.ant import ANT_PLUS_PROFILES
 
 from whad.common.monitors import WiresharkMonitor
 from whad.exceptions import ExternalToolNotFound
@@ -29,8 +25,8 @@ class AntPlusDisplayShell(InteractiveShell):
     """ANT+ Display interactive shell
     """
 
-    def __init__(self, interface: WhadDevice = None, connector=None):
-        super().__init__(HTML("<b>wantplus-display></b>"))
+    def __init__(self, interface: Device = None, connector=None):
+        super().__init__(HTML("<b>wantplus-display></b> "))
 
         # If interface is None, pick the first matching our needs
         self.__interface = interface
@@ -43,7 +39,7 @@ class AntPlusDisplayShell(InteractiveShell):
         # If connector is not provided
         if connector is None:
             # Reset target info and connector.
-            self.__connector: Slave = None
+            self.__connector: Optional[Union[Slave, Scanner]] = None
             self.__device_type = None
         else:
             # If connector provided, consider the device already connected
@@ -115,15 +111,18 @@ class AntPlusDisplayShell(InteractiveShell):
         <ansicyan><b>scan</b></ansicyan>
 
         Scan surrounding ANT+ devices and display discovered device types.
+        
+        <i>
         Currently supported device types:
-         - 119: Weight Scale
-         - 120: Heart Rate Monitor
-         - 121: Combined Speed and Cadence
-         - 122: Bike Cadence Sensor
-         - 123: Bike Speed Sensor
-         - 124: Speed & Distance
-
-        You can stop a scan by hitting <b>CTL-c</b> at any time.
+            - <b>119:</b> Weight Scale
+            - <b>120:</b> Heart Rate Monitor
+            - <b>121:</b> Combined Speed and Cadence
+            - <b>122:</b> Bike Cadence Sensor
+            - <b>123:</b> Bike Speed Sensor
+            - <b>124:</b> Speed and Distance
+        </i>
+         
+        Scan can be stopped by hitting [CTRL + C]. 
         """
         if self.__wireshark is not None:
             self.__wireshark.stop()
@@ -137,16 +136,26 @@ class AntPlusDisplayShell(InteractiveShell):
         try:
             print_formatted_text(HTML('<ansigreen>RSSI Lvl   Dev. Num.     Dev. Type    Trans. Type      Profile</ansigreen>'))
             for device in self.__connector.discover_devices():
-                print("[ "+str(device.rssi)+" dBm] " + str(device.device_number) + "          " + str(device.device_type)+"          " + str(device.transmission_type) + "                " + device.profile)
+                print(
+                    "[ "+str(device.rssi)+" dBm] " + 
+                    str(device.device_number) + 
+                    "          " + 
+                    str(device.device_type)+
+                    "          " + 
+                    str(device.transmission_type) + 
+                    "                " + 
+                    device.profile
+                )
                 self.__detected_devices_cache.append(device)
                 self.__detected_devices_cache = list(set(self.__detected_devices_cache))
         except KeyboardInterrupt:
-
+            print("\rScan terminated by user.")
             if self.__wireshark is not None:
                 self.__wireshark.stop()
                 self.__wireshark.detach()
-                
+
             self.__connector.stop()
+            self.__connector = None
             #self.__connector.close()
 
     def complete_connect(self):
@@ -205,7 +214,7 @@ class AntPlusDisplayShell(InteractiveShell):
                 self.__device_type = device.device_type
                 self.__transmission_type = device.transmission_type
                 self.__profile = find_slave_profile(self.__device_type)()
-                
+
         # Create profile and slave connector
         try:
             self.__connector = Slave(self.__interface, profile=self.__profile)
@@ -219,7 +228,7 @@ class AntPlusDisplayShell(InteractiveShell):
                 self.__wireshark.attach(self.__connector)
                 self.__wireshark.start()
 
-            
+
             # Start the profile
             self.__active_channel = self.__connector.search_channel(
                 device_number=device_number,
@@ -229,7 +238,7 @@ class AntPlusDisplayShell(InteractiveShell):
             self.__profile.start()
             print(f"Connected to {str(self.__profile)} (device number {hex(device_number)}).")
             print(f"Listening for data... Press CTL-c to stop.")
-            
+
             self.update_prompt()
 
         except Exception as e:
@@ -289,16 +298,17 @@ class AntPlusDisplayShell(InteractiveShell):
 
     @category("Device interaction")
     def do_profile(self, args):
-        """Show profile attributes and available interactions. 
+        """Show profile attributes and available data pages.
 
         <ansicyan><b>profile</b></ansicyan>
 
+        Show all profile attributes.
         """
         if (
-            self.__connector is not None and 
+            self.__connector is not None and
             self.__profile is not None
         ):
-            
+
             attributes, interactions = self.get_profile_content()
             print_formatted_text(HTML("<green><b>Attributes </b></green>"))
             for attribute in attributes:
@@ -330,17 +340,19 @@ class AntPlusDisplayShell(InteractiveShell):
 
     @category("Device interaction")
     def do_get(self, args):
-        """Get attribute value from profile if a device is connected. 
+        """Get attribute value from profile if a device is connected.
 
         <ansicyan><b>get</b> <i>attribute_name</i></ansicyan>
 
+        Get attribute value from profile if a device is connected.
+
         """
         if (
-            self.__connector is not None and 
+            self.__connector is not None and
             self.__profile is not None
         ):
-            
-            attributes, interactions = self.get_profile_content()
+
+            attributes, _ = self.get_profile_content()
             selected_attribute = args[0]
 
             if selected_attribute in attributes:
@@ -364,17 +376,24 @@ class AntPlusDisplayShell(InteractiveShell):
 
     @category("Device interaction")
     def do_monitor(self, args):
-        """Monitor attribute value from profile if a device is connected. 
+        """Monitor attribute value from profile if a device is connected.
 
-        <ansicyan><b>get</b> <i>attribute_name</i></ansicyan>
+        <ansicyan><b>monitor</b> <i>attribute_name</i></ansicyan>
 
+        Monitor attribute value from profile if a device is connected.
         """
+        # Check that we have at least one parameter set.
+        if len(args) == 0:
+            self.error("Missing attribute name, see help monitor.")
+            return
+
+        # Process parameter.
         if (
-            self.__connector is not None and 
+            self.__connector is not None and
             self.__profile is not None
         ):
-            
-            attributes, interactions = self.get_profile_content()
+
+            attributes, _ = self.get_profile_content()
             selected_attribute = args[0]
 
             if selected_attribute in attributes:
@@ -395,10 +414,6 @@ class AntPlusDisplayShell(InteractiveShell):
         else:
             self.error("Not connected.")
 
-
-
-
-
     def complete_request(self):
         """Autocomplete the 'request' command with data pages.
         """
@@ -411,13 +426,19 @@ class AntPlusDisplayShell(InteractiveShell):
 
     @category("Device interaction")
     def do_request(self, args):
-        """Request a generic information if device is connected. 
+        """Request a specific data-page information if the device is connected and update the associated attributes.
 
         <ansicyan><b>request</b> <i>attribute_name</i></ansicyan>
-
+        
+        Request a specific data-page information if the device is connected and update the associated attributes.
         """
+        # If no parameters provided, display an error and do not process.
+        if len(args) == 0:
+            self.error("Missing attribute name, see help request.")
+            return
+
         if (
-            self.__connector is not None and 
+            self.__connector is not None and
             self.__profile is not None
         ):
             requested_page_number = None
@@ -452,3 +473,26 @@ class AntPlusDisplayShell(InteractiveShell):
         """Return the current profile.
         """
         return self.__profile
+
+    def do_quit(self, args):
+        """Exit <b>wantplus_display</b> CLI tool.
+        
+        <ansicyan><b>exit</b></ansicyan>
+        
+        Exit <b>wantplus_display</b> CLI tool.
+        """
+        if self.__connector is not None:
+            self.__connector.stop()
+        if self.__interface is not None:
+            self.__interface.close()
+        self.stop()
+
+    def do_exit(self, arg):
+        """Exit <b>wantplus-display</b> CLI tool (alias for quit).
+        
+        <ansicyan><b>quit</b></ansicyan>
+        
+        Exit <b>wantplus-display</b> CLI tool.
+        """
+        return self.do_quit(arg)
+

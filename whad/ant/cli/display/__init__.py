@@ -58,7 +58,6 @@ class AntPlusDisplayApp(CommandLineApp):
         self.pre_run()
 
         logger.debug("Executing main code")
-        
         if self.args.script is not None:
             if self.is_piped_interface():
                 # Make sure we have all the required parameters
@@ -88,8 +87,8 @@ class AntPlusDisplayApp(CommandLineApp):
             if self.interface is not None:
                 myshell = AntPlusDisplayShell(self.interface)
                 myshell.run()
-
-        super().run(pre=False, post=False)
+            else:
+                super().run(pre=False, post=False)
 
         # Launch post-run tasks
         logger.debug("Executing post-run hook")

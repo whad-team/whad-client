@@ -62,6 +62,7 @@ class BTMeshGenericProvisioningTest(object):
 
     @pytest.fixture(scope="class")
     def pb_adv_layer(self):
+        PBAdvMock.add(GenericProvisioningLayerProvisionee)
         return PBAdvMock()
 
 
@@ -290,7 +291,7 @@ class TestBTMeshGenericProvisioning(BTMeshGenericProvisioningTest):
         )
         trans_nb = 129
 
-        sleep(0.1)
+        sleep(0.5)
 
         assert pb_adv_layer.expect(
             LayerMessage(
