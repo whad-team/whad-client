@@ -51,6 +51,9 @@ The controller applies this address while its firmware and configuration are
 downloaded, so an uncompressed ``rtl8761bu_fw.bin`` is required.  Place that
 file, and the ``rtl8761bu_config.bin`` containing the BDADDR change configuration, 
 in a directory selected by the ``WHAD_RTK_FIRMWARE_DIR`` environment variable.  
+When that variable is unset, WHAD searches the kernel-configured firmware root,
+``/lib/firmware/rtl_bt``, ``/usr/lib/firmware/rtl_bt``, and
+``/run/current-system/firmware/rtl_bt`` on NixOS.
 The address is verified by reading it back before the operation succeeds.  
 A USB power cycle lets the operating-system driver reload its normal persistent 
 configuration.

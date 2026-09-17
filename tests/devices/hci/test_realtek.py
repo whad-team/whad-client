@@ -2,6 +2,7 @@
 
 import struct
 from collections import deque
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -14,6 +15,7 @@ from scapy.layers.bluetooth import (
 )
 
 import whad.device.hci as hci_module
+import whad.device.hci.realtek as realtek_module
 from whad.device.hci import (
     HCIUnsupportedCommand,
     Hci,
@@ -413,6 +415,94 @@ def test_loader_rejects_missing_firmware(tmp_path, monkeypatch):
         load_rtl8761bu_images()
 
 
+def test_loader_searches_kernel_configured_firmware_root_first(
+    tmp_path, monkeypatch
+):
+    configured_root = tmp_path / "configured"
+    configured_dir = configured_root / "rtl_bt"
+    configured_dir.mkdir(parents=True)
+    (configured_dir / RTK_FIRMWARE_NAME_8761BU).write_bytes(
+        _epatch(version=0x11112222)
+    )
+
+    fallback_dir = tmp_path / "fallback"
+    fallback_dir.mkdir()
+    (fallback_dir / RTK_FIRMWARE_NAME_8761BU).write_bytes(
+        _epatch(version=0x33334444)
+    )
+
+    firmware_class_path = tmp_path / "firmware_class_path"
+    firmware_class_path.write_text(str(configured_root), encoding="utf-8")
+    monkeypatch.delenv(RTK_FIRMWARE_DIR_ENV, raising=False)
+    monkeypatch.setattr(
+        realtek_module, "RTK_FIRMWARE_CLASS_PATH", firmware_class_path
+    )
+    monkeypatch.setattr(
+        realtek_module, "RTK_FIRMWARE_SEARCH_DIRS", (fallback_dir,)
+    )
+
+    firmware, _ = load_rtl8761bu_images()
+
+    assert firmware.version == 0x11112222
+
+
+def test_loader_searches_later_distribution_firmware_directory(
+    tmp_path, monkeypatch
+):
+    firmware_dir = tmp_path / "usr" / "lib" / "firmware" / "rtl_bt"
+    firmware_dir.mkdir(parents=True)
+    (firmware_dir / RTK_FIRMWARE_NAME_8761BU).write_bytes(
+        _epatch(version=0x55556666)
+    )
+
+    monkeypatch.delenv(RTK_FIRMWARE_DIR_ENV, raising=False)
+    monkeypatch.setattr(
+        realtek_module,
+        "RTK_FIRMWARE_CLASS_PATH",
+        tmp_path / "missing-firmware-class-path",
+    )
+    monkeypatch.setattr(
+        realtek_module,
+        "RTK_FIRMWARE_SEARCH_DIRS",
+        (tmp_path / "missing", firmware_dir),
+    )
+
+    firmware, _ = load_rtl8761bu_images()
+
+    assert firmware.version == 0x55556666
+
+
+def test_loader_environment_directory_remains_an_override(tmp_path, monkeypatch):
+    fallback_dir = tmp_path / "fallback"
+    fallback_dir.mkdir()
+    (fallback_dir / RTK_FIRMWARE_NAME_8761BU).write_bytes(_epatch())
+
+    override_dir = tmp_path / "override"
+    override_dir.mkdir()
+    monkeypatch.setenv(RTK_FIRMWARE_DIR_ENV, str(override_dir))
+    monkeypatch.setattr(
+        realtek_module, "RTK_FIRMWARE_SEARCH_DIRS", (fallback_dir,)
+    )
+
+    with pytest.raises(RealtekFirmwareError, match=RTK_FIRMWARE_NAME_8761BU):
+        load_rtl8761bu_images()
+
+
+def test_loader_wraps_firmware_read_errors(tmp_path, monkeypatch):
+    (tmp_path / RTK_FIRMWARE_NAME_8761BU).write_bytes(_epatch())
+    monkeypatch.setenv(RTK_FIRMWARE_DIR_ENV, str(tmp_path))
+
+    def fail_read(_path):
+        raise OSError("permission denied")
+
+    monkeypatch.setattr(Path, "read_bytes", fail_read)
+
+    with pytest.raises(RealtekFirmwareError, match="could not be read") as error:
+        load_rtl8761bu_images()
+
+    assert isinstance(error.value.__cause__, OSError)
+
+
 @pytest.mark.parametrize(
     ("length", "expected_lengths", "expected_indices"),
     (
@@ -705,6 +795,48 @@ def test_failed_stock_rollback_returns_false_without_masking_original_failure(
     assert [call[2] for call in calls] == [target, original]
     assert calls[1][1] is base_config
     assert device._bd_address.value == original
+
+
+def test_unexpected_setup_exception_is_not_swallowed(monkeypatch):
+    target = bytes.fromhex("a8 25 19 f3 38 44")
+    device = _device_with_address(bytes.fromhex("92 27 41 4c e0 00"))
+
+    def fail_load():
+        raise RuntimeError("unexpected setup failure")
+
+    monkeypatch.setattr(hci_module, "load_rtl8761bu_images", fail_load)
+
+    with pytest.raises(RuntimeError, match="unexpected setup failure"):
+        device._set_realtek_public_bd_address(
+            target, _version_response(0x12345678)
+        )
+
+
+def test_unexpected_rollback_exception_is_not_swallowed(monkeypatch):
+    original = bytes.fromhex("92 27 41 4c e0 00")
+    target = bytes.fromhex("a8 25 19 f3 38 44")
+    device = _device_with_address(original)
+    firmware = RealtekFirmware(_epatch(version=0x12345678))
+    base_config = RealtekConfig().with_bd_address(original)
+    calls = []
+
+    def fail_download(firmware_arg, config_arg, expected_address=None):
+        calls.append((firmware_arg, config_arg, expected_address))
+        if len(calls) == 1:
+            raise RealtekFirmwareError("expected setup failure")
+        raise RuntimeError("unexpected rollback failure")
+
+    monkeypatch.setattr(device, "_download_realtek_firmware", fail_download)
+    monkeypatch.setattr(
+        hci_module, "load_rtl8761bu_images", lambda: (firmware, base_config)
+    )
+
+    with pytest.raises(RuntimeError, match="unexpected rollback failure"):
+        device._set_realtek_public_bd_address(
+            target, _version_response(firmware.version)
+        )
+
+    assert [call[2] for call in calls] == [target, original]
 
 
 def test_public_address_command_timeout_returns_false_without_attribute_error(
