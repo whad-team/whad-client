@@ -36,10 +36,10 @@ from whad.scapy.layers.bluetooth import HCI_Cmd_LE_Complete_Read_Buffer_Size, \
 # Whad custom layers
 from whad.scapy.layers.hci import HCI_VERSIONS, BT_MANUFACTURERS, \
     HCI_Cmd_LE_Read_Supported_States, \
-    HCI_Cmd_Complete_LE_Read_Supported_States, HCI_Cmd_CSR_Write_BD_Address, HCI_Cmd_CSR_Reset, \
-    HCI_Cmd_TI_Write_BD_Address, HCI_Cmd_BCM_Write_BD_Address, HCI_Cmd_Zeevo_Write_BD_Address, \
-    HCI_Cmd_Ericsson_Write_BD_Address, HCI_Cmd_ST_Write_BD_Address, \
-    HCI_Cmd_LE_Set_Host_Channel_Classification
+    HCI_Cmd_Complete_LE_Read_Supported_States, \
+    HCI_Cmd_LE_Set_Host_Channel_Classification, HCI_Cmd_Realtek_Read_ROM_Version, \
+    HCI_Cmd_Complete_Realtek_Read_ROM_Version, HCI_Cmd_Realtek_Download, \
+    HCI_Cmd_Complete_Realtek_Download, HCI_Cmd_Realtek_Drop_Firmware
 
 # Whad
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
@@ -54,10 +54,14 @@ from whad.hub.ble import Direction as BleDirection, Commands, AddressType, BDAdd
 from ..device import VirtualDevice
 from .converter import HCIConverter
 from .hciconfig import HCIConfig
-from .constants import LE_STATES, ADDRESS_MODIFICATION_VENDORS, HCIInternalState, \
-    HCIConnectionState
+from .constants import LE_STATES, HCIInternalState, HCIConnectionState
+from .realtek import RealtekFirmwareError, RTK_PROJECT_ID_8761B, RTK_ROM_LMP_8761A, \
+    iter_download_fragments, load_rtl8761bu_images
 
 logger = logging.getLogger(__name__)
+
+REALTEK_COMPANY_IDENTIFIER = 0x005D
+REALTEK_COMMAND_TIMEOUT = 10.0
 
 def get_hci(index):
     '''
@@ -478,7 +482,7 @@ class Hci(VirtualDevice):
             logger.debug("[hci] response code: 0x%04x", response.code)
         return response.num_handles == 1 and response.num_completed_packets_list[0] == 1
 
-    def _write_command(self, command, from_queue=True):
+    def _write_command(self, command, from_queue=True, timeout=None):
         """
         Writes an HCI command and returns the response.
         """
@@ -503,13 +507,16 @@ class Hci(VirtualDevice):
 
             # And we wait for a response to be sent to our reception queue
             logger.debug("[%s][write_command] Waiting for response ...", self.interface)
-            response = self._wait_response()
-            while response.opcode != hci_command[HCI_Command_Hdr].opcode:
+            response = self._wait_response(timeout=timeout)
+            while (
+                response is not None
+                and response.opcode != hci_command[HCI_Command_Hdr].opcode
+            ):
                 logger.debug("[%s][write_command] Received response with opcode %d", self.interface, response.opcode)
-                response = self._wait_response()
-            logger.debug("[%s][write_command] Response received.", self.interface)
-
+                response = self._wait_response(timeout=timeout)
             if response is not None:
+                logger.debug("[%s][write_command] Response received.", self.interface)
+
                 logger.debug("[%s] HCI write command returned status %d",
                             self.interface, response.status)
         else:
@@ -531,6 +538,15 @@ class Hci(VirtualDevice):
             response = event
 
         return response
+
+    def _write_command_without_response(self, command):
+        """Write an HCI command for which the controller sends no event."""
+        hci_command = HCI_Hdr()/HCI_Command_Hdr()/command
+        self.__lock.acquire()
+        try:
+            self.__socket.send(hci_command)
+        finally:
+            self.__lock.release()
 
     def reset(self):
         """
@@ -955,80 +971,166 @@ class Hci(VirtualDevice):
         logger.debug("[%s] Unsupported HCI interface.")
         raise WhadDeviceNotReady()
 
-    @req_cmd("le_set_random_address")
+    def _download_realtek_firmware(self, firmware, config, expected_address=None):
+        """Drop and reload RTL8761BU firmware with ``config`` appended."""
+        self._write_command_without_response(HCI_Cmd_Realtek_Drop_Firmware())
+        sleep(0.2)
+
+        reset_response = self._write_command(
+            HCI_Cmd_Reset(), timeout=REALTEK_COMMAND_TIMEOUT
+        )
+        if reset_response is None or reset_response.status != 0x00:
+            raise RealtekFirmwareError("controller did not reset into Realtek ROM")
+
+        version_response = self._write_command(
+            HCI_Cmd_Read_Local_Version_Information(),
+            timeout=REALTEK_COMMAND_TIMEOUT
+        )
+        if (
+            version_response is None
+            or version_response.status != 0x00
+            or version_response.company_identifier != REALTEK_COMPANY_IDENTIFIER
+            or version_response.lmp_subversion != RTK_ROM_LMP_8761A
+            or version_response.hci_version != 0x0A
+            or version_response.hci_subversion != 0x000B
+        ):
+            raise RealtekFirmwareError("controller is not supported RTL8761BU ROM")
+
+        rom_response = self._write_command(
+            HCI_Cmd_Realtek_Read_ROM_Version(), timeout=REALTEK_COMMAND_TIMEOUT
+        )
+        if (
+            rom_response is None
+            or rom_response.status != 0x00
+            or HCI_Cmd_Complete_Realtek_Read_ROM_Version not in rom_response
+        ):
+            raise RealtekFirmwareError("controller ROM revision could not be read")
+        rom_version = rom_response[HCI_Cmd_Complete_Realtek_Read_ROM_Version].version
+
+        patch = firmware.patch_for_rom(rom_version)
+        payload = patch.payload + config.to_bytes()
+        for index, fragment in iter_download_fragments(payload):
+            response = self._write_command(
+                HCI_Cmd_Realtek_Download(index=index, data=fragment),
+                timeout=REALTEK_COMMAND_TIMEOUT
+            )
+            if (
+                response is None
+                or response.status != 0x00
+                or HCI_Cmd_Complete_Realtek_Download not in response
+                or response[HCI_Cmd_Complete_Realtek_Download].index != index
+            ):
+                raise RealtekFirmwareError(
+                    "controller rejected Realtek firmware fragment"
+                )
+
+        sleep(0.2)
+        loaded_response = self._write_command(
+            HCI_Cmd_Read_Local_Version_Information(),
+            timeout=REALTEK_COMMAND_TIMEOUT
+        )
+        if (
+            loaded_response is None
+            or loaded_response.status != 0x00
+            or loaded_response.company_identifier != REALTEK_COMPANY_IDENTIFIER
+            or (
+                (loaded_response.hci_subversion << 16)
+                | loaded_response.lmp_subversion
+            ) != firmware.version
+        ):
+            raise RealtekFirmwareError("Realtek firmware version verification failed")
+
+        if not self._initialize():
+            raise RealtekFirmwareError("controller reinitialization failed")
+
+        if expected_address is not None:
+            if self._bd_address is None or self._bd_address.value != expected_address:
+                raise RealtekFirmwareError("public Bluetooth address readback failed")
+
+    def _set_realtek_public_bd_address(self, bd_address, current_version):
+        """Set and verify an ephemeral RTL8761BU public address."""
+        firmware = None
+        base_config = None
+        download_started = False
+        try:
+            firmware, base_config = load_rtl8761bu_images()
+            if firmware.project_id != RTK_PROJECT_ID_8761B:
+                raise RealtekFirmwareError("firmware is not an RTL8761B image")
+            current_firmware_version = (
+                (current_version.hci_subversion << 16)
+                | current_version.lmp_subversion
+            )
+            is_loaded_image = current_firmware_version == firmware.version
+            is_cold_rom = (
+                current_version.hci_version == 0x0A
+                and current_version.hci_subversion == 0x000B
+                and current_version.lmp_subversion == RTK_ROM_LMP_8761A
+            )
+            if not (is_loaded_image or is_cold_rom):
+                raise RealtekFirmwareError("controller is not supported RTL8761BU")
+
+            if self._bd_address is None:
+                raise RealtekFirmwareError("current public address is unavailable")
+            original_address = self._bd_address.value
+            custom_config = base_config.with_bd_address(bd_address)
+            download_started = True
+            self._download_realtek_firmware(
+                firmware, custom_config, expected_address=bd_address
+            )
+        except RealtekFirmwareError:
+            logger.exception(
+                "[%s] Failed to configure Realtek public Bluetooth address",
+                self.interface
+            )
+            if download_started:
+                try:
+                    self._download_realtek_firmware(
+                        firmware, base_config, expected_address=original_address
+                    )
+                    self._bd_address_type = AddressType.PUBLIC
+                    self._dev_id = self._generate_dev_id()
+                except RealtekFirmwareError:
+                    logger.exception(
+                        "[%s] Failed to restore the stock Realtek configuration",
+                        self.interface
+                    )
+            return False
+
+        self._bd_address_type = AddressType.PUBLIC
+        self._dev_id = self._generate_dev_id()
+        return True
+
     def _set_bd_address(self, bd_address: bytes = b"\x55\x44\x33\x22\x11\x00",
                         bd_address_type: int = AddressType.RANDOM) -> bool:
         """
         Modify the BD address (if supported by the HCI device).
         """
-        logger.debug("[%s] Setting HCI adapter random address to %s ...", self.interface, 
-                     BDAddress(bd_address))
+        target_address = BDAddress(
+            bd_address, random=(bd_address_type == AddressType.RANDOM)
+        )
 
-        # Disabled for now
-        if False and bd_address_type == AddressType.PUBLIC:
-            _, self._manufacturer = self._read_local_version_information()
-            if self._manufacturer in ADDRESS_MODIFICATION_VENDORS:
-                logger.info("[i] Address modification supported !")
-                if self._manufacturer == b'Qualcomm Technologies International, Ltd. (QTIL)':
-                    # Keep in cache existing devices
-                    existing_devices = devices = HCIConfig.list()
-
-                    # Write BD address and reset with vendor specific commands
-                    self._write_command(HCI_Cmd_CSR_Write_BD_Address(addr=bd_address),
-                                        from_queue=False)
-                    self._write_command(HCI_Cmd_CSR_Reset(), from_queue=False)
-
-                    # We are forced to close the socket and reopen it here...
-                    self.__socket.close()
-                    # Add a delay to prevent error
-                    sleep(0.5)
-
-                    # The index may have changed, find it automatically and reconfigure self.__index
-                    success = False
-                    while not success:
-                        devices = HCIConfig.list()
-                        if self.__index not in devices:
-                            for i in existing_devices:
-                                if i != self.__index:
-                                    devices.remove(i)
-                            if len(devices) > 0:
-                                self.__index = devices[0]
-                                success = True
-
-                    # If all goes right, we should be able to open a new socket
-                    self.__socket = get_hci(self.__index)
-                    # Initialize a new socket
-                    self._initialize()
-
-                else:
-                    # For the other manufacturers, we only need to pick the
-                    # right command and perform a reset
-                    bd_address_mod_map = {
-                        b'Texas Instruments Inc.' : HCI_Cmd_TI_Write_BD_Address,
-                        b'Broadcom Corporation' : HCI_Cmd_BCM_Write_BD_Address,
-                        b'Zeevo, Inc.' : HCI_Cmd_Zeevo_Write_BD_Address,
-                        b'Ericsson Technology Licensing' : HCI_Cmd_Ericsson_Write_BD_Address,
-                        b'Integrated System Solution Corp.' : HCI_Cmd_Ericsson_Write_BD_Address,
-                        b'ST Microelectronics' : HCI_Cmd_ST_Write_BD_Address
-                    }
-                    command = bd_address_mod_map[self._manufacturer](addr=bd_address)
-                    self._write_command(command, from_queue=False)
-                    self._reset()
-
-                # Check the modification success and re-generate device ID
-                self._bd_address = self._read_bd_address()
-                self._dev_id = self._generate_dev_id()
-                self._bd_address_type = AddressType.PUBLIC
-                return self._bd_address == bd_address
-
-            # Not supported !
-            logger.debug("Address modification not supported.")
-
-            # But at least we keep our address type
-            self._bd_address_type = bd_address_type
-            return False
+        if bd_address_type == AddressType.PUBLIC:
+            logger.debug(
+                "[%s] Setting HCI adapter public address to %s ...",
+                self.interface,
+                target_address
+            )
+            version_response = self._write_command(
+                HCI_Cmd_Read_Local_Version_Information(),
+                timeout=REALTEK_COMMAND_TIMEOUT
+            )
+            if (
+                version_response is None
+                or version_response.status != 0x00
+                or version_response.company_identifier != REALTEK_COMPANY_IDENTIFIER
+            ):
+                logger.debug("[%s] Public address modification is unsupported", self.interface)
+                return False
+            return self._set_realtek_public_bd_address(bd_address, version_response)
 
         if bd_address_type == BDAddress.RANDOM:
+            if not self.is_cmd_supported("le_set_random_address"):
+                raise HCIUnsupportedCommand("le_set_random_address")
             response = self._write_command(HCI_Cmd_LE_Set_Random_Address(address=bd_address))
             if response is not None and response.status == 0x00:
                 logger.debug("[%s] Random address successfully set to %s", self.interface, 
@@ -1564,4 +1666,3 @@ class Hci(VirtualDevice):
         else:
             logger.debug("HCI adapter does not support BD address spoofing")
             self._send_whad_command_result(CommandResult.ERROR)
-
