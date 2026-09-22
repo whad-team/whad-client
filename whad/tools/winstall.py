@@ -944,6 +944,8 @@ class WhadInstallApp(CommandLineApp):
         yardstickone_count = 0
         rfstorm_count = 0
         rzusbstick_count = 0
+        antstick_count = 0
+
         for device in usb.core.find(find_all=1):
             vid, pid = device.idVendor, device.idProduct
             if (vid == 0xffff and pid == 0x0004) or (vid == 0x1d50 and pid >= 0x6000 and pid <= 0x6003):
@@ -999,6 +1001,15 @@ class WhadInstallApp(CommandLineApp):
                 rzusbstick_count += 1
                 print()
 
+            elif (vid == 0x0fcf and pid in (0x1008, 0x1009)):
+                print_formatted_text(HTML(
+                    f"  - <b>ANTStick: </b> {antstick_count}"
+                ))
+                print_formatted_text(HTML(
+                    "    <u>Command (install rules):</u> <i>winstall --rules antstick </i>"
+                ))
+                antstick_count += 1
+                print()
         for device in os.listdir("/sys/class/bluetooth"):
             print_formatted_text(HTML(f"  - <b>HCI device: </b> {device}"))
             print_formatted_text(HTML(
@@ -1041,6 +1052,7 @@ class WhadInstallApp(CommandLineApp):
                     "nucleowl55",
                     "rzusbstick",
                     "yardstickone"
+                    "antstick"
                 ]
 
             # Iterate over devices
