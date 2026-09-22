@@ -63,7 +63,7 @@ class Slave(ANT):
 
     def search_channel(
         self,
-        device_number=0,
+        device_number=None,
         device_type=None,
         transmission_type=None,
         channel_period = None,
@@ -73,6 +73,14 @@ class Slave(ANT):
         shared = False,
         background = False
     ):
+
+        if (
+            device_number is None and
+            self.__profile is not None and 
+            hasattr(self.__profile, "DEVICE_NUMBER")
+        ):
+            device_number =  self.__profile.DEVICE_NUMBER
+            print("here")
 
         if device_type is None:
             device_type = (
@@ -130,7 +138,7 @@ class Slave(ANT):
                 if candidate_profile is not None:
                     self.__profile = candidate_profile()
                     channel.app.set_profile(self.__profile)
-                    
+            self.start()
         return channel 
                
 

@@ -63,7 +63,7 @@ class Master(ANT):
 
     def create_channel(
         self,
-        device_number=0,
+        device_number=None,
         device_type=None,
         transmission_type=None,
         channel_period = None,
@@ -74,6 +74,13 @@ class Master(ANT):
         background = False
     ):
 
+        if (
+            device_number is None and
+            self.__profile is not None and 
+            hasattr(self.__profile, "DEVICE_NUMBER")
+        ):
+            device_number =  self.__profile.DEVICE_NUMBER
+          
         if device_type is None:
             device_type = (
                 self.__profile.DEVICE_TYPE if 
@@ -123,13 +130,14 @@ class Master(ANT):
             self._enable_role()
             if self.__profile is not None:
                 channel.app.set_profile(self.__profile)
-
+        self.start()
         return channel 
                
 
     def start(self):
         """Start Master mode.
         """
+        super().start()
         self.__started = True
 
     def stop(self):

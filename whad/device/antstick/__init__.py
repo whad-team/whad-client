@@ -702,7 +702,7 @@ class ANTStick(VirtualDevice):
 
 
     def _assign_channel( self, channel_number:int = 0, channel_type:int = 0,
-                         network_number:int = 0, background_scanning:bool = False) -> bool:
+                         network_number:int = 0, background_scanning:bool = True) -> bool:
         '''Transmit a command to assign a given channel.
         
         This function will also update the channel internal structure of the virtual device.
@@ -724,18 +724,21 @@ class ANTStick(VirtualDevice):
 
         if self.__channels[channel_number].opened:
             self._close_channel(channel_number)
-        
+
+        if self.__channels[channel_number].status != ChannelStatus.UNASSIGNED:
+            self._unassign_channel(channel_number)
+
         # Send ANTStick command to assign ANT channel
         response = self._antstick_send_command(ANTStick_Command_Assign_Channel(
                 channel_number=channel_number, 
                 network_number=network_number, 
                 channel_type=channel_type
             )
-             / 
-            ANTStick_Extended_Assignment_Extension(
-                extended_assignment = 0x20 # | (0x01 if background_scanning else 0x00)
-            ) # for some reason transmission doesn't work without async mode so let's hardcode it
         )
+        ''' / 
+        ANTStick_Extended_Assignment_Extension(
+            extended_assignment = 0x20 # | (0x01 if background_scanning else 0x00)
+        )''' # for some reason transmission doesn't work without async mode so let's hardcode it
         #TODO: check if extended assignement can use background scanning or not
         # Update internal structure
         self.__channels[channel_number].status = ChannelStatus.ASSIGNED
@@ -911,7 +914,6 @@ class ANTStick(VirtualDevice):
         :return: boolean indicating if it has been successfully configured.
         :rtype: bool
         '''
-
         response = self._antstick_send_command(ANTStick_Command_Enable_Extended_Messages(
                 enable=(1 if enable else 0)
             )
@@ -1066,7 +1068,6 @@ class ANTStick(VirtualDevice):
         :rtype: ANTStick_Message
         '''
         data = bytes(ANTStick_Message() / command)
-        
 
         while True:
             try:
@@ -1159,12 +1160,20 @@ class ANTStick(VirtualDevice):
             if len(self.__in_buffer) <= 4:
                 break
 
+            '''
             if len(self.__in_buffer) < 2 + self.__in_buffer[1]:
                 break
 
             msg = self.__in_buffer[:len(self.__in_buffer) + 3]
-            
-            self.__in_buffer = self.__in_buffer[len(msg):]
+            '''
+            if len(self.__in_buffer) < 4 + self.__in_buffer[1]:
+                break
+
+            msg_len = 4 + self.__in_buffer[1]
+            msg = self.__in_buffer[:msg_len]
+            self.__in_buffer = self.__in_buffer[msg_len:]
+
+            #self.__in_buffer = self.__in_buffer[len(msg):]
 
             message_id = msg[2]
             if message_id in (
@@ -1173,6 +1182,7 @@ class ANTStick(VirtualDevice):
                 AntMessageIds.BURST_TRANSFER_DATA,
                 AntMessageIds.ADVANCED_BURST_TRANSFER_DATA
             ):
+
                 self.__pdu_queue.put(msg)
             elif (
                 message_id == AntMessageIds.RESPONSE_CHANNEL and
@@ -1381,7 +1391,7 @@ class ANTStick(VirtualDevice):
         
         if message.network_number not in self.__networks:
             self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
-
+        
         # Frequency agility, fast channel initiation & async transmission ignored for now
         if not self._assign_channel(
             channel_number = message.channel_number, 
@@ -1429,6 +1439,7 @@ class ANTStick(VirtualDevice):
         :type message: SetNetworkKey
         """
 
+        
         if message.network_number not in self.__networks:
             self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
 
@@ -1592,7 +1603,6 @@ class ANTStick(VirtualDevice):
         :type message: SendPdu
         """       
         packet = ANT_Hdr(message.pdu)
-
         if packet.broadcast == 1:
             logger.debug('Transmitting ANT Ack/Burst PDU: ' + repr(packet))
             # We have to transmit an ACK/Burst packet
@@ -1626,7 +1636,7 @@ class ANTStick(VirtualDevice):
 
                         channel_seq = burst.channel_number | sequence << 5
                         packet_data = data[i * 8 : i * 8 + 8]
-                        
+
                         # Send a command for each 8-byte length burst
                         self._antstick_send_command(
                             ANTStick_Data_Burst_Data(
@@ -1634,24 +1644,8 @@ class ANTStick(VirtualDevice):
                                 pdu = packet_data
                             ), no_response = True
                         )
-                    # Clean up the pending PDU queue
-                    self.pending_burst_packets = []            
-            
-                    # Wait actively for an ack and return the CommandResult                    
-                    while self.__ack_queue.empty():
-                        sleep(0.001)
-
-                    ack_event = ANTStick_Message(self.__ack_queue.get())
-
-                    logger.debug('Receiving an ANT Ack event.')
-                    
-                    if ack_event.message_code == AntMessageCode.EVENT_TRANSFER_TX_FAILED:
-                        self._send_whad_command_result(CommandResult.ERROR)
-                        return
-                    else:
-                        self._send_whad_command_result(CommandResult.SUCCESS)
-                        return
                 else:
+                    
                     # We are transmitting an acknowledged PDU, send the corresponding ANTStick command 
                     self._antstick_send_command(
                         ANTStick_Data_Acknowledged_Data(
@@ -1659,23 +1653,31 @@ class ANTStick(VirtualDevice):
                             pdu = bytes(message.pdu[-8:]) # crop the message to 8 bytes
                         ), no_response = True
                     )
-                    
-                    # Actively expect an ack
-                    while self.__ack_queue.empty():
-                        sleep(0.001)
 
-                    ack_event = ANTStick_Message(self.__ack_queue.get())
-                    
-                    if ack_event.message_code == 6:
+                # Clean up the pending PDU queue
+                self.pending_burst_packets = []            
+    
+                start_time = time()
+                while self.__ack_queue.empty():
+                    sleep(0.001)
+                    if time() - start_time > 1.0:
                         self._send_whad_command_result(CommandResult.ERROR)
                         return
-                    else:
-                        self._send_whad_command_result(CommandResult.SUCCESS)
-                        return
+
+                
+                ack_event = ANTStick_Message(self.__ack_queue.get())
+                
+                if ack_event.message_code == AntMessageCode.EVENT_TRANSFER_TX_FAILED:
+                    self._send_whad_command_result(CommandResult.ERROR)
+                    return
+                else:
+                    self._send_whad_command_result(CommandResult.SUCCESS)
+                    return
         else:
             # We have to transmit a Broadcast packet
             # Note: it will be repeated every slot OTA until next transmission
             logger.debug('Transmitting ANT Broadcast PDU: ' + repr(packet))
+            
             self._antstick_send_command(
                 ANTStick_Data_Broadcast_Data(
                     channel_number = message.channel_number, 

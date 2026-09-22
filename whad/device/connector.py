@@ -548,6 +548,7 @@ class Connector:
         if msg is not None:
             logger.info("[connector] send packet command")
             resp = self.send_command(msg, message_filter(CommandResult))
+            
             logger.info("[connector] Command sent, result: %s", resp)
 
             # Do we have an error while sending this command ?

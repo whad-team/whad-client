@@ -385,17 +385,20 @@ class LinkLayer(Layer):
             raise NoAvailableNetworks()
         
         self.get_layer('phy').set_network_key(network_number, network_key)
-        self.get_layer('phy').set_device_number(channel_number, device_number)
-        self.get_layer('phy').set_device_type(channel_number, device_type)
-        self.get_layer('phy').set_transmission_type(channel_number, transmission_type)
-        self.get_layer('phy').set_rf_channel(channel_number, rf_channel)
 
         self.get_layer('phy').assign_channel(
             channel_number,
             network_number,
             shared=shared,
             direction=ChannelDirection.TX,
-            unidirectional=unidirectional)
+            unidirectional=unidirectional
+        )
+
+        self.get_layer('phy').set_device_number(channel_number, device_number)
+        self.get_layer('phy').set_device_type(channel_number, device_type)
+        self.get_layer('phy').set_transmission_type(channel_number, transmission_type)
+        self.get_layer('phy').set_rf_channel(channel_number, rf_channel)
+
         
         self.get_layer('phy').set_channel_period(channel_number, channel_period)
         self.get_layer('phy').open_channel(channel_number)
@@ -449,7 +452,8 @@ class LinkLayer(Layer):
             raise InvalidChannel()
 
         channel = self.state.channels[channel_number]
-        
+        rf_channel = channel.rf_channel
+
         payload = bytes(payload)
         if len(payload) < 8:
             payload = payload  + b"\x00" * (8 - len(payload))
@@ -476,7 +480,8 @@ class LinkLayer(Layer):
         
         return self.send('phy',
             packet, 
-            channel_number = channel_number
+            channel_number = channel_number, 
+            rf_channel = rf_channel
         )
 
 
@@ -496,6 +501,7 @@ class LinkLayer(Layer):
             payload = payload[:8]
 
         channel = self.state.channels[channel_number]
+        rf_channel = channel.rf_channel
         preamble = generate_sync_from_network_key(channel.network_key)
 
         packet = (
@@ -519,7 +525,8 @@ class LinkLayer(Layer):
         #packet.show()
         success = self.send('phy',
             packet, 
-            channel_number = channel_number
+            channel_number = channel_number,
+            rf_channel = rf_channel
         )
         event = channel.get_pending_transfer_event()
         if event == ChannelEventCode.EVENT_TRANSFER_TX_COMPLETED:
@@ -543,6 +550,7 @@ class LinkLayer(Layer):
         for payload in payloads:
             burst_payload += bytes(payload)
         
+        rf_channel = channel.rf_channel
         preamble = generate_sync_from_network_key(channel.network_key)
 
         packets = []
@@ -572,7 +580,8 @@ class LinkLayer(Layer):
         for packet in packets:        
             success = self.send('phy',
                 packet,
-                channel_number = channel_number
+                channel_number = channel_number, 
+                rf_channel = rf_channel
             )
         event = channel.get_pending_transfer_event()
         if event == ChannelEventCode.EVENT_TRANSFER_TX_COMPLETED:

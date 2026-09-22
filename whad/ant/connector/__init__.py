@@ -260,15 +260,16 @@ class ANT(WhadDeviceConnector):
         if not self.can_manage_channels():
             raise UnsupportedCapability("ChannelManagement")
 
-        # Create a SniffMode message
-        msg = self.hub.ant.create_set_device_number(
-            channel_number = channel_number, 
-            device_number = device_number
-        )
+        if device_number is not None:
+            # Create a SetDeviceNumber message
+            msg = self.hub.ant.create_set_device_number(
+                channel_number = channel_number,
+                device_number = device_number
+            )
 
-        resp = self.send_command(msg, message_filter(CommandResult))
-        return isinstance(resp, Success)
-
+            resp = self.send_command(msg, message_filter(CommandResult))
+            return isinstance(resp, Success)
+        return False
 
 
     def set_transmission_type(self, channel_number : int, transmission_type : int) -> bool:
