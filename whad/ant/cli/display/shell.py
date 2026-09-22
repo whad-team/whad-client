@@ -236,8 +236,8 @@ class AntPlusDisplayShell(InteractiveShell):
                 transmission_type=self.__transmission_type
             )
             self.__profile.start()
-            print(f"Connected to {str(self.__profile)} (device number {hex(device_number)}).")
-            print(f"Listening for data... Press CTL-c to stop.")
+            print(f"Connected as {str(self.__profile.human_readable_name)} to Dev. Num. {str(device_number)}.")
+            #print(f"Listening for data... Press CTL-c to stop.")
 
             self.update_prompt()
 
