@@ -25,13 +25,17 @@ class SendPdu(PbMessageWrapper):
         return ANT_Hdr(self.pdu)
 
     @staticmethod
-    def from_packet(packet, channel_number : int = 0, rf_channel: int = 57, version=3):
+    def from_packet(packet, channel_number : int = 0, rf_channel: int = None, version=3):
         """Convert a scapy packet to a SendPdu message
         """
         if ANT_Hdr in packet:
             pdu = bytes(packet[ANT_Hdr])
         else:
             return None
+        
+        if hasattr(packet, "metadata") and hasattr(packet.metadata, "rf_channel"):
+            rf_channel = packet.metadata.rf_channel
+
         if rf_channel is not None:
             msg = SendPdu(
                 version,
@@ -128,6 +132,7 @@ class PduReceived(PbMessageWrapper):
     def from_packet(packet, version: int = 3):
         """Convert scapy packet to a PduReceived message
         """
+        
         # Create a PduReceived message
         msg = PduReceived(
             version,
