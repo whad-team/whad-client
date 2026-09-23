@@ -610,7 +610,8 @@ class PeripheralClient(Peripheral):
             scan_data=scan_data,
             bd_address=bd_address,
             public=public,
-            stack=stack
+            stack=stack,
+            gatt=GattClientServer
         )
 
         # Change ATTLayer to use GattClientServer and reinstantiate our stack
