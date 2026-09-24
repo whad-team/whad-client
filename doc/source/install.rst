@@ -117,8 +117,10 @@ If you prefer to install rules for a specific device, replace 'all' by the devic
     $ winstall --rules apimote
 
     # Install rules for RZUSBStick
-    $ winstall --rules rzusbstickrfstorm
+    $ winstall --rules rzusbstick
 
+    # Install rules for ANTStick
+    $ winstall --rules antstick
 
 Flashing firmware on WHAD-compatible devices
 ---------------------------------------------

@@ -21,6 +21,9 @@ WHAD support the following hardware devices:
 - [River Loop Security's ApiMote](http://apimote.com/)
 - [Nordic nRF52840 USB dongle](https://www.nordicsemi.com/Products/Development-hardware/nRF52840-Dongle)
 - [Maker Diary's nRF52840 MDK USB dongle](https://makerdiary.com/products/nrf52840-mdk-usb-dongle)
+- [ATMEL RZUSBStick dongle](https://www.microchip.com/en-us/development-tool/atavrrzusbstick)
+- [ANTStick & ANTStick v2 (nRF24AP2)](https://www.thisisant.com/developer/components/nrf24ap2-usb)
+
 
 Some devices are supported natively (running a custom firmware implementing our WHAD protocol) while others
 are supported through a dedicated adaptation layer in a dedicated class inheriting from
