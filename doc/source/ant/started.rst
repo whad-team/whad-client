@@ -79,3 +79,160 @@ A discovered device is implemented as a :class:`whad.ant.scanning.ANTDiscoveredD
         print("  - Last observed payload: ", device.last_payload)
         print("  - Last observed timestamp: ", device.last_timestamp)
         print()
+
+Sniff ANT traffic
+----------------------
+
+The :class:`whad.ant.connector.sniffer.Sniffer` class implements a sniffer
+detecting ANT frames. This sniffer can be used to sniff ANT frames, including 
+ANT+ & ANT-FS traffic.
+
+Sniffing ANT+ traffic
+^^^^^^^^^^^^^^^^^^^^^^
+The following snippet allows basic ANT+ sniffing:
+
+.. code-block:: python
+
+    from whad.ant.crypto import ANT_PLUS_NETWORK_KEY
+    from whad.device import WhadDevice
+    from whad.ant import Sniffer
+
+    # Instantiate a compatible device
+    device = WhadDevice.create('uart0')
+
+    # Wraps device with a ANT sniffer
+    sniffer = Sniffer(device)
+
+    # Configure the sniffer
+    sniffer.network_key =  ANT_PLUS_NETWORK_KEY
+    sniffer.channel = 57
+
+    sniffer.device_number = 0 # 0 acts as a wildcard for filtering
+    sniffer.device_type = 0 # 0 acts as a wildcard for filtering
+    sniffer.transmission_type = 0 # 0 acts as a wildcard for filtering
+
+
+    # Sniff packets for 30 seconds
+    for packet in sniffer.sniff(timeout=30.0):
+        packet.show()
+
+Any ANT+ frame will be shown whatever the device is.
+
+It is also possible to filter out results, based on the device number, the device type or 
+the transmission type. As an example, the following configuration allows to focus only on 
+Heart Rate Monitor (`device_type = 120`) with `transmission_type` set to `1`:
+
+.. code-block:: python
+
+    from whad.ant.crypto import ANT_PLUS_NETWORK_KEY
+    from whad.device import WhadDevice
+    from whad.ant import Sniffer
+
+    # Instantiate a compatible device
+    device = WhadDevice.create('uart0')
+
+    # Wraps device with a ANT sniffer
+    sniffer = Sniffer(device)
+
+    # Configure the sniffer
+    sniffer.network_key =  ANT_PLUS_NETWORK_KEY
+    sniffer.channel = 57
+
+    sniffer.device_number = 0 # 0 acts as a wildcard for filtering
+    sniffer.device_type = 120
+    sniffer.transmission_type = 1
+
+    # Sniff packets for 30 seconds
+    for packet in sniffer.sniff(timeout=30.0):
+        packet.show()
+
+
+Packets can be easily processed by an asynchronous callback using `attach_callback` instead of `sniff`:
+
+.. code-block:: python
+
+    def on_received_packet(pkt):
+        pkt.show()
+
+    # [...]
+    sniffer.attach_callback(on_received_packet)
+
+Sniffing ANT-FS traffic
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+It is also possible to easily monitor ANT-FS traffic by setting the correct network key and configure the RF channel:
+
+.. code-block:: python
+
+    from whad.ant.crypto import ANT_FS_NETWORK_KEY
+    from whad.device import WhadDevice
+    from whad.ant import Sniffer
+
+    # Instantiate a compatible device
+    device = WhadDevice.create('uart0')
+
+    # Wraps device with a ANT sniffer
+    sniffer = Sniffer(device)
+
+    # Configure the sniffer
+    sniffer.network_key =  ANT_FS_NETWORK_KEY
+    sniffer.channel = 62
+
+    sniffer.device_number = 0 # 0 acts as a wildcard for filtering
+    sniffer.device_type = 0
+    sniffer.transmission_type = 0
+
+    # Sniff packets for 30 seconds
+    for packet in sniffer.sniff(timeout=30.0):
+        packet.show()
+
+
+Let's note that the sniffer can automatically switch to another RF channel if an `ANT-FS Link Packet` is detected, according to 
+the received `rf_channel` field. Such option can be enabled by configuring the `follow` property:
+
+.. code-block:: python
+
+    # Enable channel follow mechanism
+    sniffer.follow = True
+
+    # Disable channel follow mechanism
+    sniffer.follow = False
+
+
+Using a custom ANT Network Key
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+ANT relies on a specific 8 bytes-long value called **Network key**.
+A limited set of values are considered as valids, according to a basic checking algorithm. 
+The validity algorithm is implemented in WHAD as an helper function in the ::class:`whad.ant.crypto` module, and can 
+be used to check a key:
+
+.. code-block:: python
+
+    from whad.ant.crypto import is_valid_network_key
+
+    candidate_network_key = bytes.fromhex("45C372BDFB21A5B9")
+    if is_valid_network_key(candidate_network_key):
+        sniffer.network_key = candidate_network_key
+        # [...]
+
+
+This value is mainly used to generate a 2 bytes long synchronization word, specific to the network key in use. 
+Radio GFSK receiver is then configured to match this value in the demodulated bitstream and detect corresponding ANT frames.
+
+The synchronization word can be generated from a given network key using `generate_sync_from_network_key` helper function:
+
+.. code-block:: python
+
+    from whad.ant.crypto import generate_sync_from_network_key
+
+    candidate_network_key = bytes.fromhex("45C372BDFB21A5B9")
+    sync_word = generate_sync_from_network_key(candidate_network_key)
+
+
+
+Finally, sniffer can also be configured to use a valid network key by providing as a 8 bytes value the network key:
+
+.. code-block:: python
+
+    sniffer.network_key = bytes.fromhex("45C372BDFB21A5B9")
