@@ -55,25 +55,29 @@ class ANTDiscoveredDevice:
 
     @property
     def device_number(self) -> int:
-        """Device number.
+        """
+        Device number.
         """
         return self.__device_number
 
     @property
     def device_type(self) -> int:
-        """Device type.
+        """
+        Device type.
         """
         return self.__device_type
 
     @property
     def transmission_type(self) -> int:
-        """Transmission type.
+        """
+        Transmission type.
         """
         return self.__transmission_type
 
     @property
     def rssi(self) -> int:
-        """Device RSSI.
+        """
+        Device RSSI.
         """
         return self.__rssi
 
