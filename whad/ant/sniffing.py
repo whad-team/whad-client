@@ -11,9 +11,12 @@ class SnifferConfiguration:
     :param device_number: filter a specific device number (dn)
     :param device_type: filter a specific device type (dp)
     :param addresses: filter a specific transmission type (tt)
+    :param follow: automatically follow the RF channel switches (f)
+
     """
     channel : int = 57
     device_number : int = 0
     device_type : int = 0
     transmission_type : int = 0
     network_key : bytes = ANT_PLUS_NETWORK_KEY
+    follow : bool = False
