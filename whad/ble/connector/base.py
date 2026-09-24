@@ -633,9 +633,14 @@ class BLE(Connector):
         # Cannot set TX power level
         return False
 
-    def enable_scan_mode(self, active=False, interval=500):
+    def enable_scan_mode(self, active=False, interval=200):
         """
         Enable Bluetooth Low Energy scanning mode.
+
+        :param active: Enable active scan (sends SCAN_REQ PDU if device is scannable)
+        :type active: bool
+        :param interval: Advertising channel switch delay (in milliseconds)
+        :type interval: int
         """
         # Create a ScanMode message
         msg = self.hub.ble.create_scan_mode(active=active, interval=interval)
