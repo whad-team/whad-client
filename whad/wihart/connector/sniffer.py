@@ -543,3 +543,65 @@ class Sniffer(WirelessHart, EventsManager):
         }
         with open(filename, "w", encoding="utf-8") as output:
             json.dump(data, output, indent=2)
+
+    def load_network_state(self, filename: str):
+        """Load a previously saved network state from a JSON file.
+
+        The loaded state contains the keys and TSCH network state required
+        to restore the current network state without performing the joining procedure again.
+        Be careful: a network may update its state while the sniffer is not running, so the
+        loaded state may no longer be valid when restoring it 
+        
+        :param filename: path to the JSON file produced by `save_network_state`
+        :type filename: str
+        """
+        with open(filename, "r", encoding="utf-8") as input_file:
+            data = json.load(input_file)
+
+        # Keys extraction
+        if data.get("join_key") is not None :
+            self.add_join_key(bytes.fromhex(data["join_key"]))
+
+        if data.get("network_key") is not None:
+            self.add_network_key(bytes.fromhex(data["network_key"]))
+        
+        self.clear_session_keys()
+
+        for entry in data.get("unicast_session_keys", []):
+            source, destination, key_hex, nonce = entry.split(",")
+            self.add_unicast_session_key(
+                key=bytes.fromhex(key_hex),
+                source=int(source),
+                destination=int(destination),
+                nonce=int(nonce)
+            )
+
+        for entry in data.get("broadcast_session_keys", []):
+            source, destination, key_hex, nonce = entry.split(",")
+            self.add_broadcast_session_key(
+                key=bytes.fromhex(key_hex),
+                source=int(source),
+                destination=int(destination),
+                nonce=int(nonce)
+            )  
+
+        # Superframes and links extraction
+        for sf_id, superframe in data.get("superframe", {}).items():
+            self.update_superframe(
+                superframe_id=int(sf_id),
+                number_of_slots=superframe["number_of_slots"],
+                flags=superframe["flags"],
+                asn=superframe["asn"]
+            )
+            for link in superframe.get("links", []):
+                self.add_link(
+                    superframe_id=int(sf_id),
+                    source=link["source"],
+                    time_slot=link["time_slot"],
+                    channel_offset=link["channel_offset"],
+                    neighbor=link["neighbor"],
+                    options=LinkOptions[link["options"]],
+                    link_type=LinkType[link["link_type"]]
+                )
+        self._provision_keys_from_configuration()
+        logger.info("Loaded network parameters from %s", filename)
