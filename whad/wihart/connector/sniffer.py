@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import Generator
 from time import time
@@ -504,3 +505,41 @@ class Sniffer(WirelessHart, EventsManager):
 
         except WhadDeviceDisconnected:
             return
+
+    def stop(self):
+        """Stop sniffing and save the requested WirelessHART network state."""
+        self._save_configured_network_state()
+        return super().stop()
+
+    def _save_configured_network_state(self):
+        filename = getattr(self.__configuration, "export_file", None)
+        if filename is not None:
+            self.save_network_state(filename)
+            logger.info("Saved network parameters to %s", filename)
+            self.__configuration.export_file = None # for a reason i ignore stop was called twice so here's a method to ignore the second call after the destruction of the object
+
+    def save_network_state(self, filename: str):
+        """Save the current network state to a JSON file.
+
+        The saved state contains the keys and TSCH network state required
+        to restore the current network state without performing the joining procedure again.
+        Be careful: a network may update its state while the sniffer is not running, so the
+        saved state may no longer be valid when restoring it (for example, after network
+        key rotation or superframe/link updates).
+        """
+        superframes = {str(superframe_id): self.network.superframes[superframe_id].to_dict() for superframe_id in self.network.superframes}
+        data = {
+            "join_key": (
+                self.__configuration.join_key.hex()
+                if self.__configuration.join_key is not None else None
+            ),
+            "network_key": (
+                self.__configuration.network_key.hex()
+                if self.__configuration.network_key is not None else None
+            ),
+            "unicast_session_keys": self.__configuration.unicast_session_keys,
+            "broadcast_session_keys": self.__configuration.broadcast_session_keys,
+            "superframe": superframes,
+        }
+        with open(filename, "w", encoding="utf-8") as output:
+            json.dump(data, output, indent=2)

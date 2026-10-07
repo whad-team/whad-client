@@ -14,6 +14,7 @@ class SnifferConfiguration:
     :param network_key: provide network key (n)
     :param unicast_session_keys: provide unicast session keys - format "ID,KEY[,NONCE]" (u)
     :param broadcast_session_keys: provide broadcast session keys - format "ID,KEY[,NONCE]" (b)
+    :param export_file: save captured network parameters to a JSON file (e)
 
     """
     channel : int = 11
@@ -30,6 +31,7 @@ class SnifferConfiguration:
 
     unicast_session_keys : list = field(default_factory=lambda: [])
     broadcast_session_keys : list = field(default_factory=lambda: [])
+    export_file: str = None
 
 
 
