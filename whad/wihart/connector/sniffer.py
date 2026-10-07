@@ -219,6 +219,9 @@ class Sniffer(WirelessHart, EventsManager):
     def _enable_sniffing(self):
         self._provision_keys_from_configuration()        
         self.enable_tsch()
+        if self.__configuration.load_file is not None:
+            self.load_network_state(self.__configuration.load_file)
+            self.__configuration.load_file = None
         self.sniff_wihart(channel=self.__configuration.channel)
         
     
