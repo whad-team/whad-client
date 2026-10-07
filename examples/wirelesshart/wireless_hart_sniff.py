@@ -3,7 +3,7 @@ from time import sleep
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
 from whad.common.monitors import WiresharkMonitor
-from whad.wirelesshart.connector import Sniffer
+from whad.wihart.connector import Sniffer
 from whad.hub.dot15d4 import LinkType, LinkOptions
 from whad.scapy.layers.wirelesshart import WirelessHart_DataLink_Advertisement, Superframe, Link
 import logging

@@ -28,6 +28,16 @@ class Link:
         return (f"Link(slot={self.time_slot}, offset={self.channel_offset}, "
                 f"type={self.link_type.name}, options={self.options.name})")
 
+    def to_dict(self) -> Dict:
+        return {
+            "source": self.source,
+            "time_slot": self.time_slot,
+            "channel_offset": self.channel_offset,
+            "neighbor": self.neighbor,
+            "options": self.options.name,
+            "link_type": self.link_type.name
+        }
+
 
 class Superframe:   
     def __init__(self, superframe_id: int, number_of_slots: int, flags: int = 0x0, asn: int = 0):
@@ -47,6 +57,15 @@ class Superframe:
 
     def __repr__(self) -> str:
         return f"Superframe(id={self.id}, slots={self.number_of_slots}, links={len(self.links)})"
+
+    def to_dict(self) -> Dict:
+        return {
+            "superframe_id": self.id,
+            "number_of_slots": self.number_of_slots,
+            "flags": self.flags,
+            "asn": self.asn,
+            "links": [link.to_dict() for link in self.links]
+        }
 
 
 class Network:
