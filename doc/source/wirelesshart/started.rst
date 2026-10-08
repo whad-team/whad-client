@@ -152,3 +152,10 @@ The recovered state of the network (join key, network key, session keys and supe
 
     # Save the network state to a JSON file
     sniffer.save_network_state("filename.json")
+
+The state can also be loaded from a JSON file to restore the sniffer's configuration as follows:
+
+.. code-block:: python
+
+    # Load the network state from a JSON file
+    sniffer.load_network_state("filename.json")
