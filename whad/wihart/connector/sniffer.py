@@ -230,6 +230,13 @@ class Sniffer(WirelessHart, EventsManager):
         return self.__decryptor
 
     def add_join_key(self, key):
+        """
+        Add a join key to the sniffer configuration and provision it to the decryptor.
+        Every constructor provides its own join key to its devices. Here is a non-exhaustive list of known join keys for some manufacturers:
+        ### Dust :            0x445553544E4554574F524B53524F434B
+        ### Pepperl+Fuchs :   0xE090D6E2DADACE94C7E9C8D1E781D5ED
+        ### Emerson:          0x24924760000000000000000000000000 
+        ### Endress+Hauser :  0x456E6472657373202B20486175736572"""
         self.__configuration.join_key = key
         self._provision_keys_from_configuration()
 
