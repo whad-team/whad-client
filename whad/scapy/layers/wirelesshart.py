@@ -1,5 +1,5 @@
 from scapy.packet import Packet, bind_layers, split_layers
-from scapy.fields import Field, ByteEnumField, StrLenField, StrFixedLenField, IntField, XShortField, LEShortField, \
+from scapy.fields import Field, ByteEnumField, StrLenField, StrFixedLenField, IntField, X3BytesField, XShortField, LEShortField, \
     FieldLenField, StrLenField, ConditionalField, PacketField, XByteField, XIntField,  SignedShortField, SignedByteField, \
     XShortEnumField, BitEnumField, BitField, ByteField, ShortField, XShortField, PacketListField, FieldListField, IEEEFloatField, \
     ThreeBytesField, StrField
@@ -836,6 +836,46 @@ class WirelessHart_Report_Neighbor_Health_List_Response(WirelessHart_Command_Pay
     ]
 
 
+class WirelessHart_Vendor_Specific_Dust_Networks_Set_Value_To_Flash_Request(WirelessHart_Command_Payload):
+    name = "Vendor Specific (Dust Networks) Set byte value in flash Request"
+    fields_desc = [
+        XShortField("expanded_device_type", None), 
+        X3BytesField("reserved", None),
+        ByteField("section", None), 
+        ByteField("offset", None),
+        ByteField("value", None)
+    ]
+
+
+class WirelessHart_Vendor_Specific_Dust_Networks_Set_Value_To_Flash_Response(WirelessHart_Command_Payload):
+    name = "Vendor Specific (Dust Networks) Set byte value in flash Response"
+    fields_desc = [
+        ByteEnumField("response_code", None, { 0x0: "success", 0x40: "not implemented" }),
+
+    ]
+
+class WirelessHart_Vendor_Specific_Dust_Networks_Get_Value_From_Flash_Request(WirelessHart_Command_Payload):
+    name = "Vendor Specific (Dust Networks) Get byte value from flash Request"
+    fields_desc = [
+        XShortField("expanded_device_type", None), 
+        X3BytesField("reserved", None),
+        ByteField("section", None), 
+        ByteField("offset", None),
+    ]
+
+
+class WirelessHart_Vendor_Specific_Dust_Networks_Get_Value_From_Flash_Response(WirelessHart_Command_Payload):
+    name = "Vendor Specific (Dust Networks) Get byte value from flash Response"
+    fields_desc = [
+        ByteEnumField("response", None, { 0x0: "success", 0x40: "not implemented" }),
+        ConditionalField(
+            ByteField("value", None),
+            lambda pkt: pkt.section == 0x0
+        )
+    ]
+
+
+
 class WirelessHart_Vendor_Specific_Dust_Networks_Ping_Request(WirelessHart_Command_Payload):
     name = "Vendor Specific (Dust Networks) Ping Request"
     fields_desc = [
@@ -926,6 +966,12 @@ bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Write_Timetable_Resp
 
 bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Vendor_Specific_Dust_Networks_Ping_Request, command_number=0xfc04)
 bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Vendor_Specific_Dust_Networks_Ping_Response, command_number=0xfc05)
+
+bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Vendor_Specific_Dust_Networks_Set_Value_To_Flash_Request, command_number=0xfc0e)
+bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Vendor_Specific_Dust_Networks_Set_Value_To_Flash_Response, command_number=0xfc0e)
+
+bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Vendor_Specific_Dust_Networks_Get_Value_From_Flash_Request, command_number=0xfc0f)
+bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Vendor_Specific_Dust_Networks_Get_Value_From_Flash_Response, command_number=0xfc0f)
 
 # Monkey patch to add Wireless Hart support in Dot15d4 layer
 old_guess_payload_class = Dot15d4Data.guess_payload_class
