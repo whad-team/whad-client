@@ -1,3 +1,11 @@
+Release notes for versions 1.2.18
+=================================
+
+New features
+------------
+
+- Added support for Makerdiary nRF52840 Connect Kit
+
 Release notes for versions 1.2.12
 =================================
 

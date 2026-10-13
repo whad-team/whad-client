@@ -12,6 +12,8 @@ by running custom firmware:
 +==========================+=====+=========+=====+=====+==========+
 | :ref:`dev-md-nrf52`      | X   | X       | X   | X   | X        |
 +--------------------------+-----+---------+-----+-----+----------+
+| :ref:`dev-md-nrf52-ck`   | X   | X       | X   | X   | X        |
++--------------------------+-----+---------+-----+-----+----------+
 | :ref:`dev-ns-nrf52`      | X   | X       | X   | X   | X        |
 +--------------------------+-----+---------+-----+-----+----------+
 | :ref:`dev-lora-e5`       |     |         |     | X   |          |
@@ -64,6 +66,10 @@ configuration.
 Makerdiary nRF52840 MDK USB Dongle
 ----------------------------------
 
+.. image:: ../images/devices/nrf52840dongle-hero.png
+   :width: 60%
+   :align: center
+
 The *nRF52840 MDK USB Dongle* is a nRF52-based development kit in the form of
 an USB stick. It is based on Nordic Semiconductor's nRF52840 SoC that is fully
 compatible with WHAD.
@@ -85,14 +91,49 @@ Follow this procedure to install a WHAD-compatible firmware on this device:
 4. Access with a file explorer the new mass storage device and copy the firmware update file into it.
 5. Replug your dongle to run the new firmware.
 
+.. _dev-md-nrf52-ck:
+
+Makerdiary nRF52840 Connect Kit
+-------------------------------
+
+.. image:: ../images/devices/nrf52840-connectkit-ufl.png
+   :width: 60%
+   :align: center
+
+The *nRF52840 Connect Kit* is a nRF52-based development kit in the form of a development board with an optional U.FL antenna socket that has
+a USB type C female connector. It is based on Nordic Semiconductor's nRF52840 SoC that is fully compatible with WHAD.
+
+Where to buy
+^^^^^^^^^^^^
+
+The Makerdiary's *nRF52840 Connect Kit* is sold by Makerdiary (see `Makerdiary's product page <https://makerdiary.com/products/nrf52840-connectkit>`_)
+and costs between $19.90 USD and $21.90 USD, depending on the chosen options.
+
+Installing *Butterfly* firmware on an nRF52840 Connect Kit (UF2 Bootloader)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Follow this procedure to install a WHAD-compatible firmware on this device:
+
+1. Download the `latest version <https://github.com/whad-team/butterfly/releases/latest>`_ of Butterfly for MDK nRF52840 Connect Kit (UF2 file).
+2. Connect the *nRF52840 Connect Kit* to your computer
+3. Press the _RESET_ button first and then the _USR_ button while maintaining the _RESET_ button pressed, release the _RESET_
+   button and then the _USR_ button
+4. A green LED shines when the board has successfully been set in bootloader mode, and a `UF2BOOT` mass-storage device should be
+   detected by the computer. If no, retry step 3.
+5. Copy the previously downloaded `UF2` file onto the newly mounted `UF2BOOT` storage device.
+6. Once copied, press and release the _RESET_ button to exit bootloader mode and use the newly flashed `ButteRFly` firmware
 
 .. _dev-ns-nrf52:
 
 Nordic nRF52840 Dongle
 ----------------------
 
+.. image:: ../images/devices/pca10059-dongle.jpg
+   :width: 60%
+   :align: center
+
 Nordic nRF52840 dongle is pretty similar to Makerdiary's nR52840 MDK dongle,
-and costs around $10 USD.
+and costs around USD 10.
 
 Where to buy
 ^^^^^^^^^^^^
@@ -156,6 +197,10 @@ To launch *nrfutil*:
 SeeedStudio LoRa-e5-Mini
 ------------------------
 
+.. image:: ../images/devices/lora-e5-mini.png
+   :width: 60%
+   :align: center
+
 SeeedStudio LoRa-e5-Mini dongle is produced by SeeedStudio and its cost is really attractive.
 This dongle is based on SeeedStudio's Wio-e5 module that relies on an STM32WLE5 system-on-chip.
 
@@ -176,6 +221,10 @@ Installing a WHAD-compatible firmware
 STM32WL55 Nucleo board
 ----------------------
 
+.. image:: ../images/devices/nucleo-wl55.png
+   :width: 40%
+   :align: center
+
 This board is a development board produced and sold by ST Microelectronics based on a STM32WL55 system-on-chip.
 
 Where to buy
@@ -191,7 +240,7 @@ Installing a WHAD-compatible firmware
     
     You must have the `STM32 Cube Programmer <https://www.st.com/en/development-tools/stm32cubeprog.html>`_ installed on your machine to flash this firmware.
 
-1. Download the latest version of our WHAD-compatible firmware from the [corresponding repository](https://github.com/whad-team/stm32wlxx-firmware/releases/latest) named ``nucleo_wl55.hex``.
+1. Download the latest version of our WHAD-compatible firmware from the `corresponding repository <https://github.com/whad-team/stm32wlxx-firmware/releases/latest>`_ named ``nucleo_wl55.hex``.
 2. Launch STM32 Cube Programmer, connect the Nucleo STM32WL55 board to your computer and click *Connect*.
 3. Go to the programming/upload tab, select the ``nucleo_wl55.hex`` file previously downloaded and upload it to the board.
 
