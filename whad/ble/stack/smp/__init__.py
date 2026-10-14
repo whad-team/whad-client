@@ -2334,7 +2334,7 @@ class SMPLayer(Layer):
             if self.state.responder.is_key_distribution_complete():
                 self.perform_key_distribution()
 
-        elif self.state.state == SecurityManagerState.STATE_LESC_DHK_CHECK_SENT:
+        elif self.state.state in (SecurityManagerState.STATE_LESC_DHK_CHECK_SENT, SecurityManagerState.STATE_LESC_DHK_CHECK_RECVD):
             logger.info('[smp] Channel is now successfully encrypted')
             self.perform_key_distribution()
         else:
