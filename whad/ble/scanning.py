@@ -335,10 +335,10 @@ class AdvertisingDevicesDB:
 
                 # Register device if it matches our criterias
                 if filter_addr is not None and filter_addr.lower() == str(bd_address).lower():
-                    if self.register_device(device, update=updates) and updates:
+                    if self.register_device(device, update=updates):
                         devices.append(device)
                 elif filter_addr is None:
-                    if self.register_device(device, update=updates) and updates:
+                    if self.register_device(device, update=updates):
                         devices.append(device)
             except AdvDataError:
                 pass
@@ -361,10 +361,10 @@ class AdvertisingDevicesDB:
 
                 # Register device if it matches our criterias
                 if filter_addr is not None and filter_addr.lower() == str(bd_address).lower():
-                    if self.register_device(device, update=updates) and updates:
+                    if self.register_device(device, update=updates):
                         devices.append(device)
                 elif filter_addr is None:
-                    if self.register_device(device, update=updates) and updates:
+                    if self.register_device(device, update=updates):
                         devices.append(device)
 
             except AdvDataError:
