@@ -83,12 +83,22 @@ class Sniffer(WirelessHart, EventsManager):
     ) -> Packet:
 
         current_asn = self.network.asn
-        
-        if force_next_sf:
-            asn_to_send = current_asn + asn_offset
-        else:
-            asn_to_send = current_asn
+        print("get link")
+        (sf, link) = self.network.get_link(dst, 0xFFFF, LinkType.BROADCAST, LinkOptions.RECEIVE)
+        if sf is None or link is None:
+            raise Exception(f"No link found for src={spoofed_src}, dst={dst}, link_type={link_type}, link_options={link_options}")  
 
+        # If the current ASN is greater than the link's time slot, we need to force the next superframe to ensure the packet is sent in the correct time slot.
+        if (current_asn % sf.number_of_slots) > link.time_slot:
+            force_next_sf = True
+        else:
+            asn_to_send = current_asn - (current_asn % sf.number_of_slots) + link.time_slot
+
+        # Calculate the ASN for the next superframe
+        if force_next_sf:
+            asn_to_send = (((current_asn + asn_offset) // sf.number_of_slots) + 1) * sf.number_of_slots + link.time_slot
+        print("ASN to send:", asn_to_send)
+        
         if is_broadcast_crypto:
             key = self.__decryptor.get_broadcast_session_key(0xf980, 0xffff)
             peer = self.__decryptor.get_broadcast_peer(0xf980, 0xffff)
@@ -121,7 +131,7 @@ class Sniffer(WirelessHart, EventsManager):
             second_src_route_segment=0, 
             first_src_route_segment=first_src_route_segment, 
             ttl=0,
-            asn_snippet=(asn_to_send % 0xffff),
+            asn_snippet=(asn_to_send & 0xffff ) - 1,
             graph_id=graph,
             nwk_dest_addr=target_nwk_dst,
             nwk_src_addr=nwk_src_addr,
