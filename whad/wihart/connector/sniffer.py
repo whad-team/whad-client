@@ -79,11 +79,11 @@ class Sniffer(WirelessHart, EventsManager):
         nwk_src_addr: int = 0xf980,
         nwk_dest_addr: int = None,
         first_src_route_segment: int = 0,
-        first_route_segment: list = None
+        first_route_segment: list = None,
+        wait_offset: int = 2200
     ) -> Packet:
 
         current_asn = self.network.asn
-        print("get link")
         (sf, link) = self.network.get_link(dst, 0xFFFF, LinkType.BROADCAST, LinkOptions.RECEIVE)
         if sf is None or link is None:
             raise Exception(f"No link found for src={spoofed_src}, dst={dst}, link_type={link_type}, link_options={link_options}")  
@@ -179,15 +179,15 @@ class Sniffer(WirelessHart, EventsManager):
         
         final_packet = dot15d4_fcs / dot15d4_data / data_link_layer / network_layer / security_sub_layer / enciphered
 
-        self.send_in_slot(final_packet, asn_to_send)
+        self.send_in_slot(final_packet, asn_to_send, wait_offset=wait_offset)
         return final_packet
 
-    def ping_request(self, dst: int, spoofed_src: int = 0x0001, graph: int = 0x0001):
+    def ping_request(self, dst: int, spoofed_src: int = 0x0001, graph: int = 0x0001, wait_offset: int = 2200):
         req = WirelessHart_Command_Request_Hdr(command_number=0xfc04, len=4) / \
               WirelessHart_Vendor_Specific_Dust_Networks_Ping_Request(expanded_device_type=0xe0a2, hops=1)
         return self._send_wihart_frame(
             dst=dst, commands=[req], spoofed_src=spoofed_src, graph=graph,
-            link_type=LinkType.BROADCAST, link_options=LinkOptions.RECEIVE, asn_offset=200
+            link_type=LinkType.BROADCAST, link_options=LinkOptions.RECEIVE, asn_offset=200, wait_offset=wait_offset
         )
 
     def ping_response(self, src: int, dst_dl: int, graph: int = 0x0001, hops: int = 1):   
