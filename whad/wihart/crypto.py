@@ -166,7 +166,8 @@ class Peer:
 class WirelessHartDecryptor:
 
     def __init__(self, *keys):
-        self.__join_key = bytes.fromhex("7777772e68617274636f6d6d2e6f7267") #known join key : "www.hartcomm.org"
+        self.__WELKNOWN_JOIN_KEY = bytes.fromhex("7777772e68617274636f6d6d2e6f7267") #well-known join key : "www.hartcomm.org"
+        self.__join_key = bytes.fromhex("445553544E4554574F524B53524F434B") #DUSTNETWORKSROCK
         self.__network_key = None
         self.__unicast_sessions_keys = {}
         self.__broadcast_sessions_keys = {}
@@ -211,6 +212,9 @@ class WirelessHartDecryptor:
         key = self.parse_key(key)
         if key:
             self.__network_key = key
+
+    def get_wellknown_join_key(self):
+        return self.__WELKNOWN_JOIN_KEY
         
     def get_network_key(self):
         return self.__network_key
