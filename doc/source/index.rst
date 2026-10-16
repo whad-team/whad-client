@@ -46,6 +46,12 @@ Welcome to WHAD's documentation!
 
 .. toctree::
     :maxdepth: 1
+    :caption: WirelessHART API
+
+    wirelesshart/started
+
+.. toctree::
+    :maxdepth: 1
     :caption: ZigBee API
 
     zigbee/started
