@@ -4,6 +4,7 @@ from typing import Generator
 from time import time
 
 from scapy.packet import Packet
+from whad.dot15d4.utils.phy import ChannelMap
 from whad.scapy.layers.wirelesshart import WirelessHart_Network_Security_SubLayer_Hdr, \
     WirelessHart_DataLink_Advertisement, WirelessHart_Transport_Layer_Hdr, \
     WirelessHart_Add_Link_Response, WirelessHart_Add_Link_Request, \
@@ -64,7 +65,24 @@ class Sniffer(WirelessHart, EventsManager):
         for ext_key in self.__configuration.unicast_session_keys:
             self.__decryptor.add_unicast_extended_session_key(ext_key)
         
-        
+
+    def get_asn_to_send(self, src, dst, link_type, link_options, force_next_sf: bool = True, asn_offset: int = 200):
+        current_asn = self.network.asn
+        (sf, link) = self.network.get_link(src, dst, link_type=link_type, options=link_options)
+        if sf is None or link is None:
+            raise Exception(f"No link found for src={dst}, dst=0xFFFF, link_type={link_type}, link_options={link_options}")  
+
+        # If the current ASN is greater than the link's time slot, we need to force the next superframe to ensure the packet is sent in the correct time slot.
+        if (current_asn % sf.number_of_slots) > link.time_slot:
+            force_next_sf = True
+        else:
+            asn_to_send = current_asn - (current_asn % sf.number_of_slots) + link.time_slot
+
+        # Calculate the ASN for the next superframe
+        if force_next_sf:
+            asn_to_send = (((current_asn + asn_offset) // sf.number_of_slots) + 1) * sf.number_of_slots + link.time_slot
+        return asn_to_send
+
     def _send_wihart_frame(
         self, 
         dst: int, 
@@ -83,22 +101,8 @@ class Sniffer(WirelessHart, EventsManager):
         wait_offset: int = 2200
     ) -> Packet:
 
-        current_asn = self.network.asn
-        (sf, link) = self.network.get_link(dst, 0xFFFF, LinkType.BROADCAST, LinkOptions.RECEIVE)
-        if sf is None or link is None:
-            raise Exception(f"No link found for src={spoofed_src}, dst={dst}, link_type={link_type}, link_options={link_options}")  
+        asn_to_send = self.get_asn_to_send(dst, 0xFFFF, link_type=link_type, link_options=link_options, force_next_sf=force_next_sf, asn_offset=asn_offset)
 
-        # If the current ASN is greater than the link's time slot, we need to force the next superframe to ensure the packet is sent in the correct time slot.
-        if (current_asn % sf.number_of_slots) > link.time_slot:
-            force_next_sf = True
-        else:
-            asn_to_send = current_asn - (current_asn % sf.number_of_slots) + link.time_slot
-
-        # Calculate the ASN for the next superframe
-        if force_next_sf:
-            asn_to_send = (((current_asn + asn_offset) // sf.number_of_slots) + 1) * sf.number_of_slots + link.time_slot
-        print("ASN to send:", asn_to_send)
-        
         if is_broadcast_crypto:
             key = self.__decryptor.get_broadcast_session_key(0xf980, 0xffff)
             peer = self.__decryptor.get_broadcast_peer(0xf980, 0xffff)
@@ -180,6 +184,104 @@ class Sniffer(WirelessHart, EventsManager):
         final_packet = dot15d4_fcs / dot15d4_data / data_link_layer / network_layer / security_sub_layer / enciphered
 
         self.send_in_slot(final_packet, asn_to_send, wait_offset=wait_offset)
+        return final_packet
+
+    def send_fake_advertisement(
+            self, 
+            dst: int = 0xffff, 
+            graph: int = 0x0001, 
+            spoofed_src: int = 0x0001, 
+            wait_offset: int = 2200, 
+            channel_map = None, 
+            superframes: list = None, 
+            link_type: int = LinkType.BROADCAST, 
+            link_options: int = LinkOptions.RECEIVE
+    ) -> Packet:
+        
+        # get the slot number on which we will inject packet
+        asn_to_send = self.get_asn_to_send(dst, 0xFFFF, link_type=link_type, link_options=link_options)
+
+        # get channel map
+        if channel_map is None :
+            if self.network.channel_map is not None:
+                channel_map = self.network.channel_map
+            else : 
+                raise Exception("Channel map neither specified nor saved in network configuration")
+        else :
+            channel_map = ChannelMap(channel_map)
+
+        # get superframes advertised
+        if superframes is None : 
+            superframes = list(self.network.superframes.bytes)
+
+
+        adv = WirelessHart_DataLink_Advertisement(
+            asn=asn_to_send,
+            security_level_supported="join_keyed",
+            join_priority=1,
+            channel_count=15,
+            channel_map=channel_map.bytes,
+            graph_id=graph,
+            superframes=[sf.to_pkt() for sf in superframes]
+        )
+
+        data_link_layer = WirelessHart_DataLink_Hdr(
+            reserved=0, priority=3, network_key_use=0, pdu_type=1, mic=0x0
+        )
+
+        dot15d4_data = Dot15d4Data(
+            dest_panid=self.network.panid,
+            dest_addr=dst, 
+            src_addr=spoofed_src
+        )
+
+        dot15d4_fcs = Dot15d4FCS(
+            fcf_panidcompress=True, fcf_ackreq=False, fcf_pending=False, fcf_security=False,
+            fcf_frametype=1, fcf_srcaddrmode=2, fcf_framever=0, fcf_destaddrmode=2,
+            seqnum=asn_to_send % 256
+        )
+
+        packet = dot15d4_fcs / dot15d4_data / data_link_layer / adv
+
+        dl_mic = compute_dlmic(packet, self.__decryptor.get_wellknown_join_key(), asn_to_send)
+        
+        data_link_layer.mic = int.from_bytes(dl_mic)
+
+        final_packet = dot15d4_fcs / dot15d4_data / data_link_layer / adv
+
+        self.send_in_slot(final_packet, asn_to_send, wait_offset=wait_offset)
+        
+        return final_packet
+
+    def send_keep_alive(self, src, dst, wait_offset : int = 2200):
+        asn_to_send = self.get_asn_to_send(dst, 0xffff, LinkType.BROADCAST, LinkOptions.RECEIVE)
+        
+        data_link_layer = WirelessHart_DataLink_Hdr(
+            reserved=0, priority=3, network_key_use=1, pdu_type=2, mic=0x0
+        )
+
+        dot15d4_data = Dot15d4Data(
+            dest_panid=self.network.panid,
+            dest_addr=dst, 
+            src_addr=src
+        )
+
+        dot15d4_fcs = Dot15d4FCS(
+            fcf_panidcompress=True, fcf_ackreq=False, fcf_pending=False, fcf_security=False,
+            fcf_frametype=1, fcf_srcaddrmode=2, fcf_framever=0, fcf_destaddrmode=2,
+            seqnum=asn_to_send % 256
+        )
+
+        packet = dot15d4_fcs / dot15d4_data / data_link_layer
+        
+        dl_mic = compute_dlmic(packet, self.__decryptor.get_network_key(), asn_to_send)
+        
+        data_link_layer.mic = int.from_bytes(dl_mic)
+
+        final_packet = dot15d4_fcs / dot15d4_data / data_link_layer
+
+        self.send_in_slot(final_packet, asn_to_send, wait_offset=wait_offset)
+        
         return final_packet
 
     def ping_request(self, dst: int, spoofed_src: int = 0x0001, graph: int = 0x0001, wait_offset: int = 2200):

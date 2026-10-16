@@ -1,5 +1,6 @@
 from typing import List, Dict, Tuple, Optional
 from whad.hub.dot15d4 import LinkOptions, LinkType
+from whad.scapy.layers import Superframe as PktSuperframe, Link as PktLink
 
 class Link:
     def __init__(
@@ -38,6 +39,14 @@ class Link:
             "link_type": self.link_type.name
         }
 
+    def to_pkt(self) -> PktLink : 
+        return PktLink(
+            link_join_slot=self.time_slot,
+            link_reserved=0,
+            link_use_for_transmission= 1 if (self.options==LinkOptions.SHARED or self.options==LinkOptions.TRANSMIT) else 0,
+            link_channel_offset=self.channel_offset
+        )
+
 
 class Superframe:   
     def __init__(self, superframe_id: int, number_of_slots: int, flags: int = 0x0, asn: int = 0):
@@ -67,11 +76,28 @@ class Superframe:
             "links": [link.to_dict() for link in self.links]
         }
 
+    def to_pkt(self) -> PktSuperframe:
+        return PktSuperframe(
+            superframe_id=self.id,
+            superframe_number_of_slots=self.number_of_slots,
+            superframe_number_of_links=len(self.links),
+            superframe_links=[l.to_pkt() for l in self.links]
+        )
+
 
 class Network:
     def __init__(self):
         self.superframes: Dict[int, Superframe] = {}
         self.asn = 0
+        self._channel_map = None
+
+    @property
+    def channel_map(self):
+        return self._channel_map
+
+    @channel_map.setter
+    def channel_map(self, channel_map):
+        self._channel_map = channel_map
 
     def clear(self):
         self.superframes.clear()

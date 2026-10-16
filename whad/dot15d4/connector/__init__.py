@@ -621,7 +621,7 @@ class Dot15d4(Connector):
             except ValueError as e:
                 # Invalid channel map
                 return False
-        
+        self.network.channel_map = channel_map
         msg = self.hub.dot15d4.create_set_channel_map(
             channel_map = channel_map.value
         )
