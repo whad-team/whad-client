@@ -6,4 +6,5 @@ from .sniffer import Sniffer
 __all__ = [
     "WirelessHart",
     "Sniffer",
+    "Injector"
 ]

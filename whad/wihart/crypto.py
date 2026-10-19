@@ -163,18 +163,21 @@ class Peer:
     def __repr__(self):
         return f"id1={self._id1}, id2={self._id2}, nonce={self._nonce}"
 
-class WirelessHartDecryptor:
+class KeyStore:
+    WELLKNOWN_KEY = b"www.hartcomm.org"
+    DEFAULT_JOIN_KEY = b"DUSTNETWORKSROCK"
 
-    def __init__(self, *keys):
-        self.__WELKNOWN_JOIN_KEY = bytes.fromhex("7777772e68617274636f6d6d2e6f7267") #well-known join key : "www.hartcomm.org"
-        self.__join_key = bytes.fromhex("445553544E4554574F524B53524F434B") #DUSTNETWORKSROCK
+    def __init__(self, join_key=None):
+        if join_key is None : 
+            join_key = self.DEFAULT_JOIN_KEY
+        self.__join_key = self.parse_key(join_key)
         self.__network_key = None
         self.__unicast_sessions_keys = {}
         self.__broadcast_sessions_keys = {}
         self.__join_sessions_keys = {}
 
     def __repr__(self):
-        repr_str = ["<WirelessHartDecryptor>"]
+        repr_str = ["<KeyStore>"]
 
         repr_str.append(f"  Join Key       : {self.__join_key}")
         repr_str.append(f"  Network Key    : {self.__network_key}")
@@ -201,20 +204,22 @@ class WirelessHartDecryptor:
             repr_str.append("    (empty)")
 
         return "\n".join(repr_str)
-
+    
     def set_join_key(self, key):
         key = self.parse_key(key)
         if key:
             self.__join_key = key
 
-    
+    def get_join_key(self):
+        return self.__join_key
+
     def set_network_key(self, key):
         key = self.parse_key(key)
         if key:
             self.__network_key = key
 
-    def get_wellknown_join_key(self):
-        return self.__WELKNOWN_JOIN_KEY
+    def get_wellknown_key(self):
+        return self.WELLKNOWN_KEY
         
     def get_network_key(self):
         return self.__network_key
@@ -271,7 +276,7 @@ class WirelessHartDecryptor:
             if peer == Peer(id1,id2):
                 return peer
         return None
-            
+
     def parse_extended_key(self, key:str) -> Tuple[int, int, bytes, int]:
         if not isinstance(key, str) or "," not in key:
             return None
@@ -330,6 +335,78 @@ class WirelessHartDecryptor:
         if not isinstance(key, bytes) or len(key) != 16:
             return None
         return key
+class WirelessHartDecryptor:
+
+    def __init__(self, store : KeyStore = None):
+        if store is None : 
+            store = KeyStore()
+        self.store  = store
+
+
+    def __repr__(self):
+        repr_str = ["<WirelessHartDecryptor>"]
+
+        repr_str.append(f"\n{self.store!r}")
+
+        return "\n".join(repr_str)
+
+    def get_store(self):
+        return self.store
+
+    def set_join_key(self, key):
+        self.store.set_join_key(key)
+
+    def get_join_key(self):
+        return self.store.get_join_key()
+    
+    def set_network_key(self, key):
+        self.store.set_network_key(key)
+
+    def get_wellknown_key(self):
+        return self.store.get_wellknown_key()
+        
+    def get_network_key(self):
+        return self.store.get_network_key()
+    
+    def add_unicast_extended_session_key(self, extended_key):
+        self.store.add_unicast_extended_session_key(extended_key)
+
+
+    def add_broadcast_extended_session_key(self, extended_key):
+        self.store.add_broadcast_extended_session_key(extended_key)
+
+    def add_unicast_session_key(self, peer, key):
+        self.store.add_unicast_session_key(peer, key)
+    
+    def add_broadcast_session_key(self, peer, key):
+        self.store.add_broadcast_session_key(peer, key)
+     
+    def add_join_session_key(self, peer, key):
+        self.store.add_join_session_key(peer, key)
+        
+    def get_unicast_session_key(self, id1, id2):
+        return self.store.get_unicast_session_key(id1, id2)
+    
+    def get_broadcast_session_key(self, id1, id2):
+        return self.store.get_broadcast_session_key(id1, id2)
+    
+    def get_join_session_key(self, id1, id2):
+        return self.store.get_join_session_key(id1, id2)
+    
+    def get_unicast_peer(self, id1, id2)->Peer:
+        return self.store.get_unicast_peer(id1, id2)
+
+    def get_broadcast_peer(self, id1, id2)->Peer:
+        return self.store.get_broadcast_peer(id1, id2)
+    
+    def get_join_peer(self, id1, id2)->Peer:
+        return self.store.get_join_peer(id1, id2)
+
+    def parse_extended_key(self, key:str) -> Tuple[int, int, bytes, int]:
+        return self.store.parse_extended_key(key)
+
+    def parse_key(self, key)->bytes:
+        return self.store.parse_key(key)
     
     def extract_keys(self, packet):
         # convert into scapy packet if bytes only
@@ -396,7 +473,7 @@ class WirelessHartDecryptor:
             communications.append((self.get_broadcast_peer(packet.nwk_src_addr, 0xffff), self.get_broadcast_session_key(packet.nwk_src_addr, 0xffff)))
             communications.append((self.get_join_peer(packet.nwk_src_addr, packet.nwk_dest_addr), self.get_join_session_key(packet.nwk_src_addr, packet.nwk_dest_addr)))            
         elif packet.security_types == 1 : #join keyed
-            communications = [(None, self.__join_key)]
+            communications = [(None, self.get_join_key())]
         elif packet.security_types == 15: #already decrypted
             return packet, True
 
@@ -420,6 +497,29 @@ class WirelessHartDecryptor:
         #packet.show()
         #exit()
         return packet, False
+
+class WirelessHartEncryptor:
+    def __init__(self, store: KeyStore = None):
+        if store is None : 
+            store = KeyStore()
+        self.store = store
+
+    def __repr__(self):
+        repr_str = ["<WirelessHartEncryptor>"]
+
+        repr_str.append(f"\n{self.store!r}")
+
+        return "\n".join(repr_str)
+    
+    def get_join_key(self): return self.store.get_join_key()
+    def get_network_key(self):      return self.store.get_network_key()
+    def get_wellknown_key(self): return self.store.get_wellknown_key()
+    def get_unicast_session_key(self, id1, id2): return self.store.get_unicast_session_key(id1, id2) 
+    def get_broadcast_session_key(self, id1, id2): return self.store.get_broadcast_session_key(id1, id2)
+    def get_join_session_key(self, id1, id2): return self.store.get_join_session_key(id1, id2)
+    def get_unicast_peer(self, id1, id2)->Peer: return self.store.get_unicast_peer(id1, id2)
+    def get_broadcast_peer(self, id1, id2)->Peer: return self.store.get_broadcast_peer(id1, id2)
+    def get_join_peer(self, id1, id2)->Peer: return self.store.get_join_peer(id1, id2)
 
 class WirelessHartNetworkKeyExtractor(TrafficAnalyzer):
     """
