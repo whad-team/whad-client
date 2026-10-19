@@ -59,29 +59,38 @@ To display the list of available analyzers by domain, just use the ``--list`` (o
 .. code-block:: text
 
     $ wanalyze -l
+    Available analyzers:  ant
+      - download : index, offset, new_transfer, crc_seed, max_block_size, data_offset, file_size, crc, data
+      - authentication : method, response, host_serial, client_serial, host_auth, client_auth
+
     Available analyzers:  ble
-    - peripheral_information : adv_data, bd_addr, addr_type
-    - encrypted_session_initialization : master_skd, master_iv, slave_skd, slave_iv, started
-    - legacy_pairing_cracking : tk, stk
-    - ltk_distribution : ltk, rand, ediv
-    - irk_distribution : address, irk
-    - csrk_distribution : csrk
-    - profile_discovery : profile
+      - peripheral_information : adv_data, bd_addr, addr_type
+      - encrypted_session_initialization : master_skd, master_iv, slave_skd, slave_iv, started
+      - legacy_pairing_cracking : tk, stk
+      - ltk_distribution : ltk, rand, ediv
+      - irk_distribution : address, irk
+      - csrk_distribution : csrk
+      - profile_discovery : profile
 
     Available analyzers:  rf4ce
-    - key_cracking : key
-    - audio : raw_audio
-    - keystroke : key
+      - key_cracking : key
+      - audio : raw_audio
+      - keystroke : key
 
     Available analyzers:  unifying
-    - pairing_cracking : key
-    - mouse : x, y, wheel_x, wheel_y, button
-    - keystroke : key
-        parameter locale (default: "fr")
+      - pairing_cracking : key
+      - mouse : x, y, wheel_x, wheel_y, button
+      - keystroke : key
+          parameter locale (default: "fr")
+
+    Available analyzers:  wihart
+      - network_key : key
+      - session_key : type, key, source, destination, nonce
 
     Available analyzers:  zigbee
-    - touchlink_key_cracking : key_index, encrypted_key, decrypted_key
-    - transport_key_cracking : transport_key
+      - touchlink_key_cracking : key_index, encrypted_key, decrypted_key
+      - transport_key_cracking : transport_key
+
 
 Setting configuration parameters
 --------------------------------
@@ -720,3 +729,175 @@ Or as encrypted traffic by providing the key:
     f
     g
     h
+
+
+Extracting authentication data from ANT-FS communication
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+WHAD provides various analyzers to process ANT-FS communication using ``wanalyze``.
+
+As an example, let's download some traffic from several captures of ANT-FS passkey and pair methods:
+
+.. code-block:: text
+
+    $ wget https://github.com/whad-team/whad-client/raw/main/whad/resources/pcaps/antfs_passkey.pcap
+    $ wget https://github.com/whad-team/whad-client/raw/main/whad/resources/pcaps/antfs_passkey_2.pcap
+    $ wget https://github.com/whad-team/whad-client/raw/main/whad/resources/pcaps/antfs_pair.pcap
+
+
+You can then use ``wplay`` to replay the traffic:
+
+.. code-block:: text 
+
+    $ wplay --flush ../whad/resources/pcaps/antfs_passkey_2.pcap
+    [ decrypted=False, timestamp=0, rssi=0, is_crc_valid=True, rf_channel=0, channel_number=0 ]
+    <ANT_Hdr  preamble=41787 device_number=100 device_type=1 transmission_type=1 broadcast=broadcast ack=False end=False count=0 slot=True unknown=2 crc_present=yes crc=0xca2e |<ANT_FS_Header_Hdr  |<ANT_FS_Type_Hdr  packet_type=Beacon |<ANT_FS_Beacon_Packet  reserved=0 data=False upload=False pairing=True period=4 Hz (8192) state=link auth_type=pass-through |<ANT_FS_Beacon_Link_Packet  dev_type=2 manufacturer_id=GarminFr405Antfs |>>>>>
+
+    [ decrypted=False, timestamp=25000, rssi=0, is_crc_valid=True, rf_channel=0, channel_number=0 ]
+    <ANT_Hdr  preamble=41787 device_number=100 device_type=1 transmission_type=1 broadcast=broadcast ack=False end=False count=0 slot=True unknown=2 crc_present=yes crc=0xca2e |<ANT_FS_Header_Hdr  |<ANT_FS_Type_Hdr  packet_type=Beacon |<ANT_FS_Beacon_Packet  reserved=0 data=False upload=False pairing=True period=4 Hz (8192) state=link auth_type=pass-through |<ANT_FS_Beacon_Link_Packet  dev_type=2 manufacturer_id=GarminFr405Antfs |>>>>>
+
+    [ decrypted=False, timestamp=49999, rssi=0, is_crc_valid=True, rf_channel=0, channel_number=0 ]
+    <ANT_Hdr  preamble=41787 device_number=100 device_type=1 transmission_type=1 broadcast=broadcast ack=False end=False count=0 slot=True unknown=2 crc_present=yes crc=0xca2e |<ANT_FS_Header_Hdr  |<ANT_FS_Type_Hdr  packet_type=Beacon |<ANT_FS_Beacon_Packet  reserved=0 data=False upload=False pairing=True period=4 Hz (8192) state=link auth_type=pass-through |<ANT_FS_Beacon_Link_Packet  dev_type=2 manufacturer_id=GarminFr405Antfs |>>>>>
+
+Extracting the authentication information is then as simple as combining `wplay` and `wanalyze` together:
+
+.. code-block:: text
+
+    $ wplay --flush antfs_passkey.pcap | wanalyze 
+    [✓] authentication → completed
+      - method:  request_serial
+      - response:  reject
+      - host_serial:  123
+      - client_serial:  100
+      - host_auth:  
+      - client_auth:  504344656d6f
+
+    [✓] authentication → completed
+      - method:  request_passkey
+      - response:  accept
+      - host_serial:  123
+      - client_serial:  100
+      - host_auth:  00000000000000000000000000000000
+      - client_auth:  
+
+    $ wplay --flush antfs_passkey_2.pcap | wanalyze 
+    [✓] authentication → completed
+      - method:  request_passkey
+      - response:  accept
+      - host_serial:  123
+      - client_serial:  100
+      - host_auth:  4142434445464748494a4b4c4d4e4f50
+      - client_auth:  
+
+    $ wplay --flush antfs_pair.pcap | wanalyze 
+    [✓] authentication → completed
+      - method:  request_pairing
+      - response:  accept
+      - host_serial:  123
+      - client_serial:  100
+      - host_auth:  
+      - client_auth:  00000000000000000000000000000000
+
+Extracting downloaded data from ANT-FS communication
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+You can also extract data downloaded during a captured ANT-FS communication. 
+
+As an example, let's download some traffic embedding various downloaded data:
+
+.. code-block:: text
+
+    $ wget https://github.com/whad-team/whad-client/raw/main/whad/resources/pcaps/antfs_download_text.pcap
+    $ wget https://github.com/whad-team/whad-client/raw/main/whad/resources/pcaps/antfs_download_image.pcap
+    $ wget https://github.com/whad-team/whad-client/raw/main/whad/resources/pcaps/antfs_download_directory.pcap
+
+
+You can then use `wplay` to replay the traffic:
+
+.. code-block:: text
+
+    $ wplay antfs_download_text.pcap
+    [ decrypted=False, timestamp=0, rssi=0, is_crc_valid=True, rf_channel=0, channel_number=0 ]
+    <ANT_Hdr  preamble=41787 device_number=100 device_type=1 transmission_type=1 broadcast=broadcast ack=False end=False count=0 slot=True unknown=2 crc_present=yes crc=0xe1bc |<ANT_FS_Header_Hdr  |<ANT_FS_Type_Hdr  packet_type=Beacon |<ANT_FS_Beacon_Packet  reserved=0 data=True upload=False pairing=True period=8 Hz (4096) state=transport auth_type=pass-through |<ANT_FS_Beacon_Transport_Packet  host_serial=123 |>>>>>
+
+    [ decrypted=False, timestamp=12500, rssi=0, is_crc_valid=True, rf_channel=0, channel_number=0 ]
+    <ANT_Hdr  preamble=41787 device_number=100 device_type=1 transmission_type=1 broadcast=broadcast ack=False end=False count=0 slot=True unknown=2 crc_present=yes crc=0xe1bc |<ANT_FS_Header_Hdr  |<ANT_FS_Type_Hdr  packet_type=Beacon |<ANT_FS_Beacon_Packet  reserved=0 data=True upload=False pairing=True period=8 Hz (4096) state=transport auth_type=pass-through |<ANT_FS_Beacon_Transport_Packet  host_serial=123 |>>>>>
+
+Extracting downloaded data is as simple as combining `wplay` and `wanalyze`:
+
+
+.. code-block:: text
+
+    $ wplay --flush ../whad/resources/pcaps/antfs_download_text.pcap | wanalyze 
+    [✓] download → completed
+      - index:  2
+      - offset:  0
+      - new_transfer:  True
+      - crc_seed:  0
+      - max_block_size:  38
+      - data_offset:  0
+      - file_size:  38
+      - crc:  24618
+      - data:  41414141414141410d0a42424242424242420d0a43434343434343430d0a44444444444444440000
+
+
+
+With `--raw` parameter, it's also easy to recover in a text file the extracted data:
+
+.. code-block:: text
+
+    $ wplay --flush ../whad/resources/pcaps/antfs_download_text.pcap | wanalyze -r download.data > data.txt
+    $ cat data.txt 
+    AAAAAAAA
+    BBBBBBBB
+    CCCCCCCC
+    DDDDDDDD
+
+
+Using a similar method, a downloaded image can also be recovered:
+
+.. code-block:: text
+
+  $ wplay --flush ../whad/resources/pcaps/antfs_download_image.pcap | wanalyze -r download.data > data.png
+
+Finally, if a directory structure has been transferred over the ANT-FS communication, the *download* analyzer will automatically detect 
+it and append its structure to the analyzer's output. The resulting output should be similar to the following one:
+
+.. code-block:: text 
+
+  $ wplay --flush ../whad/resources/pcaps/antfs_download_directory.pcap | wanalyze 
+  [✓] authentication → completed
+    - method:  request_serial
+    - response:  reject
+    - host_serial:  123
+    - client_serial:  100
+    - host_auth:  
+    - client_auth:  504344656d6f
+
+  [✓] authentication → completed
+    - method:  request_pairing
+    - response:  accept
+    - host_serial:  123
+    - client_serial:  100
+    - host_auth:  
+    - client_auth:  00000000000000000000000000000000
+
+  [✓] download → completed
+    - index:  0
+    - offset:  0
+    - new_transfer:  True
+    - crc_seed:  0
+    - max_block_size:  65535
+    - data_offset:  0
+    - file_size:  144
+    - crc:  56175
+    - data:  0110000000000000a5000000d6b9264401008002000000c0520000004ad5eb2602008004000000a0f00200004ad5eb2603008005000000e0d30000004ad5eb2604008005010000e0ad0000004ad5eb2605008005020000e0bf0000004ad5eb2606008005030000e0bf0000004ad5eb260700800900000080ac0000004ad5eb260800800e00000080500000008a9b2827
+    - directory:  Directory - version = 0.1 | structure_length = 16 |  last_modification_date = 2026-03-25 15:57:10 - entries = 
+    FileEntry - index = 1| data type = 128 | permissions = Permissions(Rd, Wr) | date = 2010-09-09 18:02:50 | size = 82
+    FileEntry - index = 2| data type = 128 | permissions = Permissions(Rd, Er) | date = 2010-09-09 18:02:50 | size = 752
+    FileEntry - index = 3| data type = 128 | permissions = Permissions(Rd, Wr, Er) | date = 2010-09-09 18:02:50 | size = 211
+    FileEntry - index = 4| data type = 128 | permissions = Permissions(Rd, Wr, Er) | date = 2010-09-09 18:02:50 | size = 173
+    FileEntry - index = 5| data type = 128 | permissions = Permissions(Rd, Wr, Er) | date = 2010-09-09 18:02:50 | size = 191
+    FileEntry - index = 6| data type = 128 | permissions = Permissions(Rd, Wr, Er) | date = 2010-09-09 18:02:50 | size = 191
+    FileEntry - index = 7| data type = 128 | permissions = Permissions(Rd) | date = 2010-09-09 18:02:50 | size = 172
+    FileEntry - index = 8| data type = 128 | permissions = Permissions(Rd) | date = 2010-10-25 20:24:42 | size = 80

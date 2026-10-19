@@ -10,6 +10,7 @@ able to display the sniffed data in various formats:
 - IEEE 802.15.4
 - Nordic Semiconductor's *Enhanced ShockBurst* (ESB)
 - Logitech's Unifying protocol
+- ANT, ANT+ and ANT-FS
 
 Moreover, ``wsniff`` can be chained with other tools like ``wextract`` or ``wfilter``
 to allow more complex data processing. 
@@ -356,6 +357,83 @@ enabled with option ``--decrypt / -d`` in order to decode any encrypted payload 
 
     $ wsniff -i uart0 --format=show unifying --decrypt -k 086712d2f4f567662cb5ebafca20bb96
 
+
+ANT, ANT+ & ANT-FS sniffing
+----------------------------
+
+``wsniff`` can sniff ANT, ANT+ and ANT-FS packets and is able to :
+
+* automatically compute the adapted preamble depending on the provided network key
+* filter out according to device type, transmission type or device number
+* automatically switch channel to follow an ANT-FS communication
+
+
+Specific ANT options
+^^^^^^^^^^^^^^^^^^^^^^
+
+* ``--channel`` (``-c``): select a channel to sniff
+* ``--device-number DEVICE_NUMBER`` (``-dn``): filter a specific device number
+* ``--device-type DEVICE_TYPE`` (``-dp``): filter a specific device number
+* ``--transmission-type TRANSMISSION_TYPE``: filter a specific device number
+* ``--network-key`` (``-k``): provide a network key as hex string
+* ``--follow`` (``-f``): allow to automatically follow channel switches indicated in a ANT-FS communication
+
+
+Sniffing an ANT+ communication
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+By default, sniffer is configured to select the ANT+ network key, on channel 57 (default ANT+ channel). 
+As a result, sniffing ANT+ traffic is straightforward:
+
+.. code-block:: text
+
+    $ wsniff -i uart0 ant
+    [ decrypted=False, timestamp=2671055, rssi=-48, is_crc_valid=True, rf_channel=57, channel_number=0 ]
+    <ANT_Hdr  preamble=50598 device_number=7912 device_type=120 transmission_type=1 broadcast=broadcast ack=False end=False count=0 slot=True unknown=2 crc_present=yes crc=0xacfb |<ANT_Plus_Header_Hdr  |<ANT_Plus_HR_Header_Hdr  toggle_bit=1 data_page_number=4 |<ANT_HR_Previous_Heart_Beat_Data_Page  manufacturer=0 previous_heart_beat=46866 |<ANT_HR_Common_Payload  heart_beat_event_time=47635 heart_beat_count=246 computed_heart_rate=80 |>>>>>
+
+    [ decrypted=False, timestamp=2917335, rssi=-48, is_crc_valid=True, rf_channel=57, channel_number=0 ]
+    <ANT_Hdr  preamble=50598 device_number=7912 device_type=120 transmission_type=1 broadcast=broadcast ack=False end=False count=0 slot=True unknown=2 crc_present=yes crc=0xacfb |<ANT_Plus_Header_Hdr  |<ANT_Plus_HR_Header_Hdr  toggle_bit=1 data_page_number=4 |<ANT_HR_Previous_Heart_Beat_Data_Page  manufacturer=0 previous_heart_beat=46866 |<ANT_HR_Common_Payload  heart_beat_event_time=47635 heart_beat_count=246 computed_heart_rate=80 |>>>>>
+
+    [ decrypted=False, timestamp=3163615, rssi=-48, is_crc_valid=True, rf_channel=57, channel_number=0 ]
+    <ANT_Hdr  preamble=50598 device_number=7912 device_type=120 transmission_type=1 broadcast=broadcast ack=False end=False count=0 slot=True unknown=2 crc_present=yes crc=0x517a |<ANT_Plus_Header_Hdr  |<ANT_Plus_HR_Header_Hdr  toggle_bit=0 data_page_number=4 |<ANT_HR_Previous_Heart_Beat_Data_Page  manufacturer=0 previous_heart_beat=46866 |<ANT_HR_Common_Payload  heart_beat_event_time=47635 heart_beat_count=246 computed_heart_rate=80 |>>>>>
+
+You can also explicitely indicate the channel and network key parameters (ANT+ uses `45C372BDFB21A5B9` as network key and 57 as default channel):
+
+.. code-block:: text
+
+    $ wsniff -i uart0 ant -k 45C372BDFB21A5B9 -c 57
+
+
+A specific communication can be selected by providing some filters, such as device number, device type or transmission type. 
+For example, the following command will filter traffic to only keep packets matching HRM devices (device_type = 120):
+
+.. code-block:: text
+
+    $ wsniff -i uart0 ant --device-type 120
+    [ decrypted=False, timestamp=75072899, rssi=-48, is_crc_valid=True, rf_channel=57, channel_number=0 ]
+    <ANT_Hdr  preamble=50598 device_number=7912 device_type=120 transmission_type=1 broadcast=broadcast ack=False end=False count=0 slot=True unknown=2 crc_present=yes crc=0x1ff1 |<ANT_Plus_Header_Hdr  |<ANT_Plus_HR_Header_Hdr  toggle_bit=1 data_page_number=4 |<ANT_HR_Previous_Heart_Beat_Data_Page  manufacturer=0 previous_heart_beat=49062 |<ANT_HR_Common_Payload  heart_beat_event_time=50003 heart_beat_count=217 computed_heart_rate=70 |>>>>>
+
+    [ decrypted=False, timestamp=75319192, rssi=-47, is_crc_valid=True, rf_channel=57, channel_number=0 ]
+    <ANT_Hdr  preamble=50598 device_number=7912 device_type=120 transmission_type=1 broadcast=broadcast ack=False end=False count=0 slot=True unknown=2 crc_present=yes crc=0x1ff1 |<ANT_Plus_Header_Hdr  |<ANT_Plus_HR_Header_Hdr  toggle_bit=1 data_page_number=4 |<ANT_HR_Previous_Heart_Beat_Data_Page  manufacturer=0 previous_heart_beat=49062 |<ANT_HR_Common_Payload  heart_beat_event_time=50003 heart_beat_count=217 computed_heart_rate=70 |>>>>>
+
+Sniffing an ANT-FS communication
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+You can also provide the network key used by ANT-FS using `-k` parameter: `C1635EF5B923A4A8`.
+Since the communication may dynamically switch the channel, you can allow the sniffer to track the 
+communication and allow dynamic channel switching by enabling the `--follow` (`-f`) option.
+
+.. code-block:: text
+    
+    $ wsniff -i uart0 ant -k C1635EF5B923A4A8 -f
+    [ decrypted=False, timestamp=0, rssi=0, is_crc_valid=True, rf_channel=0, channel_number=0 ]
+    <ANT_Hdr  preamble=41787 device_number=100 device_type=1 transmission_type=1 broadcast=broadcast ack=False end=False count=0 slot=True unknown=2 crc_present=yes crc=0x94f6 |<ANT_FS_Header_Hdr  |<ANT_FS_Type_Hdr  packet_type=Beacon |<ANT_FS_Beacon_Packet  reserved=0 data=True upload=False pairing=True period=4 Hz (8192) state=link auth_type=pass-through |<ANT_FS_Beacon_Link_Packet  dev_type=416 manufacturer_id=GarminFr405Antfs |>>>>>
+
+    [ decrypted=False, timestamp=24999, rssi=0, is_crc_valid=True, rf_channel=0, channel_number=0 ]
+    <ANT_Hdr  preamble=41787 device_number=100 device_type=1 transmission_type=1 broadcast=broadcast ack=False end=False count=0 slot=True unknown=2 crc_present=yes crc=0x94f6 |<ANT_FS_Header_Hdr  |<ANT_FS_Type_Hdr  packet_type=Beacon |<ANT_FS_Beacon_Packet  reserved=0 data=True upload=False pairing=True period=4 Hz (8192) state=link auth_type=pass-through |<ANT_FS_Beacon_Link_Packet  dev_type=416 manufacturer_id=GarminFr405Antfs |>>>>>
+
+    [ decrypted=False, timestamp=49999, rssi=0, is_crc_valid=True, rf_channel=0, channel_number=0 ]
+    <ANT_Hdr  preamble=41787 device_number=100 device_type=1 transmission_type=1 broadcast=broadcast ack=False end=False count=0 slot=True unknown=2 crc_present=yes crc=0x94f6 |<ANT_FS_Header_Hdr  |<ANT_FS_Type_Hdr  packet_type=Beacon |<ANT_FS_Beacon_Packet  reserved=0 data=True upload=False pairing=True period=4 Hz (8192) state=link auth_type=pass-through |<ANT_FS_Beacon_Link_Packet  dev_type=416 manufacturer_id=GarminFr405Antfs |>>>>>
 
 Bluetooth Mesh sniffing
 ------------------------

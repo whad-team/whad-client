@@ -82,7 +82,19 @@ Welcome to WHAD's documentation!
 
 .. toctree::
     :maxdepth: 1
-    :caption: Bluetooth Mesh
+    :caption: ANT API
+
+    ant/started
+    ant/sniffer
+    ant/scanner
+    ant/master
+    ant/slave
+    ant/profiles
+    ant/crypto
+
+.. toctree::
+    :maxdepth: 1
+    :caption: Bluetooth Mesh API
 
     btmesh/started
     btmesh/profile

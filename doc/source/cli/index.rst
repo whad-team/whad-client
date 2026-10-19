@@ -51,6 +51,15 @@ Logitech Unifying tools
     unifying/wuni-mouse
     unifying/wuni-keyboard
 
+ANT, ANT+ & ANT-FS tools
+-------------------------
+
+.. toctree::
+    :maxdepth: 1
+
+    ant/antplus-display
+    ant/antplus-sensor
+
 Bluetooth Mesh tools
 --------------------------
 
