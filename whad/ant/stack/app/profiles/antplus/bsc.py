@@ -25,7 +25,7 @@ from whad.scapy.layers.ant import (
 )
 from time import time
 
-
+#! Dictionary of Speed Sensor Page Descriptors, indexed by page number
 SPEED_PAGE_DESCRIPTORS = {
     0: DataPageDescriptor(
         ANT_Bicycle_Speed_Default_Data_Page,
@@ -71,6 +71,8 @@ SPEED_PAGE_DESCRIPTORS = {
     ),
 }
 
+
+#! Dictionary of Candence Sensor Page Descriptors, indexed by page number
 CADENCE_PAGE_DESCRIPTORS = {
     0: DataPageDescriptor(
         ANT_Bicycle_Cadence_Default_Data_Page,
@@ -147,16 +149,24 @@ class BikeSpeedDisplay(AntPlusGenericDisplay):
     cumulative_count_attr = "cumulative_speed_revolution_count"
     event_time_attr = "bike_speed_event_time"
     
-    def on_speed_received(self, cumulative_rev_count, event_time):
+    def on_speed_received(self, cumulative_rev_count:int, event_time:int):
         """
         This callback is called when speed data is received.
         It can be overriden in subclasses.
+
+        :param cumulative_rev_count: Cumulative revision count
+        :type cumulative_rev_count: int
+        :param event_time: time of event
+        :type event_time: int
         """
         pass
 
-    def on_data_received(self, **kwargs):
+    def on_data_received(self, **kwargs:dict[str, str|int|bytes]):
         """
         Forwards generic callback to profile-specific callback.
+
+        :param kwargs: Dictionary of parameters
+        :type kwargs: dict[str, str|int|bytes]
         """
         cumulative = kwargs.get(self.cumulative_count_attr)
         event_time = kwargs.get(self.event_time_attr)
@@ -197,16 +207,24 @@ class BikeCadenceDisplay(AntPlusGenericDisplay):
     cumulative_count_attr = "cumulative_cadence_revolution_count"
     event_time_attr = "bike_cadence_event_time"
     
-    def on_cadence_received(self, cumulative_rev_count, event_time):
+    def on_cadence_received(self, cumulative_rev_count:int, event_time:int):
         """
         This callback is called when cadence data is received. 
         It can be overriden in subclass.
+
+        :param cumulative_rev_count: Cumulative revision count
+        :type cumulative_rev_count: int
+        :param event_time: time of event
+        :type event_time: int
         """
         pass
 
-    def on_data_received(self, **kwargs):
+    def on_data_received(self, **kwargs:dict[str, str|int|bytes]):
         """
         Forwards generic callback to profile-specific callback.
+
+        :param kwargs: Dictionary of parameters
+        :type kwargs: dict[str, str|int|bytes]
         """
         cumulative = kwargs.get(self.cumulative_count_attr)
         event_time = kwargs.get(self.event_time_attr)
@@ -238,6 +256,9 @@ class CombinedSpeedAndCadenceSensor(AntPlusGenericSensor):
     default_page_index = 0
 
     def reset(self):
+        """
+        Reset the profile.
+        """
         super().reset()
         self.__start_time = time()
         self.bike_cadence_event_time = 0
@@ -277,23 +298,36 @@ class CombinedSpeedAndCadenceDisplay(AntPlusGenericDisplay):
         self.bike_cadence_event_time = None
         self.cumulative_cadence_revolution_count = None
 
-    def on_cadence_received(self, cumulative_rev_count, event_time):
+    def on_cadence_received(self, cumulative_rev_count:int, event_time:int):
         """
         This callback is called when cadence data is received.
         It can be overriden in subclass.
+        
+        :param cumulative_rev_count: Cumulative revision count
+        :type cumulative_rev_count: int
+        :param event_time: time of event
+        :type event_time: int
         """
         pass
 
-    def on_speed_received(self, cumulative_rev_count, event_time):
+    def on_speed_received(self, cumulative_rev_count:int, event_time:int):
         """
         This callback is called when speed data is received.
         It can be overriden in subclass.
+
+        :param cumulative_rev_count: Cumulative revision count
+        :type cumulative_rev_count: int
+        :param event_time: time of event
+        :type event_time: int
         """
         pass
 
-    def on_broadcast(self, payload):
+    def on_broadcast(self, payload:bytes):
         """
         Extraction of speed and cadence from broadcast.
+        
+        :param payload: received payload
+        :type payload: bytes
         """
         if ANT_Plus_Bicycle_Speed_And_Cadence in payload:
             data = payload[ANT_Plus_Bicycle_Speed_And_Cadence]

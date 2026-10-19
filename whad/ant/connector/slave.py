@@ -138,6 +138,10 @@ class Slave(ANT):
                 if candidate_profile is not None:
                     self.__profile = candidate_profile()
                     channel.app.set_profile(self.__profile)
+            
+            if self.__profile is not None:
+                self.__profile.start()
+                
             self.start()
         return channel 
                

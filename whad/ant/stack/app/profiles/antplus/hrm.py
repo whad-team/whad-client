@@ -18,11 +18,12 @@ from whad.scapy.layers.ant import (
     ANT_HR_Common_Payload,
     ANT_MANUFACTURERS_ID,
     ANT_Request_Data_Page,
+    ANT_Hdr
 )
 from time import sleep, time
 from queue import Empty
 
-
+#! Dictionary of HRM Page Descriptors, indexed by page number
 HRM_PAGE_DESCRIPTORS = {
     0: DataPageDescriptor(
         ANT_HR_Default_Data_Page,
@@ -99,10 +100,15 @@ class HeartRateMonitor(AntPlusGenericSensor):
         self.heart_beat_event_time = 0
         self.heart_beat_count = 0
 
-    def _get_extra_layers(self, descriptor):
+    def _get_extra_layers(self, descriptor:DataPageDescriptor):
         """
         HRM always appends the common payload (heart rate data)
         after every data page.
+
+        :param descriptor: Descriptor of the Data Page
+        :type descriptor: DataPageDescriptor
+        :return: Scapy Packet filled with information
+        :rtype: list[ANT_HR_Common_Payload]
         """
         return [
             ANT_HR_Common_Payload(
@@ -112,9 +118,12 @@ class HeartRateMonitor(AntPlusGenericSensor):
             )
         ]
 
-    def _handle_request(self, requested_page):
+    def _handle_request(self, requested_page:int):
         """
         Handle data page request using page number directly.
+
+        :param requested_page: Requested page number
+        :type requested_page: int
         """
         if requested_page in self.data_page_descriptors:
             self.send_page(self.data_page_descriptors[requested_page])
@@ -125,6 +134,7 @@ class HeartRateMonitor(AntPlusGenericSensor):
     def main_loop(self):
         """
         Implement the HRM-specific main loop:
+
         - 16x Previous Heart Beat
         - 1x Manufacturer Information
         - 16x Previous Heart Beat
@@ -186,21 +196,36 @@ class HeartRateDisplay(AntPlusGenericDisplay):
         super().__init__()
         self.computed_heart_rate = None
 
-    def on_heart_rate_received(self, computed_heart_rate):
+    def on_heart_rate_received(self, computed_heart_rate:int):
         """
         Callback called when a heart rate value is received.
+
+        This callback can be overriden in child classes in order to
+        implement a custom behaviour.
+
+        :param computed_heart_rate: Computed Heart Rate received from the sensor
+        :type computed_heart_rate: int
         """
         pass
 
-    def on_heart_rate_update(self, computed_heart_rate):
+    def on_heart_rate_update(self, computed_heart_rate:int):
         """
         Callback called when heart rate changes.
+        
+        This callback can be overriden in child classes in order to
+        implement a custom behaviour.
+
+        :param computed_heart_rate: Computed Heart Rate received from the sensor
+        :type computed_heart_rate: int
         """
         pass
 
-    def on_data_received(self, **kwargs):
+    def on_data_received(self, **kwargs:dict[str,str|int|bytes]):
         """
         Forwards generic callback to profile-specific callbacks.
+        
+        :param kwargs: Dictionary of parameters
+        :type kwargs: dict[str, str|int|bytes]
         """
         hb = kwargs.get("computed_heart_rate")
         if hb is not None:
@@ -208,9 +233,12 @@ class HeartRateDisplay(AntPlusGenericDisplay):
             if self.computed_heart_rate != hb:
                 self.on_heart_rate_update(hb)
 
-    def on_broadcast(self, payload):
+    def on_broadcast(self, payload:ANT_Hdr):
         """
         Handle HRM broadcast.
+
+        :param payload: Scapy packet representing the payload
+        :type payload: ANT_Hdr
         """
         # Extract the common payload (heart rate data)
         if ANT_HR_Common_Payload in payload:
@@ -233,9 +261,11 @@ class HeartRateDisplay(AntPlusGenericDisplay):
 
         self._extract_known_attributes(payload)
 
-    def heart_rates(self):
+    def heart_rates(self) -> int:
         """
         Iterator over received heart rate values.
+
+        :yields: int
         """
         while self.is_started() or not self._data_queue.empty():
             try:

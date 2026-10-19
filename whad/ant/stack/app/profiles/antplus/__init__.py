@@ -5,7 +5,7 @@ from whad.ant.stack.app.profiles import AntProfile
 from whad.ant.crypto import ANT_PLUS_NETWORK_KEY
 from whad.ant.channel import ChannelDirection
 from whad.scapy.layers.ant import ANT_MANUFACTURERS_ID, ANT_Plus_Header_Hdr, \
-    ANT_Plus_HR_Header_Hdr, ANT_Request_Data_Page
+    ANT_Plus_HR_Header_Hdr, ANT_Request_Data_Page, ANT_Hdr
 from time import sleep, time
 from threading import Thread
 from queue import Queue, Empty
@@ -20,17 +20,28 @@ class AntPlusProfile(AntProfile):
     DEFAULT_RF_CHANNEL = 57
 
     @property
-    def human_readable_name(self):
+    def human_readable_name(self) -> str:
+        """Human readable name.
+
+        :return: human readable name (as string)
+        :rtype: str
+        """
         name = self.__class__.__name__
         human_readable_name = re.sub(r'(?<!^)(?=[A-Z])', ' ', name)
         return human_readable_name
 
 
 class AntPlusMasterProfile(AntPlusProfile):
+    """
+    Basic ANT+ Master Profile.
+    """
     CHANNEL_DIRECTION = ChannelDirection.TX
 
 
 class AntPlusSlaveProfile(AntPlusProfile):
+    """
+    Basic ANT+ Slave Profile.
+    """
     CHANNEL_DIRECTION = ChannelDirection.RX
 
 
@@ -47,15 +58,25 @@ class DataPageDescriptor:
         self.event_time_field = event_time_field
         self.cumulative_field = cumulative_field
 
-    def build(self, **kwargs):
+    def build(self, **kwargs) -> ANT_Hdr:
         """
         Build the Scapy layer according to keywords.
+
+        :param kwargs: keywords profided.
+        :type kwargs: dict[str, int|bytes|str]
+        :return: corresponding Scapy packet
+        :rtype: `whad.scapy.layers.ant.ANT_Hdr`
         """
         return self.layer_class(**kwargs)
 
-    def extract_fields(self, packet):
+    def extract_fields(self, packet:ANT_Hdr) ->  dict[str, int|bytes|str]:
         """
         Extract all fields from this page in a packet.
+
+        :param packet: Scapy packet to parse
+        :type packet: `whad.scapy.layers.ant.ANT_Hdr`
+        :return: dictionary of fields stored in the packet according to the page.
+        :rtype: dict[str, int|bytes|str]
         """
         if self.layer_class not in packet:
             return {}
@@ -73,13 +94,14 @@ class AntPlusGenericSensor(AntPlusMasterProfile):
     Generic ANT+ sensor.
 
     Subclasses need to define:
-    - DEVICE_TYPE, CHANNEL_PERIOD, TRANSMISSION_TYPE
-    - data_page_descriptors (list of DataPageDescriptor)
-    - default_page_index, background_pages
-    - header_class (optional, e.g. ANT_Plus_Bicycle_Speed_Header_Hdr)
-    - has_page_number_in_header (True if header carries a data_page_number)
-    - event_time_attr, cumulative_count_attr (attribute names on self)
-    - update_rate (default 1/4.04)
+
+        - DEVICE_TYPE, CHANNEL_PERIOD, TRANSMISSION_TYPE
+        - data_page_descriptors (list of DataPageDescriptor)
+        - default_page_index, background_pages
+        - header_class (optional, e.g. ANT_Plus_Bicycle_Speed_Header_Hdr)
+        - has_page_number_in_header (True if header carries a data_page_number)
+        - event_time_attr, cumulative_count_attr (attribute names on self)
+        - update_rate (default 1/4.04)
     """
 
     # Profile parameters
@@ -116,9 +138,12 @@ class AntPlusGenericSensor(AntPlusMasterProfile):
             if self.cumulative_count_attr is None:
                 self.cumulative_count_attr = cumulative
     
-    def _get_descriptor_list(self):
+    def _get_descriptor_list(self) -> list[DataPageDescriptor]:
         """
         Get data_page_descriptors as a list (convert from dict if needed).
+
+        :return: list of Data page descriptor objects.
+        :rtype: list[`whad.ant.stack.app.profiles.antplus.DataPageDescriptor`]
         """
         if isinstance(self.data_page_descriptors, dict):
             return list(self.data_page_descriptors.values())
@@ -127,6 +152,10 @@ class AntPlusGenericSensor(AntPlusMasterProfile):
     def _get_background_descriptors(self):
         """
         Get all background data page descriptors.
+
+        :return: list of Data page descriptor objects.
+        :rtype: list[`whad.ant.stack.app.profiles.antplus.DataPageDescriptor`]
+
         """
         return [desc for desc in self._get_descriptor_list() 
                 if desc.is_background]
@@ -166,9 +195,14 @@ class AntPlusGenericSensor(AntPlusMasterProfile):
         if self.cumulative_count_attr is not None:
             setattr(self, self.cumulative_count_attr, 0)
 
-    def _build_header(self, data_page_number=None):
+    def _build_header(self, data_page_number:int=None):
         """
         Build the ANT+ header (with optional sub-header).
+        
+        :param data_page_number: Data page number to use for the header
+        :type data_page_number: int
+        :return: Scapy Packet describing the ANT_Plus_Header_Hdr
+        :rtype: `whad.scapy.layers.ant.ANT_Plus_Header_Hdr`
         """
         if self.header_class is not None:
             if self.has_page_number_in_header and data_page_number is not None:
@@ -182,9 +216,12 @@ class AntPlusGenericSensor(AntPlusMasterProfile):
                 )
         return ANT_Plus_Header_Hdr()
 
-    def _get_page_kwargs(self, descriptor):
+    def _get_page_kwargs(self, descriptor:DataPageDescriptor):
         """
         Build keyword arguments for a data page layer.
+
+        :param descriptor: Data Page Descriptor object to use
+        :type descriptor: `whad.ant.stack.app.profiles.antplus.DataPageDescriptor`
         """
         kwargs = {}
         layer = descriptor.layer_class()
@@ -223,16 +260,22 @@ class AntPlusGenericSensor(AntPlusMasterProfile):
                 kwargs[field.name] = self.stop_indicator
         return kwargs
 
-    def _get_extra_layers(self, descriptor):
+    def _get_extra_layers(self, descriptor:DataPageDescriptor):
         """
         Return extra Scapy layers to append after the data page.
         It must be overriden in subclasses (for example, HRM common payload).
+
+        :param descriptor: Data Page Descriptor object to use
+        :type descriptor: `whad.ant.stack.app.profiles.antplus.DataPageDescriptor`
         """
         return []
 
-    def send_page(self, descriptor):
+    def send_page(self, descriptor:DataPageDescriptor):
         """
         Broadcast a data page.
+
+        :param descriptor: Data Page Descriptor object to send
+        :type descriptor: `whad.ant.stack.app.profiles.antplus.DataPageDescriptor`
         """
         kwargs = self._get_page_kwargs(descriptor)
         header = self._build_header(data_page_number=descriptor.page_number)
@@ -293,9 +336,12 @@ class AntPlusGenericSensor(AntPlusMasterProfile):
             if len(background_descriptors) > 0:
                 background_index = (background_index + 1) % len(background_descriptors)
 
-    def _handle_request(self, requested_page):
+    def _handle_request(self, requested_page:int):
         """
         Handle a data page request transmitted by a display.
+
+        :param requested_page: data page number to use
+        :type requested_page: int
         """
         if isinstance(self.data_page_descriptors, dict):
             if requested_page in self.data_page_descriptors:
@@ -323,9 +369,12 @@ class AntPlusGenericSensor(AntPlusMasterProfile):
                 int(time() - self.__start_time) // 2
             ) & 0xFFFFFF
 
-    def on_ack_burst(self, payload):
+    def on_ack_burst(self, payload:bytes):
         """
         Handle ACK burst (used for data page requests).
+        
+        :param payload: received payload
+        :type payload: bytes
         """
         if ANT_Request_Data_Page in payload:
             self._request = payload[ANT_Request_Data_Page].requested_page_number
@@ -344,10 +393,11 @@ class AntPlusGenericDisplay(AntPlusSlaveProfile):
     Generic ANT+ display.
 
     Subclasses need to implement or override:
-    - DEVICE_TYPE, CHANNEL_PERIOD, TRANSMISSION_TYPE
-    - data_page_descriptors
-    - header_class
-    - event_time_attr, cumulative_count_attr
+
+        - DEVICE_TYPE, CHANNEL_PERIOD, TRANSMISSION_TYPE
+        - data_page_descriptors
+        - header_class
+        - event_time_attr, cumulative_count_attr
     """
 
     DEVICE_TYPE = None
@@ -382,8 +432,21 @@ class AntPlusGenericDisplay(AntPlusSlaveProfile):
         self._data_queue = Queue()
 
 
-    def request_data_page(self, requested_page_number, number_of_responses=2,
-                          acknowledged_response=False, timeout=3):
+    def request_data_page(self, requested_page_number:int, number_of_responses:int=2,
+                          acknowledged_response:bool=False, timeout:int=3) -> ANT_Hdr:
+        """Send a Request Data Page with a requested page number.
+
+        :param requested_page_number: integer indicating the data page number
+        :type requested_page_number: int
+        :param number_of_responses: number of expected responses
+        :type number_of_responses: int
+        :param acknowledged_response: boolean indicating if an acknowledged response is expected
+        :type acknowledged_response: bool
+        :param timeout: timeout (in second)
+        :type timeout: int
+        :return: Data page response
+        :rtype: `whad.scapy.layers.ant.ANT_Hdr`
+        """
         request = (ANT_Plus_Header_Hdr() /
             ANT_Plus_HR_Header_Hdr() /
             ANT_Request_Data_Page(
@@ -404,21 +467,21 @@ class AntPlusGenericDisplay(AntPlusSlaveProfile):
 
         return self._data_page_response
 
-    def on_data_received(self, **kwargs):
+    def on_data_received(self, **kwargs:dict[str,str|int|bytes]):
         """
         Called when measurement data is received.
         This method must be overriden in subclasses.
         """
         pass
 
-    def on_page_received(self, page_descriptor, fields):
+    def on_page_received(self, page_descriptor:DataPageDescriptor, fields:dict[str,str|int|bytes]):
         """
         Called for every received data page.
         This method must be overriden in subclasses.
         """
         pass
 
-    def _extract_known_attributes(self, payload):
+    def _extract_known_attributes(self, payload:ANT_Hdr) -> bool:
         """
         Extract common attributes from any received data page.
         """
@@ -473,9 +536,12 @@ class AntPlusGenericDisplay(AntPlusSlaveProfile):
             return True
         return False
 
-    def on_broadcast(self, payload):
+    def on_broadcast(self, payload:bytes):
         """
         Generic broadcast handler.
+
+        :param payload: payload received in broadcast mode.
+        :type payload: bytes
         """
         if self.header_class is not None and self.header_class not in payload:
             return
@@ -521,6 +587,12 @@ ANTPLUS_PROFILES = (
 
 
 def find_slave_profile(device_type):
+    """
+    Returns the matching slave profile class according to the provided device type.
+
+    :param device_type: Device type to use for filter profiles
+    :type device_type: int
+    """
     for profile in ANTPLUS_PROFILES:
         if profile.DEVICE_TYPE == device_type and issubclass(profile, AntPlusSlaveProfile):
             return profile
@@ -528,6 +600,13 @@ def find_slave_profile(device_type):
 
 
 def find_master_profile(device_type):
+    """
+    Returns the matching master profile class according to the provided device type.
+
+    :param device_type: Device type to use for filter profiles
+    :type device_type: int
+    """
+
     for profile in ANTPLUS_PROFILES:
         if profile.DEVICE_TYPE == device_type and issubclass(profile, AntPlusMasterProfile):
             return profile

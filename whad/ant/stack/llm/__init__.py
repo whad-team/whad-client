@@ -26,7 +26,7 @@ from whad.ant.stack.app import AppLayer
 logger = logging.getLogger(__name__)
 
 
-class ANTChannel:
+class AntChannel:
     """ANT Channel implementation
     """
 
@@ -87,6 +87,41 @@ class ANTChannel:
         """Return the next pending transfer channel event.
         """
         return self.__transfer_events.get()
+
+    def broadcast(self, payload: bytes) -> bool:
+        """Send a given payload in broadcast at regular intervals.
+
+        :param payload: payload to transmit
+        :type payload: bytes
+        :return: boolean indicating if the payload has been transmitted
+        :rtype:boolean
+        """
+        return self.__app.get_layer('ll').broadcast(self.__channel_number, payload)
+
+
+    def ack(self, payload: bytes) -> bool:
+        """Send a given payload and ask for an acknowledgement.
+        
+        :param payload: payload to transmit
+        :type payload: bytes
+        :return: boolean indicating if the payload has been acknowledged
+        :rtype:boolean
+        """
+        return self.__app.get_layer('ll').ack(self.__channel_number, payload)
+
+
+
+    def burst(self, payload: bytes) -> bool:
+        """Send a given long payload in acknowledged burst mode.
+        
+        :param payload: payload to transmit
+        :type payload: bytes
+        :return: boolean indicating if the payload has been acknowledged
+        :rtype:boolean
+        """
+        return self.__app.get_layer('ll').burst(self.__channel_number, payload)
+
+
 
     def close(self):
         """Close this channel.
@@ -152,6 +187,15 @@ class ANTChannel:
         """
         return self.__channel_period
 
+    def on_broadcast(self, broadcast):
+        """Callback called when a broadcast is received (and no profile is set).
+        """
+        pass
+
+    def on_ack_burst(self, ack):
+        """Callback called when a ACK or Burst is received (and no profile is set).
+        """
+        pass
 
     @device_type.setter
     def device_type(self, new_value:int):
@@ -223,7 +267,7 @@ class LinkLayerState(LayerState):
         """Register a new channel.
         """
 
-        self.channels[channel_number] = ANTChannel(
+        self.channels[channel_number] = AntChannel(
             app_instance,
             channel_number,
             direction,
@@ -327,10 +371,10 @@ class LinkLayer(Layer):
         if network_number >= self.get_layer('phy').max_networks:
             raise NoAvailableNetworks()
         
-        self.get_layer('phy').set_network_key(network_number, network_key)
         self.get_layer('phy').set_device_number(channel_number, device_number)
         self.get_layer('phy').set_device_type(channel_number, device_type)
         self.get_layer('phy').set_transmission_type(channel_number, transmission_type)
+        self.get_layer('phy').set_network_key(network_number, network_key)
         
         self.get_layer('phy').assign_channel(
             channel_number,
@@ -384,6 +428,11 @@ class LinkLayer(Layer):
         if network_number >= self.get_layer('phy').max_networks:
             raise NoAvailableNetworks()
         
+        self.get_layer('phy').set_device_number(channel_number, device_number)
+        self.get_layer('phy').set_device_type(channel_number, device_type)
+        self.get_layer('phy').set_transmission_type(channel_number, transmission_type)
+
+
         self.get_layer('phy').set_network_key(network_number, network_key)
 
         self.get_layer('phy').assign_channel(
@@ -394,12 +443,8 @@ class LinkLayer(Layer):
             unidirectional=unidirectional
         )
 
-        self.get_layer('phy').set_device_number(channel_number, device_number)
-        self.get_layer('phy').set_device_type(channel_number, device_type)
-        self.get_layer('phy').set_transmission_type(channel_number, transmission_type)
-        self.get_layer('phy').set_rf_channel(channel_number, rf_channel)
 
-        
+        self.get_layer('phy').set_rf_channel(channel_number, rf_channel)        
         self.get_layer('phy').set_channel_period(channel_number, channel_period)
         self.get_layer('phy').open_channel(channel_number)
     
@@ -425,7 +470,7 @@ class LinkLayer(Layer):
         return channel
 
     def close_channel(self, channel):
-        if isinstance(channel, ANTChannel):
+        if isinstance(channel, AntChannel):
             channel_number = channel.channel_number
         elif isinstance(channel, int):
             channel_number = channel
@@ -626,7 +671,6 @@ class LinkLayer(Layer):
                 self.state.channels[channel_number].mark_as_opened()
 
             app_instance = self.state.channels[channel_number].app
-
             if (
                 self.state.channels[channel_number].device_type == 0 or
                 self.state.channels[channel_number].device_number == 0 or
@@ -635,8 +679,12 @@ class LinkLayer(Layer):
                 self.state.channels[channel_number].device_type = pdu.device_type
                 self.state.channels[channel_number].transmission_type = pdu.transmission_type
                 self.state.channels[channel_number].device_number = pdu.device_number
-            
+        
             self.send(app_instance.name, pdu)
-
+            
+            if ANT_Hdr in pdu and pdu.broadcast == 0:
+                self.state.channels[channel_number].on_broadcast(pdu[1:])
+            else:
+                self.state.channels[channel_number].on_ack_burst(pdu[1:])
 
 LinkLayer.add(AppLayer)

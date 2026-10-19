@@ -18,10 +18,12 @@ from whad.scapy.layers.ant import (
     ANT_Plus_User_Profile_Data_Page,
     ANT_MANUFACTURERS_ID,
     ANT_Request_Data_Page,
+    ANT_Hdr
 )
 from time import sleep
 from queue import Empty
 
+#! Dictionary of Weight Scale Page Descriptors, indexed by page number
 WEIGHT_SCALE_PAGE_DESCRIPTORS = {
     1: DataPageDescriptor(
         ANT_Plus_Weight_Scale_Body_Weight_Data_Page,
@@ -123,9 +125,12 @@ class WeightScaleSensor(AntPlusGenericSensor):
         self.user_specific_data_enabled = False
         self._ws_request = None
 
-    def set_weight(self, weight_kg):
+    def set_weight(self, weight_kg:int):
         """
         Set the weight measurement (in kg).
+
+        :param weight_kg: New weight in kilograms.
+        :type weight_kg: int
         """
         if weight_kg is not None:
             self.body_weight = int(weight_kg * 100)
@@ -134,29 +139,45 @@ class WeightScaleSensor(AntPlusGenericSensor):
 
     def set_body_composition_percentage(
         self,
-        hydration_percent=None,
-        body_fat_percent=None
+        hydration_percent:float=None,
+        body_fat_percent:float=None
     ):
         """
         Set body composition percentage data.
+
+        :param hydration_percent: Percentage of hydratation
+        :type hydratation_percent: float
+        :param body_fat_percent: Percentage of body fat
+        :type body_fat_percent: float
         """
         if hydration_percent is not None:
             self.hydration = int(hydration_percent * 100)
         if body_fat_percent is not None:
             self.body_fat = int(body_fat_percent * 100)
 
-    def set_metabolic_information(self, active_met_kcal=None, basal_met_kcal=None):
+    def set_metabolic_information(self, active_met_kcal:float=None, basal_met_kcal:float=None):
         """
         Set metabolic information (in kcal, resolution 0.25 kcal).
+
+
+        :param active_met_kcal: Active metabolic information (in kilo calories).
+        :type active_met_kcal: float
+        :param basal_met_kcal: Basal metabolic information (in kilo calories).
+        :type basal_met_kcal: float
         """
         if active_met_kcal is not None:
             self.active_metabolic_rate = int(active_met_kcal * 4)
         if basal_met_kcal is not None:
             self.basal_metabolic_rate = int(basal_met_kcal * 4)
 
-    def set_body_composition_mass(self, muscle_mass_kg=None, bone_mass_kg=None):
+    def set_body_composition_mass(self, muscle_mass_kg:float=None, bone_mass_kg:float=None):
         """
         Set body composition mass data.
+        
+        :param muscle_mass_kg: Muscle mass (in kilograms).
+        :type muscle_mass_kg: float
+        :param bone_mass_kg: Bone mass (in kilograms).
+        :type bone_mass_kg: float
         """
         if muscle_mass_kg is not None:
             self.muscle_mass = int(muscle_mass_kg * 100)
@@ -269,7 +290,7 @@ class WeightScaleSensor(AntPlusGenericSensor):
 
     def send_default_page(self):
         """
-        Send body weight data page (page 1).
+        Send body weight data page (page 1) in broadcast mode.
         """
         header = self._build_header(data_page_number=1)
         packet = header / ANT_Plus_Weight_Scale_Body_Weight_Data_Page(
@@ -290,9 +311,12 @@ class WeightScaleSensor(AntPlusGenericSensor):
         )
         self.broadcast(packet)
 
-    def send_page(self, descriptor):
+    def send_page(self, descriptor:DataPageDescriptor):
         """
         Send a specific data page.
+
+        :param descriptor: Data Page Descriptor
+        :type descriptor: DataPageDescriptor
         """
         if descriptor.layer_class == ANT_Plus_Weight_Scale_Body_Weight_Data_Page:
             self.send_default_page()
@@ -304,17 +328,33 @@ class WeightScaleSensor(AntPlusGenericSensor):
             packet = header / descriptor.build(**kwargs)
             self.broadcast(packet)
 
-    def on_user_profile_received(self, user_profile_id, gender, age,
-                                  height, athlete_setting, activity_class):
+    def on_user_profile_received(self, user_profile_id:int, gender:int, age:int,
+                                  height:int, athlete_setting:int, activity_class:int):
         """
         Called when a valid user profile is received from the display.
         Override in subclasses to handle user profile data.
+        
+        :param user_profile_id: User profile identifier
+        :type user_profile_id: int
+        :param gender: Indicator of gender
+        :type gender: int
+        :param age: Age of user
+        :type age: int
+        :param height: Height of user (in cm)
+        :type height: int
+        :param athlete_setting: Athlete setting
+        :param athlete_setting: int
+        :param activity_class: Activity class
+        :param activity_class: int
         """
         pass
 
-    def on_ack_burst(self, payload):
+    def on_ack_burst(self, payload: ANT_Hdr):
         """
         Handle ACK burst messages.
+        
+        :param payload: Received payload
+        :type payload: ANT_Hdr
         """
         if ANT_Request_Data_Page in payload:
             self._ws_request = (
@@ -411,44 +451,79 @@ class WeightScaleDisplay(AntPlusGenericDisplay):
         self.scale_user_specific_data = False
 
     # Callbacks
-    def on_weight_received(self, weight_kg):
+    def on_weight_received(self, weight_kg:float):
         """
         This callback is called when a weight measurement is received.
         It can be overriden in subclasses.
+
+        :param weight_kg: Weight in kilograms
+        :type weight_kg: float
         """
         pass
 
-    def on_body_composition_received(self, hydration_percent=None, body_fat_percent=None):
+    def on_body_composition_received(self, hydration_percent:float=None, body_fat_percent:float=None):
         """
         This callback is called when a body composition data is received.
         It can be overriden in subclasses.
+
+        :param hydration_percent: Hydratation in percentage
+        :type hydration_percent: float
+        :param body_fat_percent: Body Fat in percentage
+        :type body_fat_percent: float
         """
         pass
 
-    def on_metabolic_information_received(self, active_met_kcal=None, basal_met_kcal=None):
+    def on_metabolic_information_received(self, active_met_kcal:float=None, basal_met_kcal:float=None):
         """
         This callback is called when a metabolic information is received.
         It can be overriden in subclasses.
+
+        :param active_met_kcal: Active metabolic information in kilo calories
+        :type active_met_kcal: float
+        :param basal_met_kcal: Basal metabolic information in kilo calories
+        :type basal_met_kcal: float
+
         """
         pass
 
-    def on_body_composition_mass_received(self, muscle_mass_kg=None, bone_mass_kg=None):
+    def on_body_composition_mass_received(self, muscle_mass_kg:float=None, bone_mass_kg:float=None):
         """
         This callback is called when a body composition mass data is received.
         It can be overriden in subclasses.
+
+        :param muscle_mass_kg: Muscle mass in kilograms
+        :type muscle_mass_kg: float
+        :param bone_mass_kg: Bone mass in kilograms
+        :type bone_mass_kg: float
         """
         pass
 
-    def on_user_profile_received(self, profile_id, gender, age, height, athlete, activity):
+    def on_user_profile_received(self, profile_id:int, gender:int, age:int, height:int, athlete:int, activity:int):
         """
         This callback is called when a user data profile is received.
         It can be overriden in subclasses.
+
+        :param profile_id: User profile identifier
+        :type profile_id: int
+        :param gender: Indicator of gender
+        :type gender: int
+        :param age: Age of user
+        :type age: int
+        :param height: Height of user (in cm)
+        :type height: int
+        :param athlete: Athlete setting
+        :param athlete: int
+        :param activity: Activity class
+        :param activity: int
         """
         pass
 
-    def on_broadcast(self, payload):
+    def on_broadcast(self, payload:ANT_Hdr):
         """
         Handle weight scale broadcast.
+
+        :param payload: received payload
+        :type payload: ANT_Hdr
         """
 
         if self.header_class in payload:
@@ -563,15 +638,23 @@ class WeightScaleDisplay(AntPlusGenericDisplay):
 
         self._extract_known_attributes(payload)
 
-    def send_user_profile(self, profile_id, gender=0, age=0, height=0, athlete_setting=0, activity_class=0):
+    def send_user_profile(self, profile_id:int, gender:int=0, age:int=0, height:int=0, athlete_setting:int=0, activity_class:int=0):
         """Send a user profile data page (0x3A) to the weight scale.
 
         :param profile_id: User profile ID (256-65534 for mobile display, 16-255 for stationary display)
+        :type profile_id: int
         :param gender: 0 = Female, 1 = Male
+        :type gender: int
         :param age: 0-127 years
+        :type age: int
         :param height: Height in cm (0-255)
+        :type height: int
         :param athlete_setting: 0 = Standard, 1 = Lifetime Athlete
+        :type athlete_setting: int
         :param activity_class: 0-7 activity level (see spec Table 6-9)
+        :type activity_class: int
+
+        
         """
         header = ANT_Plus_Weight_Scale_Header_Hdr(data_page_number=0x3A)
         profile = ANT_Plus_User_Profile_Data_Page(
@@ -596,6 +679,8 @@ class WeightScaleDisplay(AntPlusGenericDisplay):
     def weight_values(self):
         """
         Iterator over received body weight values (in kg).
+
+        :yields: Weight values (in kg)
         """
         while self.is_started() or not self._data_queue.empty():
             try:

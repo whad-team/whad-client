@@ -12,6 +12,8 @@ from whad.hub.ant import RawPduReceived, PduReceived
 from whad.hub.message import AbstractPacket
 from whad.exceptions import WhadDeviceDisconnected
 from whad.ant.crypto import ANT_PLUS_NETWORK_KEY
+from whad.ant.stack.llm import AntChannel
+from whad.ant.stack.app.profiles import AntProfile
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +22,12 @@ class Master(ANT):
     ANT connector to emulate an ANT Master node.
     """
 
-    def __init__(self, device, profile=None):
+    def __init__(self, device, profile:AntProfile=None):
+        """Constructor of the ANT Master connector.
+
+        :param profile: Pre-select a profile.
+        :type profile: `whad.ant.stack.app.profiles.AntProfile`
+        """
         ANT.__init__(self, device)
 
         self.__profile = profile
@@ -47,10 +54,16 @@ class Master(ANT):
         
     @property
     def stack(self):
+        """
+        ANT Stack.
+        """
         return self.__stack
 
     @property
     def profile(self):
+        """
+        ANT Profile (None if no profile selected).
+        """
         return self.__profile
 
 
@@ -63,16 +76,39 @@ class Master(ANT):
 
     def create_channel(
         self,
-        device_number=None,
-        device_type=None,
-        transmission_type=None,
-        channel_period = None,
-        rf_channel = None,
-        network_key = None,
-        unidirectional = False,
-        shared = False,
-        background = False
-    ):
+        device_number:int = None,
+        device_type:int = None,
+        transmission_type:int = None,
+        channel_period:int = None,
+        rf_channel:int = None,
+        network_key:bytes = None,
+        unidirectional:bool = False,
+        shared:bool = False,
+        background:bool = False
+    ) -> AntChannel:
+        """Create a new channel (and automatically starts the connector).
+        
+        :param device_number: Identifier of the device
+        :type device_number: int
+        :param device_type: Type of the device
+        :type device_type: int
+        :param transmission_type: Transmission type of the device
+        :type transmission_type: int
+        :param channel_period: Duration of a channel timeslot
+        :type channel_period: int
+        :param rf_channel: RF channel to use
+        :type rf_channel: int
+        :param network_key: Network key used by the channel
+        :type network_key: bytes
+        :param unidirectional: Boolean indicating if the channel is unidirectional
+        :type unidirectional: bool
+        :param shared: Boolean indicating if the channel is shared
+        :type shared: bool
+        :param background: Boolean indicating if the channel runs in background
+        :type background: bool
+        :return: ANT Channel if successfully created, None otherwise
+        :rtype: :class:`whad.ant.stack.llm.AntChannel`
+        """
 
         if (
             device_number is None and
@@ -130,6 +166,7 @@ class Master(ANT):
             self._enable_role()
             if self.__profile is not None:
                 channel.app.set_profile(self.__profile)
+                self.__profile.start()
         self.start()
         return channel 
                
