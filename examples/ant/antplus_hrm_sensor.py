@@ -21,7 +21,7 @@ if __name__ == '__main__':
             profile = HeartRateMonitor()
 
             master = Master(dev, profile=profile)
-            profile.start()
+            
             channel = master.create_channel()
             if channel is not None:
                 print("Heart Rate Monitor Sensor started. Press Ctrl+C to stop.")

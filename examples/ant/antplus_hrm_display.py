@@ -21,7 +21,6 @@ if __name__ == '__main__':
             profile = HeartRateDisplay()
 
             slave = Slave(dev, profile=profile)
-            profile.start()
             
             channel = slave.search_channel()
             if channel is not None:
