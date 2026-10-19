@@ -567,6 +567,10 @@ class WirelessHartSessionKeyExtractor(TrafficAnalyzer):
         self._source = None
         self._destination = None
         self._nonce_counter = None
+        self._nonce_counter = None
+        self._pending_key = None
+        self._pending_id2 = None
+        self._pending_nonce = None
 
     @property
     def output(self):
@@ -577,71 +581,7 @@ class WirelessHartSessionKeyExtractor(TrafficAnalyzer):
             "destination": self._destination,
             "nonce": self._nonce_counter
         }
-    '''
-    def process_packet(self, packet: Packet):
-        if isinstance(packet, bytes):
-            packet = Dot15d4FCS(packet)
 
-        pkt = packet.decrypted if hasattr(packet, "decrypted") and packet.decrypted is not None else packet
-        transport_layer = pkt.getlayer(WirelessHart_Transport_Layer_Hdr)
-
-        if transport_layer is None:
-            return
-
-        for cmd in transport_layer.commands:
-
-            if hasattr(cmd, "command_number") and cmd.command_number == 0x3c3:
-                source = None
-                destination = None
-
-                source = cmd.nickname 
-
-                if cmd.session_type == 0x0:
-                    key_type = "unicast" 
-
-                    if pkt.nwk_src_addr == source:
-                        destination = pkt.parent_proxy_addr if hasattr(pkt, 'parent_proxy_addr') else 0x0001
-                    else:
-                        destination = pkt.nwk_src_addr if pkt.nwk_src_addr_length == 0 else 0x0001
-                        
-                    key = cmd.key_value
-                    nonce_counter = cmd.peer_nonce_counter_value
-
-                elif cmd.session_type == 0x1:
-                    key_type = "broadcast" 
-                    destination = 0xFFFF
-                    key = cmd.key_value
-                    nonce_counter = cmd.peer_nonce_counter_value
-
-                elif cmd.session_type == 0x2:
-                    key_type = "join" 
-                    destination = 0x0001
-                    key = cmd.key_value
-                    nonce_counter = cmd.peer_nonce_counter_value
-
-                if source is not None and destination is not None:
-                    peer = Peer(source, destination)
-                    
-                    if peer in self.__class__._cache and self.__class__._cache[peer] == nonce_counter:
-                        continue
-                if source is not None and destination is not None:
-                    peer = Peer(source, destination)
-                    
-                    if peer in self.__class__._cache and self.__class__._cache[peer] == nonce_counter:
-                        continue
-
-                self.__class__._cache[peer] = nonce_counter
-                self.trigger()
-                self.mark_packet(packet)
-                
-                self._key_type = key_type
-                self._source = source
-                self._key = key
-                self._destination = destination
-                self._nonce_counter = nonce_counter
-                    
-                self.complete()
-    '''
     def process_packet(self, packet):
         triggered_this_packet = False
 
@@ -659,11 +599,12 @@ class WirelessHartSessionKeyExtractor(TrafficAnalyzer):
             if hasattr(cmd, "command_number") and cmd.command_number == 0x3c3:
                 id_1 = pkt.nwk_src_addr if pkt.response != 0 else pkt.nwk_dest_addr
                 peer = Peer(cmd.nickname, id_1)
+                cached = self.__class__._cache.get(peer)
 
                 if cmd.session_type == 0x0:
                     if getattr(pkt, "nwk_dest_addr_length", None) == 0x0 and getattr(pkt, "nwk_src_addr_length", None) == 0x0:
                         
-                        if peer in self.__class__._cache and self.__class__._cache[peer] == cmd.peer_nonce_counter_value:
+                        if cached == (cmd.key_value, cmd.peer_nonce_counter_value):
                             continue
 
                         self._key_type = "unicast"
@@ -679,7 +620,8 @@ class WirelessHartSessionKeyExtractor(TrafficAnalyzer):
 
                 elif cmd.session_type == 0x1: # Broadcast
                     peer = Peer(0xffff, cmd.nickname)
-                    if peer in self.__class__._cache and self.__class__._cache[peer] == cmd.peer_nonce_counter_value:
+                    cached = self.__class__._cache.get(peer)
+                    if cached == (cmd.key_value, cmd.peer_nonce_counter_value):
                         continue
                     
                     self._key_type = "broadcast"
@@ -690,7 +632,7 @@ class WirelessHartSessionKeyExtractor(TrafficAnalyzer):
                     triggered_this_packet = True
 
                 elif cmd.session_type == 0x2: # Join
-                    if peer in self.__class__._cache and self.__class__._cache[peer] == cmd.peer_nonce_counter_value:
+                    if cached == (cmd.key_value, cmd.peer_nonce_counter_value):
                         continue
                     
                     self._key_type = "join"
@@ -703,8 +645,9 @@ class WirelessHartSessionKeyExtractor(TrafficAnalyzer):
             elif hasattr(cmd, "command_number") and cmd.command_number == 0x3C2:
                 if self._pending_key is not None:
                     peer = Peer(cmd.nickname, self._pending_id2, self._pending_nonce)
-                    
-                    if peer in self.__class__._cache and self.__class__._cache[peer] == self._pending_nonce:
+                    cached = self.__class__._cache.get(peer)
+
+                    if cached == (self._pending_key, self._pending_nonce):
                         continue
                     
                     self._key_type = "unicast"
@@ -717,7 +660,7 @@ class WirelessHartSessionKeyExtractor(TrafficAnalyzer):
 
         if triggered_this_packet:
             final_peer = Peer(self._source, self._destination)
-            self.__class__._cache[final_peer] = self._nonce_counter
+            self.__class__._cache[final_peer] = (self._key, self._nonce_counter)
             
             self.trigger()
             self.mark_packet(packet)
