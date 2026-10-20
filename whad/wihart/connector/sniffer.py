@@ -63,6 +63,9 @@ class Sniffer(WirelessHart, EventsManager):
             self.__decryptor.add_unicast_extended_session_key(ext_key)
         
 
+    def is_synchronized(self):
+        return self._synchronized
+    
     def _enable_sniffing(self):
         self._provision_keys_from_configuration()        
         self.enable_tsch()
