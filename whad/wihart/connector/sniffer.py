@@ -414,6 +414,8 @@ class Sniffer(WirelessHart, EventsManager):
         data = self.network_state_to_dict()
         with open(filename, "w", encoding="utf-8") as output:
             json.dump(data, output, indent=2)
+        
+        logger.info("Saved network parameters to %s", filename)
 
     def network_state_to_dict(self):
         superframes = {str(superframe_id): self.network.superframes[superframe_id].to_dict() for superframe_id in self.network.superframes}
