@@ -65,6 +65,30 @@ class Sniffer(WirelessHart, EventsManager):
 
     def is_synchronized(self):
         return self._synchronized
+
+    def detect_channel(self, duration : int = 1, show : bool = True) -> int:
+        """
+        Detects a first channel used to transmit WirelessHART traffic to permit synchronization to the network
+        
+        :param duration: duration to listen for on each cahnnel used by WirelessHART in seconds
+        :type duration: int
+        :param show: show the captured packets while detecting the channel used
+        :type show: bool
+
+        :return: a channel used by the network 
+        :rtype: int
+        """
+        while not self.is_synchronized():
+            for channel in range(11,26):
+                #Set channel on which our sniffer will listen
+                self.channel = channel
+
+                for packet in self.sniff(timeout=duration):
+                    if show :
+                        packet.show()
+                    if self.is_synchronized():
+                        return channel
+        return self.channel
     
     def _enable_sniffing(self):
         self._provision_keys_from_configuration()        

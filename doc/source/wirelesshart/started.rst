@@ -67,15 +67,8 @@ Once synchronised, iterating over :meth:`sniff` follows the hopping schedule:
         # Enable TSCH mode on the sniffer
         sniffer.enable_tsch()
 
-        # Check the sniffer was synchronized otherwise change channel as we consider it to be not operated
-        for channel in range(11,26):
-            #Set channel on which our sniffer will listen
-            sniffer.channel = channel
-
-            for packet in sniffer.sniff(timeout=1.0):
-                packet.show()
-            if sniffer.is_synchronized():
-                break
+        # Look for a channel used to transmit WirelessHART packets
+        sniffer.detect_channel()
         
         for pkt in sniffer.sniff():
             if WirelessHart_DataLink_Advertisement not in pkt:
