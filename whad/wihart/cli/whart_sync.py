@@ -95,6 +95,8 @@ class WiHARTsynchApp(CommandLineDeviceSource):
         
         bridge = Bridge(sniffer, unix_server)
 
+        bridge.join()
+
 
     def run(self):
         
@@ -151,7 +153,7 @@ class WiHARTsynchApp(CommandLineDeviceSource):
                                 break
 
                     state = sniffer.network_state_to_dict()
-                    self.connect_target(self.args.mote, state)              
+                    self.connect_target(sniffer, self.args.mote, state)              
 
                     self.warning("Synchronized, handing over the interface...")
 
