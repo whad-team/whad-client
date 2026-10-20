@@ -411,8 +411,13 @@ class Sniffer(WirelessHart, EventsManager):
         saved state may no longer be valid when restoring it (for example, after network
         key rotation or superframe/link updates).
         """
+        data = self.network_state_to_dict()
+        with open(filename, "w", encoding="utf-8") as output:
+            json.dump(data, output, indent=2)
+
+    def network_state_to_dict(self):
         superframes = {str(superframe_id): self.network.superframes[superframe_id].to_dict() for superframe_id in self.network.superframes}
-        data = {
+        return {
             "join_key": (
                 self.__configuration.join_key.hex()
                 if self.__configuration.join_key is not None else None
@@ -425,23 +430,8 @@ class Sniffer(WirelessHart, EventsManager):
             "broadcast_session_keys": self.__configuration.broadcast_session_keys,
             "superframe": superframes,
         }
-        with open(filename, "w", encoding="utf-8") as output:
-            json.dump(data, output, indent=2)
 
-    def load_network_state(self, filename: str):
-        """Load a previously saved network state from a JSON file.
-
-        The loaded state contains the keys and TSCH network state required
-        to restore the current network state without performing the joining procedure again.
-        Be careful: a network may update its state while the sniffer is not running, so the
-        loaded state may no longer be valid when restoring it 
-        
-        :param filename: path to the JSON file produced by `save_network_state`
-        :type filename: str
-        """
-        with open(filename, "r", encoding="utf-8") as input_file:
-            data = json.load(input_file)
-
+    def dict_to_network_state(self, data):
         # Keys extraction
         if data.get("join_key") is not None :
             self.add_join_key(bytes.fromhex(data["join_key"]))
@@ -488,4 +478,20 @@ class Sniffer(WirelessHart, EventsManager):
                     link_type=LinkType[link["link_type"]]
                 )
         self._provision_keys_from_configuration()
+
+    def load_network_state(self, filename: str):
+        """Load a previously saved network state from a JSON file.
+
+        The loaded state contains the keys and TSCH network state required
+        to restore the current network state without performing the joining procedure again.
+        Be careful: a network may update its state while the sniffer is not running, so the
+        loaded state may no longer be valid when restoring it 
+        
+        :param filename: path to the JSON file produced by `save_network_state`
+        :type filename: str
+        """
+        with open(filename, "r", encoding="utf-8") as input_file:
+            data = json.load(input_file)
+        
+        self.dict_to_network_state(data)
         logger.info("Loaded network parameters from %s", filename)
