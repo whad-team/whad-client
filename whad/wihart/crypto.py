@@ -204,7 +204,16 @@ class KeyStore:
             repr_str.append("    (empty)")
 
         return "\n".join(repr_str)
-    
+
+    def get_unicast_peers(self):
+        return list(self.__unicast_sessions_keys.keys())
+
+    def get_broadcast_peers(self):
+        return list(self.__broadcast_sessions_keys.keys())
+
+    def get_join_peers(self):
+        return list(self.__join_sessions_keys.keys())
+
     def set_join_key(self, key):
         key = self.parse_key(key)
         if key:
@@ -349,6 +358,15 @@ class WirelessHartDecryptor:
         repr_str.append(f"\n{self.store!r}")
 
         return "\n".join(repr_str)
+
+    def get_unicast_peers(self):
+        return self.store.get_unicast_peers()
+
+    def get_broadcast_peers(self):
+        return self.store.get_broadcast_peers()
+
+    def get_join_peers(self):
+        return self.store.get_join_peers()
 
     def get_store(self):
         return self.store
@@ -510,7 +528,9 @@ class WirelessHartEncryptor:
         repr_str.append(f"\n{self.store!r}")
 
         return "\n".join(repr_str)
-    
+    def get_unicast_peers(self): return self.store.get_unicast_peers()
+    def get_broadcast_peers(self): return self.store.get_broadcast_peers()
+    def get_join_peers(self): return self.store.get_join_peers()
     def get_join_key(self): return self.store.get_join_key()
     def get_network_key(self):      return self.store.get_network_key()
     def get_wellknown_key(self): return self.store.get_wellknown_key()
