@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class WiHARTsynchApp(CommandLineDeviceSource):
-    """Wireless HART keyboard CLI app
+    """Wireless HART synchronization app
     """
 
     def __init__(self):
@@ -160,7 +160,7 @@ class WiHARTsynchApp(CommandLineDeviceSource):
                 else:
                     self.error("You need to specify an interface with option --interface.")
             else:
-                self.error("This tool is destinated for synchronization before handling over to another  ")
+                self.error("This tool is destined for synchronization before handling over to another  ")
 
         except KeyboardInterrupt:
             self.warning('whart-synch stopped (CTRL-C)')
