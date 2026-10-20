@@ -1,5 +1,4 @@
 from whad.dot15d4.utils.tsch import Network
-from whad.wihart.connector import WirelessHart
 from whad.wihart.crypto import KeyStore, WirelessHartEncryptor, \
         compute_dlmic, WirelessHartNetworkLayerCryptoManager
 from whad.scapy.layers.wirelesshart import WirelessHart_Command_Response_Hdr, WirelessHart_Network_Security_SubLayer_Hdr, \
@@ -12,16 +11,17 @@ from whad.dot15d4.utils.phy import ChannelMap
 from whad.hub.dot15d4 import LinkOptions, LinkType
 from scapy.packet import Packet
 from whad.wihart.exceptions import MissingCryptographicMaterial
+from whad.dot15d4.connector.injector import Injector as Dot15d4Injector
 
 
 
-class Injector(WirelessHart):
+class Injector(Dot15d4Injector):
     """
     WirelessHART Injector interface for WHAD devices
     """
 
     def __init__(self, device, store : KeyStore = None, network : Network = None):
-        WirelessHart.__init__(self, device)
+        Dot15d4Injector.__init__(self, device, scapy_config='wihart')
 
         if store is None :
             store = KeyStore()

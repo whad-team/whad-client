@@ -18,10 +18,10 @@ class Injector(Dot15d4):
     802.15.4 Injector interface for compatible WHAD device.
     """
 
-    def __init__(self, device):
+    def __init__(self, device, synchronous=False, scapy_config='zigbee'):
         """Initialize our injector.
         """
-        Dot15d4.__init__(self, device)
+        Dot15d4.__init__(self, device, synchronous, scapy_config)
 
         self.__configuration = InjectionConfiguration()
 
