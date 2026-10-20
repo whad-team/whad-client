@@ -150,6 +150,12 @@ class Peer:
 
     def get_nonce_counter(self):
         return self._nonce
+
+    def get_id1(self):
+        return self._id1
+
+    def get_id2(self):
+        return self._id2
     
     def set_nonce_counter(self, nonce):
         self._nonce = nonce & 0xFFFFFFFF
