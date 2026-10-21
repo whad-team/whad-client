@@ -17,6 +17,10 @@ jobs:
       matrix:
         os: [ubuntu-22.04, ubuntu-latest]
         python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
+        exclude:
+          # ubuntu-latest (26.04) no longer provides Python 3.9.
+          - os: ubuntu-latest
+            python-version: '3.9'
     steps:
       - uses: actions/checkout@v2
         with:
