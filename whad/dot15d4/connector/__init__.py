@@ -516,7 +516,7 @@ class Dot15d4(Connector):
 
         if isinstance(resp, Success):
             self.__tsch_network.add_link(superframe_id, source, time_slot, channel_offset, neighbor, options, link_type)
-            print(self.network)
+            #print(self.network)
             return True
 
         return False

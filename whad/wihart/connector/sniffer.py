@@ -374,7 +374,7 @@ class Sniffer(WirelessHart, EventsManager):
             for message in super().capture(messages=(message_type), timeout=timeout):
                 if message is not None:
                     packet = message.to_packet()
-                    print("Time offset:", packet.metadata.timestamp - packet.metadata.start_of_slot_timestamp)
+                    #print("Time offset:", packet.metadata.timestamp - packet.metadata.start_of_slot_timestamp)
 
                     if self.__configuration.hide_adv and WirelessHart_DataLink_Advertisement in packet and self._synchronized:
                         continue
