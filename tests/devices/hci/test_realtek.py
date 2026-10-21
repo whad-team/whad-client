@@ -1,6 +1,7 @@
 """Offline tests for the Realtek HCI firmware/configuration helpers."""
 
 import struct
+import hashlib
 from collections import deque
 from pathlib import Path
 from types import SimpleNamespace
@@ -26,16 +27,21 @@ from whad.device.hci.realtek import (
     RTK_CONFIG_BDADDR_OFFSET,
     RTK_CONFIG_MAGIC,
     RTK_CONFIG_NAME_8761BU,
+    RTK_CONFIG_NAME_8761CU,
     RTK_EXTENSION_SIGNATURE,
     RTK_FIRMWARE_DIR_ENV,
     RTK_FIRMWARE_NAME_8761BU,
+    RTK_FIRMWARE_NAME_8761CU,
     RTK_FRAGMENT_LENGTH,
     RTK_PROJECT_ID_8761B,
+    RTK_PROJECT_ID_8761C,
+    RTK_BUNDLED_FIRMWARE_DIR,
     RealtekConfig,
     RealtekFirmware,
     RealtekFirmwareError,
     iter_download_fragments,
     load_rtl8761bu_images,
+    load_rtl8761cu_images,
 )
 from whad.hub.ble import AddressType, BDAddress
 from whad.scapy.layers.hci import (
@@ -401,6 +407,44 @@ def test_loader_uses_environment_directory_and_optional_config(tmp_path, monkeyp
     assert config.entries == RealtekConfig.parse(config_data).entries
 
 
+@pytest.mark.parametrize(
+    ("loader", "project_id", "firmware_name", "config_name", "digest"),
+    (
+        (load_rtl8761bu_images, RTK_PROJECT_ID_8761B,
+         RTK_FIRMWARE_NAME_8761BU, RTK_CONFIG_NAME_8761BU,
+         "1d7a9597349ad89344fa16c1913d3e39e9a12e966e417ca16871bc79bbe59edb"),
+        (load_rtl8761cu_images, RTK_PROJECT_ID_8761C,
+         RTK_FIRMWARE_NAME_8761CU, RTK_CONFIG_NAME_8761CU,
+         "525bfa5ab9a3ed74b788f9ac494467c522a436c1bc5290ebcb05c7f920533c09"),
+    ),
+)
+def test_bundled_images_are_available_and_unmodified(
+    loader, project_id, firmware_name, config_name, digest, monkeypatch, tmp_path
+):
+    monkeypatch.delenv(RTK_FIRMWARE_DIR_ENV, raising=False)
+    monkeypatch.setattr(realtek_module, "RTK_FIRMWARE_SEARCH_DIRS", ())
+    monkeypatch.setattr(realtek_module, "RTK_FIRMWARE_CLASS_PATH", tmp_path / "missing")
+
+    firmware, config = loader()
+
+    assert firmware.project_id == project_id
+    assert hashlib.sha256((RTK_BUNDLED_FIRMWARE_DIR / firmware_name).read_bytes()).hexdigest() == digest
+    assert config.to_bytes() == (RTK_BUNDLED_FIRMWARE_DIR / config_name).read_bytes()
+    assert firmware.patch_for_rom(0).payload
+
+
+def test_c_firmware_directory_override(tmp_path, monkeypatch):
+    (tmp_path / RTK_FIRMWARE_NAME_8761CU).write_bytes(
+        _epatch(project_id=RTK_PROJECT_ID_8761C, version=0x1234D3F3)
+    )
+    monkeypatch.setenv(RTK_FIRMWARE_DIR_ENV, str(tmp_path))
+
+    firmware, config = load_rtl8761cu_images()
+
+    assert firmware.version == 0x1234D3F3
+    assert config.entries == ()
+
+
 def test_loader_accepts_missing_optional_config(tmp_path, monkeypatch):
     (tmp_path / RTK_FIRMWARE_NAME_8761BU).write_bytes(_epatch())
     monkeypatch.setenv(RTK_FIRMWARE_DIR_ENV, str(tmp_path))
@@ -679,6 +723,46 @@ def test_public_address_success_has_exact_download_sequence_and_readback(monkeyp
     ]
     assert device._bd_address.value == target
     assert device._bd_address_type == AddressType.PUBLIC
+
+
+def test_c_public_address_uses_c_image_and_rechecks_address(monkeypatch):
+    original = bytes.fromhex("92 27 41 4c e0 00")
+    target = bytes.fromhex("a8 25 19 f3 38 44")
+    device = _device_with_address(original)
+    firmware = RealtekFirmware(_epatch(
+        version=0x4618D3F3, project_id=RTK_PROJECT_ID_8761C
+    ))
+    config = RealtekConfig()
+    downloads = []
+
+    monkeypatch.setattr(hci_module, "load_rtl8761cu_images", lambda: (firmware, config))
+    monkeypatch.setattr(
+        hci_module, "load_rtl8761bu_images",
+        lambda: pytest.fail("RTL8761B firmware selected for RTL8761C"),
+    )
+    monkeypatch.setattr(device, "_download_realtek_firmware", lambda *args, **kwargs:
+                        downloads.append((args, kwargs)))
+
+    assert device._set_realtek_public_bd_address(
+        target, _version_response(firmware.version, hci_version=0x0D)
+    )
+    assert len(downloads) == 1
+    assert downloads[0][0][0] is firmware
+    assert downloads[0][0][1].entries == config.with_bd_address(target).entries
+    assert downloads[0][1] == {"expected_address": target}
+
+
+def test_c_cold_rom_uses_c_image(monkeypatch):
+    device = _device_with_address(bytes.fromhex("92 27 41 4c e0 00"))
+    firmware = RealtekFirmware(_epatch(project_id=RTK_PROJECT_ID_8761C))
+    monkeypatch.setattr(hci_module, "load_rtl8761cu_images", lambda: (firmware, RealtekConfig()))
+    monkeypatch.setattr(device, "_download_realtek_firmware", lambda *args, **kwargs: None)
+
+    assert device._set_realtek_public_bd_address(
+        bytes.fromhex("a8 25 19 f3 38 44"),
+        _LayeredResponse(hci_version=0x0D, hci_subversion=0x000E,
+                         lmp_subversion=0x8761),
+    )
 
 
 def test_rejected_fragment_rolls_back_stock_config_and_verifies_original_address(

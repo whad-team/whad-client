@@ -282,7 +282,7 @@ class Device:
         """Load all known interfaces."""
         # Base transport
         from .uart import Uart
-        from .hci import Hci
+        from .hci import Hci, HciUsb
         from .tcp import TcpSocket
         from .unix import UnixSocket
         # Virtual transport
@@ -295,6 +295,7 @@ class Device:
         return [
             Uart,
             Hci,
+            HciUsb,
             TcpSocket,
             UnixSocket,
             Pcap,
@@ -439,6 +440,9 @@ class Device:
             elif transport == 'hci':
                 from .hci import Hci
                 return Hci.create_inst(interface)
+            elif transport == 'hciusb':
+                from .hci import HciUsb
+                return HciUsb.create_inst(interface)
             elif transport == 'tcp':
                 from .tcp import TcpSocket
                 return TcpSocket.create_inst(interface)

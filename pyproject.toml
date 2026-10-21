@@ -94,6 +94,9 @@ whad = [
   "resources/rules/*.rules",
   "resources/wireshark/*.lua",
   "resources/clues/data/CLUES_data_human_verified.json",
+  "resources/firmware/realtek/*.bin",
+  "resources/firmware/realtek/*.txt",
+  "resources/firmware/realtek/*.md",
 ]
 
 [project.urls]

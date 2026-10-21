@@ -55,8 +55,9 @@ from ..device import VirtualDevice
 from .converter import HCIConverter
 from .hciconfig import HCIConfig
 from .constants import LE_STATES, HCIInternalState, HCIConnectionState
-from .realtek import RealtekFirmwareError, RTK_PROJECT_ID_8761B, RTK_ROM_LMP_8761A, \
-    iter_download_fragments, load_rtl8761bu_images
+from .realtek import RealtekFirmwareError, RTK_PROJECT_ID_8761B, \
+    RTK_PROJECT_ID_8761C, RTK_ROM_LMP_8761A, iter_download_fragments, \
+    load_rtl8761bu_images, load_rtl8761cu_images
 
 logger = logging.getLogger(__name__)
 
@@ -299,25 +300,31 @@ class Hci(VirtualDevice):
         """
         if not self.__opened:
             # Open a Bluetooth user socket
-            self.__socket = get_hci(self.__index)
+            self.__socket = self._open_transport()
             if self.__socket is None:
                 # An error occurred, raising error
                 logger.error("Whad device is not ready.")
                 raise WhadDeviceNotReady()
 
-            # Flush HCI interface
-            logger.debug("[%s] Flushing HCI interface ...", self.interface)
-            self.__socket.flush()
+            try:
+                # Flush HCI interface before starting the reception thread.
+                logger.debug("[%s] Flushing HCI interface ...", self.interface)
+                self.__socket.flush()
+                self.__opened = True
+                super().open()
+                if not self._initialize():
+                    raise WhadDeviceNotReady()
+            except Exception:
+                if self.__opened:
+                    super().close()
+                self.__opened = False
+                self.__socket.close()
+                self.__socket = None
+                raise
 
-            # Mark as opened
-            self.__opened = True
-
-            # Ask parent class to run a background I/O thread
-            super().open()
-
-            # Initialize this HCI interface
-            if not self._initialize():
-                raise WhadDeviceNotReady()
+    def _open_transport(self):
+        """Open the platform transport; USB subclasses provide their own."""
+        return get_hci(self.__index)
 
     def close(self):
         """
@@ -384,8 +391,10 @@ class Hci(VirtualDevice):
             if self.__socket is not None and self.__socket.readable(0.1):
                 # Lock our socket to catch the awaiting event
                 self.__lock.acquire()
-                event = self.__socket.recv()
-                self.__lock.release()
+                try:
+                    event = self.__socket.recv()
+                finally:
+                    self.__lock.release()
                 if event.type == 0x4 and event.code in (0xe, 0xf, 0x13):
                     self.__hci_responses.put(event)
                 else:
@@ -437,8 +446,10 @@ class Hci(VirtualDevice):
 
 
         except (BrokenPipeError, OSError) as err:
-            print(err)
+            if self.__closing or not self.__opened:
+                return
             logger.error("Error, waiting...")
+            logger.debug("HCI receive failed: %s", err)
             sleep(1)
 
     def _wait_response(self, timeout=None):
@@ -972,7 +983,7 @@ class Hci(VirtualDevice):
         raise WhadDeviceNotReady()
 
     def _download_realtek_firmware(self, firmware, config, expected_address=None):
-        """Drop and reload RTL8761BU firmware with ``config`` appended."""
+        """Drop and reload a supported Realtek patch with ``config`` appended."""
         self._write_command_without_response(HCI_Cmd_Realtek_Drop_Firmware())
         sleep(0.2)
 
@@ -986,15 +997,21 @@ class Hci(VirtualDevice):
             HCI_Cmd_Read_Local_Version_Information(),
             timeout=REALTEK_COMMAND_TIMEOUT
         )
+        rom_versions = {
+            RTK_PROJECT_ID_8761B: (0x0A, 0x000B),
+            RTK_PROJECT_ID_8761C: (0x0D, 0x000E),
+        }
+        expected_rom = rom_versions.get(firmware.project_id)
         if (
-            version_response is None
+            expected_rom is None
+            or version_response is None
             or version_response.status != 0x00
             or version_response.company_identifier != REALTEK_COMPANY_IDENTIFIER
             or version_response.lmp_subversion != RTK_ROM_LMP_8761A
-            or version_response.hci_version != 0x0A
-            or version_response.hci_subversion != 0x000B
+            or (version_response.hci_version,
+                version_response.hci_subversion) != expected_rom
         ):
-            raise RealtekFirmwareError("controller is not supported RTL8761BU ROM")
+            raise RealtekFirmwareError("controller is not a supported Realtek ROM")
 
         rom_response = self._write_command(
             HCI_Cmd_Realtek_Read_ROM_Version(), timeout=REALTEK_COMMAND_TIMEOUT
@@ -1048,26 +1065,38 @@ class Hci(VirtualDevice):
                 raise RealtekFirmwareError("public Bluetooth address readback failed")
 
     def _set_realtek_public_bd_address(self, bd_address, current_version):
-        """Set and verify an ephemeral RTL8761BU public address."""
+        """Set and verify an ephemeral RTL8761BU/CU public address."""
         firmware = None
         base_config = None
         download_started = False
         try:
-            firmware, base_config = load_rtl8761bu_images()
-            if firmware.project_id != RTK_PROJECT_ID_8761B:
-                raise RealtekFirmwareError("firmware is not an RTL8761B image")
+            is_cold_c = (
+                current_version.hci_version == 0x0D
+                and current_version.hci_subversion == 0x000E
+                and current_version.lmp_subversion == RTK_ROM_LMP_8761A
+            )
+            loader = load_rtl8761cu_images if is_cold_c or (
+                current_version.lmp_subversion == 0xD3F3
+            ) else load_rtl8761bu_images
+            firmware, base_config = loader()
+            expected_project = (
+                RTK_PROJECT_ID_8761C if loader is load_rtl8761cu_images
+                else RTK_PROJECT_ID_8761B
+            )
+            if firmware.project_id != expected_project:
+                raise RealtekFirmwareError("firmware is for another Realtek chip")
             current_firmware_version = (
                 (current_version.hci_subversion << 16)
                 | current_version.lmp_subversion
             )
             is_loaded_image = current_firmware_version == firmware.version
-            is_cold_rom = (
+            is_cold_b = (
                 current_version.hci_version == 0x0A
                 and current_version.hci_subversion == 0x000B
                 and current_version.lmp_subversion == RTK_ROM_LMP_8761A
             )
-            if not (is_loaded_image or is_cold_rom):
-                raise RealtekFirmwareError("controller is not supported RTL8761BU")
+            if not (is_loaded_image or is_cold_b or is_cold_c):
+                raise RealtekFirmwareError("controller is not supported RTL8761BU/CU")
 
             if self._bd_address is None:
                 raise RealtekFirmwareError("current public address is unavailable")
@@ -1666,3 +1695,40 @@ class Hci(VirtualDevice):
         else:
             logger.debug("HCI adapter does not support BD address spoofing")
             self._send_whad_command_result(CommandResult.ERROR)
+
+
+class HciUsb(Hci):
+    """Realtek USB HCI interface for macOS, using the existing HCI adapter."""
+
+    INTERFACE_NAME = "hciusb"
+
+    @classmethod
+    def list(cls):
+        from sys import platform
+        if platform != "darwin":
+            return []
+        from .usb_transport import find_realtek_usb_devices, usb_identity
+        identities = sorted(set(
+            usb_identity(device) for device in find_realtek_usb_devices()
+        ))
+        return [cls(index, identity) for index, identity in enumerate(identities)]
+
+    def __init__(self, index, identity):
+        super().__init__(index=index)
+        self._usb_identity = identity
+
+    @property
+    def identifier(self):
+        return self._usb_identity
+
+    def _open_transport(self):
+        from .usb_transport import RealtekUSBTransport
+        transport = None
+        try:
+            transport = RealtekUSBTransport(self._usb_identity)
+            transport.load_firmware_if_needed()
+            return transport
+        except (RealtekFirmwareError, OSError) as error:
+            if transport is not None:
+                transport.close()
+            raise WhadDeviceNotReady() from error

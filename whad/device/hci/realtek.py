@@ -17,10 +17,16 @@ RTK_EPATCH_SIGNATURE = b"Realtech"
 RTK_EXTENSION_SIGNATURE = bytes((0x51, 0x04, 0xFD, 0x77))
 RTK_FRAGMENT_LENGTH = 252
 RTK_PROJECT_ID_8761B = 14
+RTK_PROJECT_ID_8761C = 51
 RTK_ROM_LMP_8761A = 0x8761
 RTK_FIRMWARE_DIR_ENV = "WHAD_RTK_FIRMWARE_DIR"
 RTK_FIRMWARE_NAME_8761BU = "rtl8761bu_fw.bin"
 RTK_CONFIG_NAME_8761BU = "rtl8761bu_config.bin"
+RTK_FIRMWARE_NAME_8761CU = "rtl8761cu_fw.bin"
+RTK_CONFIG_NAME_8761CU = "rtl8761cu_config.bin"
+RTK_BUNDLED_FIRMWARE_DIR = (
+    Path(__file__).resolve().parents[2] / "resources" / "firmware" / "realtek"
+)
 RTK_FIRMWARE_CLASS_PATH = Path("/sys/module/firmware_class/parameters/path")
 RTK_FIRMWARE_SEARCH_DIRS = (
     Path("/lib/firmware/rtl_bt"),
@@ -223,11 +229,12 @@ def _system_firmware_search_dirs():
     return tuple(dict.fromkeys(search_dirs))
 
 
-def load_rtl8761bu_images():
-    """Load the RTL8761BU epatch and optional base configuration.
+def _load_realtek_images(firmware_name, config_name):
+    """Load an unmodified Realtek epatch and its optional base config.
 
     ``WHAD_RTK_FIRMWARE_DIR`` overrides system discovery. Otherwise, the
-    kernel-configured firmware root and common distribution paths are searched.
+    kernel-configured firmware root, common distribution paths, and bundled
+    upstream linux-firmware copies are searched in that order.
     Compressed distro firmware is intentionally not decompressed in-process;
     callers can point the environment variable at an uncompressed copy.
     """
@@ -237,27 +244,42 @@ def load_rtl8761bu_images():
         search_dirs.append(Path(os.environ[RTK_FIRMWARE_DIR_ENV]))
     else:
         search_dirs.extend(_system_firmware_search_dirs())
+        search_dirs.append(RTK_BUNDLED_FIRMWARE_DIR)
 
     firmware_path = None
     for directory in search_dirs:
-        candidate = directory / RTK_FIRMWARE_NAME_8761BU
+        candidate = directory / firmware_name
         if candidate.is_file():
             firmware_path = candidate
             break
     if firmware_path is None:
         raise RealtekFirmwareError(
             "{} was not found; set {} to an uncompressed firmware directory".format(
-                RTK_FIRMWARE_NAME_8761BU, RTK_FIRMWARE_DIR_ENV
+                firmware_name, RTK_FIRMWARE_DIR_ENV
             )
         )
 
-    config_path = firmware_path.with_name(RTK_CONFIG_NAME_8761BU)
+    config_path = firmware_path.with_name(config_name)
     try:
         firmware_data = firmware_path.read_bytes()
         config_data = config_path.read_bytes() if config_path.is_file() else None
     except OSError as error:
         raise RealtekFirmwareError(
-            "RTL8761BU firmware files could not be read"
+            "Realtek firmware files could not be read"
         ) from error
 
     return RealtekFirmware(firmware_data), RealtekConfig.parse(config_data)
+
+
+def load_rtl8761bu_images():
+    """Load RTL8761BU firmware and configuration."""
+    return _load_realtek_images(
+        RTK_FIRMWARE_NAME_8761BU, RTK_CONFIG_NAME_8761BU
+    )
+
+
+def load_rtl8761cu_images():
+    """Load RTL8761CU firmware and configuration."""
+    return _load_realtek_images(
+        RTK_FIRMWARE_NAME_8761CU, RTK_CONFIG_NAME_8761CU
+    )
