@@ -45,10 +45,10 @@ class Injector(Dot15d4Injector):
     
     def get_asn_to_send(self, src, dst, link_type, link_options, force_next_sf: bool = True, asn_offset: int = 200):
         current_asn = self.network.asn
-        (sf, link) = self.network.get_link(src, dst, link_type=link_type, options=link_options)
-        if sf is None or link is None:
+        result = self.network.get_link(src, dst, link_type=link_type, options=link_options)
+        if result is None:
             raise Exception(f"No link found for src={dst}, dst=0xFFFF, link_type={link_type}, link_options={link_options}")  
-
+        sf, link = result
         # If the current ASN is greater than the link's time slot, we need to force the next superframe to ensure the packet is sent in the correct time slot.
         if (current_asn % sf.number_of_slots) > link.time_slot:
             force_next_sf = True
