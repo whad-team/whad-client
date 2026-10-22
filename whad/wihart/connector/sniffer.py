@@ -420,6 +420,7 @@ class Sniffer(WirelessHart, EventsManager):
     def network_state_to_dict(self):
         superframes = {str(superframe_id): self.network.superframes[superframe_id].to_dict() for superframe_id in self.network.superframes}
         return {
+            "panid": self.network.panid,
             "join_key": (
                 self.__configuration.join_key.hex()
                 if self.__configuration.join_key is not None else None
@@ -434,6 +435,8 @@ class Sniffer(WirelessHart, EventsManager):
         }
 
     def dict_to_network_state(self, data):
+        if data.get("panid") is not None:
+            self.network.panid = int(data["panid"])
         # Keys extraction
         if data.get("join_key") is not None :
             self.add_join_key(bytes.fromhex(data["join_key"]))
