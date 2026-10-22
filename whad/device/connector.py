@@ -833,7 +833,7 @@ class Connector:
             # If timeout is provided, compute remaining time and
             # exit loop when reached.
             if timeout is not None:
-                timeout = timeout - (time() - start_mark)
+                timeout = initial_to - (time() - start_mark)
                 if timeout < 0:
                     break
 
