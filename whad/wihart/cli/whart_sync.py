@@ -23,7 +23,7 @@ class WiHARTsynchApp(CommandLineDeviceSource):
 
     def __init__(self):
         super().__init__(
-            description="This tool permits the synchronization to a wirelessHART network" \
+            description="This tool permits the synchronization to a wirelessHART network " \
             "in order to sniff or inject traffic",
             interface=True,
             commands=False
