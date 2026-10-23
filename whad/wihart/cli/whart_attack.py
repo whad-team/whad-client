@@ -11,6 +11,7 @@ from scapy.all import BrightTheme
 
 from prompt_toolkit import PromptSession, print_formatted_text
 from prompt_toolkit.patch_stdout import patch_stdout
+from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.formatted_text import ANSI
 
 from whad.cli.app import CommandLineDeviceSink, run_app
@@ -114,10 +115,16 @@ class WiHARTattackApp(CommandLineDeviceSink):
     def _prompt_loop(self):
         print("PROMPT THREAD ALIVE", file=sys.stderr)
 
+        completer = WordCompleter(
+            [attr[5:].replace('_', '-') for attr in dir(self) if attr.startswith('_cmd_')] + ['exit', 'quit'],
+            ignore_case=True,
+        )
         session = PromptSession(
             "whart> ",
             bottom_toolbar=self._toolbar,
             refresh_interval=0.5,
+            completer=completer,
+            complete_while_typing=True
         )
 
         print("\n[+] Interactive mode ready. Type 'help' for commands.")
