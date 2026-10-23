@@ -60,6 +60,15 @@ Bluetooth Mesh tools
     btmesh/btmesh-provisionee
     btmesh/btmesh-provisioner
 
+WirelessHART tools
+--------------------------
+
+.. toctree::
+    :maxdepth: 1
+
+    wihart/whart-attack
+    wihart/whart-sync
+
 
 
 
