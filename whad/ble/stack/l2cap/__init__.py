@@ -104,15 +104,12 @@ class L2CAPLayer(ContextualLayer):
 
     def on_cmd_packet(self, packet):
         """Handle L2CAP Connection Parameter Update Requests.
-
-        This command is rejected by default.
         """
         if L2CAP_Connection_Parameter_Update_Request in packet:
-            logger.debug("[l2cap] Received a L2CAP Connection Parameter Update Request, rejecting")
-            # Reject it
+            logger.debug("[l2cap] Received a L2CAP Connection Parameter Update Request, accepting")
             self.send("ll", L2CAP_Hdr()/L2CAP_CmdHdr(
                 id=packet[L2CAP_CmdHdr].id
-            )/L2CAP_Connection_Parameter_Update_Response(move_result=1))
+            )/L2CAP_Connection_Parameter_Update_Response(move_result=0))
 
     def get_fragments(self, data: bytes):
         """Split data into fragments based on MTU
