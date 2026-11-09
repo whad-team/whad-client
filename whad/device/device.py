@@ -393,8 +393,13 @@ class Device:
         Examples:
             - `uart` or `uart0`: defines the first compatible UART device available
             - `uart1`: defines the second compatible UART device available
-            - `uart:/dev/ttyACMO`: defines a compatible UART device identified
-              by `/dev/tty/ACMO`
+            - `uart:/dev/ttyACM0`: defines the UART device on serial port
+              `/dev/ttyACM0`, even one that is not listed (e.g. a WHAD device
+              behind another USB-serial bridge)
+            - `uart:/dev/ttyACM0:230400`: same, at a given baud rate (115200
+              by default)
+            - `uart:/dev/serial/by-id/<name>`: the serial port a symbolic link
+              points to, as the link is resolved on POSIX systems
             - `ubertooth` or `ubertooth0`: defines the first available Ubertooth device
             - `ubertooth:11223344556677881122334455667788`: defines a Ubertooth
               device with serial number *11223344556677881122334455667788*

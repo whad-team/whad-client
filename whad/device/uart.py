@@ -6,6 +6,7 @@ parsing magic is performed in our WhadDevice class.
 """
 
 import os
+import re
 import select
 from time import sleep
 from queue import Empty
@@ -29,6 +30,10 @@ SUPPORTED_UART_DEVICES = (
     (0x10C4, 0xEA60, None, None), # Espressif ESP-32 CP2102 board
     (0x0483, 0x374e, None, None), # Nucleo WL55
 )
+
+# Largest baud rate pyserial takes on Linux (a C int): a larger trailing
+# field of a port name is not read as a baud rate
+MAX_BAUDRATE = 2**31 - 1
 
 def get_port_info(port):
     """Find information about a serial port
@@ -73,6 +78,9 @@ class Uart(Device):
 
         To prevent identifying serial ports which are not compatible with WHAD, it implements
         a filtering mechanism based on vid, pid, manufacturer and / or product.
+
+        A serial port left out by this filter can still be used by naming it,
+        see `create_inst()`.
         '''
 
         devices = []
@@ -82,6 +90,50 @@ class Uart(Device):
                 dev = Uart(uart_dev.device, baudrate=115200)
                 devices.append(dev)
         return devices
+
+    @classmethod
+    def create_inst(cls, interface_string):
+        '''
+        Returns the UART device an interface string designates:
+
+        - `uart`, `uart0`, `uart1`, ...: a supported device, by its index in
+          `list()`
+        - `uart:<port>`: the serial port `<port>` (e.g. `/dev/ttyACM0`, `COM3`)
+        - `uart:<port>:<baudrate>`: the same at a given baud rate (115200 by
+          default), e.g. `uart:/dev/ttyACM0:230400`
+
+        A named serial port is used regardless of its USB IDs, so that a WHAD
+        device behind a USB-serial bridge left out by `list()` can be opened.
+        On POSIX systems, a port that is a symbolic link (e.g. in
+        `/dev/serial/by-id/`) is resolved to the port it points to. A
+        trailing field that is not a baud rate from 1 to 2**31-1 is read as
+        part of the port name.
+        '''
+        named = re.match(
+            r'^' + cls.INTERFACE_NAME
+            + r':(?P<port>.+?)(:(?P<baudrate>[1-9]\d*))?$',
+            interface_string
+        )
+        if named is None:
+            return super().create_inst(interface_string)
+
+        port, baudrate = named.group('port', 'baudrate')
+        if baudrate is not None and int(baudrate) > MAX_BAUDRATE:
+            port, baudrate = f"{port}:{baudrate}", None
+
+        # comports() names a port by its device node, not by a link to it.
+        # Windows port names (COM3) are not looked up on the filesystem.
+        if os.name == 'posix' and os.path.islink(port):
+            port = os.path.realpath(port)
+
+        if baudrate is not None:
+            return cls(port, baudrate=int(baudrate))
+
+        # A supported device is returned as listed
+        for dev in cls.list():
+            if dev.identifier == port:
+                return dev
+        return cls(port)
 
 
     def __init__(self, port='/dev/ttyUSB0', baudrate=115200):
