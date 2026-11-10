@@ -74,3 +74,24 @@ This tool retrieves the following information:
 * *Device ID*: a unique identifier associated with the WHAD device
 * *Firmware information*: shows the firmware's URL, version and author(s)
 * *Available domains with supported roles and commands* for each of them
+
+Use a serial port that is not listed
+------------------------------------
+
+``whadup`` only lists the serial devices it recognizes by their USB IDs.
+A board running a WHAD firmware behind another USB-serial bridge can still be
+used by naming its serial port, optionally followed by a baud rate (115200 by
+default). This works with every tool accepting a WHAD interface:
+
+.. code-block:: text
+
+    # whadup uart:/dev/ttyACM0:230400
+    $ wsniff -i uart:/dev/ttyACM0:230400 ble -a
+
+On Linux and macOS, the port may also be named through a symbolic link, which
+is resolved to the port it points to. On Linux, the links udev creates in
+``/dev/serial/by-id/`` keep their name when the board is plugged in again:
+
+.. code-block:: text
+
+    # whadup uart:/dev/serial/by-id/usb-<vendor>_<product>_<serial>-if00:230400
