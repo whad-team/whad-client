@@ -6,6 +6,7 @@ parsing magic is performed in our WhadDevice class.
 """
 
 import os
+import re
 import select
 from time import sleep
 from queue import Empty
@@ -73,6 +74,9 @@ class Uart(Device):
 
         To prevent identifying serial ports which are not compatible with WHAD, it implements
         a filtering mechanism based on vid, pid, manufacturer and / or product.
+
+        A serial port left out by this filter can still be used by naming it,
+        see `create_inst()`.
         '''
 
         devices = []
@@ -82,6 +86,39 @@ class Uart(Device):
                 dev = Uart(uart_dev.device, baudrate=115200)
                 devices.append(dev)
         return devices
+
+    @classmethod
+    def create_inst(cls, interface_string):
+        '''
+        Returns the UART device an interface string designates:
+
+        - `uart`, `uart0`, `uart1`, ...: a supported device, by its index in
+          `list()`
+        - `uart:<port>`: the serial port `<port>` (e.g. `/dev/ttyACM0`, `COM3`)
+
+        A named serial port is used regardless of its USB IDs, so that a WHAD
+        device behind a USB-serial bridge left out by `list()` can be opened.
+        It is opened at the default baud rate, as listed devices are. On POSIX
+        systems, a port that is a symbolic link (e.g. in `/dev/serial/by-id/`)
+        is resolved to the port it points to.
+        '''
+        named = re.match(r'^' + cls.INTERFACE_NAME + r':(?P<port>.+)$',
+                         interface_string)
+        if named is None:
+            return super().create_inst(interface_string)
+
+        port = named.group('port')
+
+        # comports() names a port by its device node, not by a link to it.
+        # Windows port names (COM3) are not looked up on the filesystem.
+        if os.name == 'posix' and os.path.islink(port):
+            port = os.path.realpath(port)
+
+        # A supported device is returned as listed
+        for dev in cls.list():
+            if dev.identifier == port:
+                return dev
+        return cls(port)
 
 
     def __init__(self, port='/dev/ttyUSB0', baudrate=115200):
