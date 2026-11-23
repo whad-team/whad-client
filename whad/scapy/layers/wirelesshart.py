@@ -2,7 +2,7 @@ from scapy.packet import Packet, bind_layers, split_layers
 from scapy.fields import Field, ByteEnumField, StrLenField, StrFixedLenField, IntField, X3BytesField, XShortField, LEShortField, \
     FieldLenField, StrLenField, ConditionalField, PacketField, XByteField, XIntField,  SignedShortField, SignedByteField, \
     XShortEnumField, BitEnumField, BitField, ByteField, ShortField, XShortField, PacketListField, FieldListField, IEEEFloatField, \
-    ThreeBytesField, StrField
+    ThreeBytesField, StrField, XStrFixedLenField, XStrField
 #from whad.scapy.layers.wirelesshart_db import EXPANDED_DEVICE_TYPES, MANUFACTURERS_ID_CODES
 from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS, Dot15d4Data, MultipleTypeField
 from scapy.config import conf
@@ -228,12 +228,22 @@ class WirelessHart_Command_Hdr(Packet):
         XShortField("command_number", None), 
         ByteField("len", None)
     ]
-            
+
+    def post_dissect(self, s):
+        if self.len is not None and self.len > len(s):
+            raise ValueError("HART command len %d > %d remaining bytes" % (self.len, len(s)))
+        return s
+
     def post_build(self, p, pay):
         p += pay
         if self.len is None:
             p = p[:2] + pack("B", len(pay)) + p[3:]
         return p
+    
+    def extract_padding(self, s):
+        if self.len is None:
+            return s, b""
+        return s[:self.len], s[self.len:]
 
 
 class WirelessHart_Command_Request_Hdr(WirelessHart_Command_Hdr):
@@ -243,6 +253,31 @@ class WirelessHart_Command_Request_Hdr(WirelessHart_Command_Hdr):
 class WirelessHart_Command_Response_Hdr(WirelessHart_Command_Hdr):
     name = "Wireless Hart Command Response header"
     
+
+class WirelessHart_Dust_Publish_Payload(Packet):
+    name = "Dust Publish Payload (reverse)"
+    fields_desc = [
+        XStrFixedLenField("header", b"", length=11),
+        IntField("timestamp_s", None),
+        IntField("timestamp_us", None),
+        IntField("period_ms", None),
+        XByteField("unknown1", None),
+        XByteField("unknown2", None),
+        ShortField("value", None),
+    ]
+
+    def extract_padding(self, s):
+        return b"", s
+
+
+def _is_publish(pkt):
+    if pkt.acknowledged != 0 or pkt.response != 0:
+        return False
+    u = pkt.underlayer
+    while u is not None and not isinstance(u, WirelessHart_DataLink_Hdr):
+        u = u.underlayer
+    return u is not None and u.priority == 2
+
 
 class WirelessHart_Transport_Layer_Hdr(Packet):
     name = "Wireless Hart Transport Layer header"
@@ -273,6 +308,7 @@ class WirelessHart_Transport_Layer_Hdr(Packet):
 
         MultipleTypeField(
             [
+                (PacketListField("commands", [], WirelessHart_Dust_Publish_Payload), _is_publish),
                 (PacketListField("commands", [], WirelessHart_Command_Request_Hdr), lambda p:p.response == 0),
             ],
             PacketListField("commands", [], WirelessHart_Command_Response_Hdr)
@@ -283,9 +319,12 @@ class WirelessHart_Command_Payload(Packet):
     name = "Wireless Hart Command Payload"
     fields_desc = []
 
-      
-    def extract_padding(self, s):
-        return b'', s
+    def do_dissect(self, s):
+        fd = self.fields_desc
+        if fd and fd[0].name == "status" and len(s) == 1:
+            self.status = s[0]
+            return b""
+        return super().do_dissect(s)
 
    
 class WirelessHart_Report_Neighbor_Signal_Level_Command_Request(WirelessHart_Command_Payload):
@@ -295,6 +334,16 @@ class WirelessHart_Report_Neighbor_Signal_Level_Command_Request(WirelessHart_Com
         ByteField("neighbor_entries_number", None), 
     ]
 
+class Neighbor_Signal_Level(Packet):
+    name = "Neighbor Signal Level"
+    fields_desc = [
+        XShortField("nickname", None),
+        SignedByteField("rsl", None),
+    ]
+
+    def extract_padding(self, s):
+        return b"", s
+
 class WirelessHart_Report_Neighbor_Signal_Level_Command_Response(WirelessHart_Command_Payload):
     name = "Report Neighbor Signal Level Command Response"
     fields_desc = [
@@ -303,8 +352,8 @@ class WirelessHart_Report_Neighbor_Signal_Level_Command_Response(WirelessHart_Co
         ByteField("neighbor_table_index", None), 
         ByteField("neighbor_entries_number", None), 
         ByteField("neighbors_number", None), 
-        XShortField("nickname", None), 
-        SignedByteField("rsl", None)
+        PacketListField("neighbors", [], Neighbor_Signal_Level,
+                        count_from=lambda p: p.neighbor_entries_number),
     ]
 class WirelessHart_Write_Modify_Session_Command_Request(WirelessHart_Command_Payload):
     name = "Write / modify session Command Request"
@@ -646,7 +695,7 @@ class WirelessHart_Read_Packet_TTL_Response(WirelessHart_Command_Payload):
 
 
 class WirelessHart_Write_Timetable_Request(WirelessHart_Command_Payload):
-    name = "Request Timetable Request"
+    name = "Write Timetable Request"
     fields_desc = [
         ByteField("timetable_id", None),
         BitField("reserved", 0, 5), 
@@ -664,8 +713,9 @@ class WirelessHart_Write_Timetable_Request(WirelessHart_Command_Payload):
 
 
 class WirelessHart_Write_Timetable_Response(WirelessHart_Command_Payload):
-    name = "Request Timetable Response"
+    name = "Write Timetable Response"
     fields_desc = [
+        ByteField("status", None),
         ByteField("timetable_id", None),
         BitField("reserved", 0, 5), 
         BitField("intermittent", 0, 1), 
@@ -782,8 +832,8 @@ class WirelessHart_Report_Device_Health_Response(WirelessHart_Command_Payload):
         ByteField("status", None), 
         ShortField("generated_packets", None), 
         ShortField("terminated_packets", None),
-        ShortField("datalink_mic_failures", None),
-        ShortField("network_mic_failures", None), 
+        ByteField("datalink_mic_failures", None),
+        ByteField("network_mic_failures", None), 
         ByteEnumField("power_status", None, {
             0 : "nominal", 
             1 : "low", 
@@ -805,7 +855,7 @@ class WirelessHart_Report_Device_Health_Response(WirelessHart_Command_Payload):
 
     ]
     
-class Neighbor_Health(WirelessHart_Command_Response_Hdr):
+class Neighbor_Health(Packet):
     name = "Neighbor Health"
     fields_desc = [
         XShortField("neighbor_nickname", None),
@@ -815,6 +865,9 @@ class Neighbor_Health(WirelessHart_Command_Response_Hdr):
         ShortField("counter_failed_transmissions", None),
         ShortField("counter_packets_received_from_this_neighbor", None)
     ]
+
+    def extract_padding(self, s):
+        return b"", s
     
 class WirelessHart_Report_Neighbor_Health_List_Request(WirelessHart_Command_Payload):
     name = "Report Neighbor Health List Request"
@@ -827,12 +880,11 @@ class WirelessHart_Report_Neighbor_Health_List_Response(WirelessHart_Command_Pay
     name = "Report Neighbor Health List Response"
     fields_desc = [
         ByteField("status", None), 
+        ByteField("neighbor_table_index", None),
         ByteField("number_of_entries", None),
         ByteField("total_number_of_neighbors", None),
-        FieldListField("neighbors",
-               [],
-               PacketField("neighbor", Neighbor_Health(), Neighbor_Health),
-               count_from=lambda p:p.number_of_entries)    
+        PacketListField("neighbors", [], Neighbor_Health,
+               count_from=lambda p: p.number_of_entries)
     ]
 
 
@@ -894,6 +946,100 @@ class WirelessHart_Vendor_Specific_Dust_Networks_Ping_Response(WirelessHart_Comm
         ShortField("voltage", None), # / 100 -> val en V
 
     ]
+
+class WirelessHart_Dust_Vendor_Request(WirelessHart_Command_Payload):
+    name = "Dust vendor command Request (generic)"
+    fields_desc = [
+        XShortEnumField("expanded_device_type", None, EXPANDED_DEVICE_TYPES),
+        XStrField("data", b""),
+    ]
+
+
+class WirelessHart_Dust_Unlock_Request(WirelessHart_Command_Payload):
+    name = "Dust Unlock Request"
+    fields_desc = [
+        XShortEnumField("expanded_device_type", None, EXPANDED_DEVICE_TYPES),
+        XShortField("magic_number", None),
+        ByteField("f_unlock", None), 
+    ]
+
+
+class WirelessHart_Dust_Unlock_Response(WirelessHart_Command_Payload):
+    name = "Dust Unlock Response"
+    fields_desc = [ByteField("status", None),
+        XShortEnumField("expanded_device_type", None, EXPANDED_DEVICE_TYPES),
+        XShortField("magic_number", None), 
+        ByteField("f_unlock", None) 
+    ]
+
+class WirelessHart_Dust_device_Identifier_Request(WirelessHart_Command_Payload):
+    name = "Dust vendor device identifier Request"
+    fields_desc = [
+        XShortEnumField("expanded_device_type", None, EXPANDED_DEVICE_TYPES),
+    ]
+
+class WirelessHart_Dust_device_Identifier_Response(WirelessHart_Command_Payload):
+    name = "Dust vendor device identifier Response"
+    fields_desc = [
+        ByteField("status", None),
+        XShortEnumField("expanded_device_type", None, EXPANDED_DEVICE_TYPES),
+        ByteField("app_id", None),
+        ByteField("hardware_id", None),
+        ByteField("version_major", None),
+        ByteField("version_minor", None),
+        ByteField("version_patch", None), 
+        ShortField("version_build", None),
+        XStrField("data", b""),
+    ]
+
+
+class WirelessHart_Dust_Stack_identifier_Request(WirelessHart_Command_Payload):
+    name = "Dust Stack Identifier Request "
+    fields_desc = [
+        XShortEnumField("expanded_device_type", None, EXPANDED_DEVICE_TYPES),
+    ]
+
+
+class WirelessHart_Dust_Stack_identifier_Response(WirelessHart_Command_Payload):
+    name = "Dust Stack Identifier Response"
+    fields_desc = [
+        ByteField("status", None),
+        XShortEnumField("expanded_device_type", None, EXPANDED_DEVICE_TYPES),
+        ByteField("version_major", None),
+        ByteField("version_minor", None),
+        ByteField("version_patch", None), 
+        ShortField("version_build", None),
+        ShortField("flags", None),
+    ]
+
+
+class WirelessHart_Dust_Write_Flags_Request(WirelessHart_Command_Payload):
+    name = "Dust Write Mote Flags Request"
+    fields_desc = [
+        XShortEnumField("expanded_device_type", None, EXPANDED_DEVICE_TYPES),
+        IntField("flags", None),      
+    ]
+
+class WirelessHart_Dust_Write_Flags_Response(WirelessHart_Command_Payload):
+    name = "Dust Write Mote Flags Response"
+    fields_desc = [ByteField("status", None),
+        XShortEnumField("expanded_device_type", None, EXPANDED_DEVICE_TYPES),
+        IntField("flags", None),        
+    ] 
+
+
+class WirelessHart_Dust_Device_Health_Response(WirelessHart_Command_Payload):
+    name = "Dust Device Health Report 0xFC03 Response"
+    fields_desc = [
+        ByteField("status", None),
+        XShortEnumField("expanded_device_type", None, EXPANDED_DEVICE_TYPES),
+        XStrField("data", b""),
+    ]
+
+
+
+
+
 
 bind_layers(WirelessHart_DataLink_Hdr, WirelessHart_DataLink_Acknowledgement, pdu_type=0)
 bind_layers(WirelessHart_DataLink_Hdr, WirelessHart_DataLink_Advertisement, pdu_type=1)
@@ -972,6 +1118,21 @@ bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Vendor_Specific_Dust
 
 bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Vendor_Specific_Dust_Networks_Get_Value_From_Flash_Request, command_number=0xfc0f)
 bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Vendor_Specific_Dust_Networks_Get_Value_From_Flash_Response, command_number=0xfc0f)
+
+bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Dust_Unlock_Request, command_number=0xfc15)
+bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Dust_Unlock_Response, command_number=0xfc15)
+
+bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Dust_device_Identifier_Request, command_number=0xfc06)
+bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Dust_device_Identifier_Response, command_number=0xfc06)
+
+bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Dust_Stack_identifier_Request, command_number=0xfc23)
+bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Dust_Stack_identifier_Response, command_number=0xfc23)
+
+bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Dust_Write_Flags_Request, command_number=0xfc27)
+bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Dust_Write_Flags_Response, command_number=0xfc27)
+
+bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Dust_Vendor_Request, command_number=0xfc03)
+bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Dust_Device_Health_Response, command_number=0xfc03)
 
 # Monkey patch to add Wireless Hart support in Dot15d4 layer
 old_guess_payload_class = Dot15d4Data.guess_payload_class
